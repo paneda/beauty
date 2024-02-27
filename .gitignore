@@ -1,0 +1,7 @@
+build
+compile_commands.json
+
+#vim
+.tags
+Session.vim
+.gdb_history

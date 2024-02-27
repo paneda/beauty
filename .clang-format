@@ -1,0 +1,48 @@
+#https://clang.llvm.org/docs/ClangFormatStyleOptions.html
+
+BasedOnStyle: Google
+IndentWidth: 4
+
+Language: Cpp
+Standard: c++14
+ColumnLimit: 100
+AllowShortBlocksOnASingleLine: Empty
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+BinPackArguments: false
+BinPackParameters: false
+ShortNamespaceLines: 10
+
+#Do not rewrite comment lines (to preserve old commented out code structures)
+ReflowComments: false
+
+#Order is significant. First regex match assigned the group.
+IncludeCategories:
+  - Regex:           '^(<|")(boost|nlohmann|zmq|websocketpp)/.*'
+    Priority:        3
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '^(<|")(ofta|flytta|logga|edi|udp|dab|rtp|audio)/.*'
+    Priority:        5
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '^<ext/.*\.h>'
+    Priority:        2
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '^<.*\.h>'
+    Priority:        1
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '^<.*'
+    Priority:        2
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '.*/.*'
+    Priority:        4
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '.*'
+    Priority:        10
+    SortPriority:    0
+    CaseSensitive:   false
