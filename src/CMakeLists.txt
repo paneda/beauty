@@ -6,5 +6,7 @@ add_executable(asio_web
 	reply.cpp
 	mime_types.cpp
 	connection_manager.cpp
-	connection.cpp)
+	connection.cpp
+	file_handler.cpp
+)
 target_link_libraries(asio_web PRIVATE asio::asio)

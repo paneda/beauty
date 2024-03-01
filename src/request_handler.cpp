@@ -1,6 +1,5 @@
 #include "request_handler.hpp"
 
-#include <fstream>
 #include <sstream>
 #include <string>
 
@@ -11,7 +10,8 @@
 namespace http {
 namespace server {
 
-RequestHandler::RequestHandler(const std::string &docRoot) : docRoot_(docRoot) {}
+RequestHandler::RequestHandler(const std::string &docRoot, IFileHandler &fileHandler)
+    : docRoot_(docRoot), fileHandler_(fileHandler) {}
 
 void RequestHandler::handleRequest(const Request &req, Reply &rep) {
     // Decode url to path.
@@ -42,9 +42,8 @@ void RequestHandler::handleRequest(const Request &req, Reply &rep) {
     }
 
     // Open the file to send back.
-    std::string full_path = docRoot_ + requestPath;
-    std::ifstream is(full_path.c_str(), std::ios::in | std::ios::binary);
-    if (!is) {
+    std::string fullPath = docRoot_ + requestPath;
+    if (!fileHandler_.openFile(fullPath)) {
         rep = Reply::stockReply(Reply::not_found);
         return;
     }
@@ -52,7 +51,13 @@ void RequestHandler::handleRequest(const Request &req, Reply &rep) {
     // Fill out the reply to be sent to the client.
     rep.status = Reply::ok;
     char buf[512];
-    while (is.read(buf, sizeof(buf)).gcount() > 0) rep.content_.append(buf, is.gcount());
+    int readBytes = 0;
+    do {
+        readBytes = fileHandler_.readFile(buf, sizeof(buf));
+        rep.content_.append(buf, readBytes);
+    } while (readBytes > 0);
+    fileHandler_.closeFile();
+
     rep.headers_.resize(2);
     rep.headers_[0].name = "Content-Length";
     rep.headers_[0].value = std::to_string(rep.content_.size());

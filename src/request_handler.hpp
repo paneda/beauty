@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "file_handler.hpp"
+
 namespace http {
 namespace server {
 
@@ -15,7 +17,7 @@ class RequestHandler {
     RequestHandler &operator=(const RequestHandler &) = delete;
 
     /// Construct with a directory containing files to be served.
-    explicit RequestHandler(const std::string &doc_root);
+    explicit RequestHandler(const std::string &doc_root, IFileHandler &fileHandler);
 
     /// Handle a request and produce a reply.
     void handleRequest(const Request &req, Reply &rep);
@@ -23,6 +25,7 @@ class RequestHandler {
    private:
     /// The directory containing the files to be served.
     std::string docRoot_;
+    IFileHandler &fileHandler_;
 
     /// Perform URL-decoding on a string. Returns false if the encoding was
     /// invalid.

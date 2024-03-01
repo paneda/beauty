@@ -5,6 +5,7 @@
 
 #include "connection.hpp"
 #include "connection_manager.hpp"
+#include "i_file_handler.hpp"
 #include "request_handler.hpp"
 
 namespace http {
@@ -20,7 +21,8 @@ class Server {
     explicit Server(asio::io_context &ioContext,
                     const std::string &address,
                     const std::string &port,
-                    const std::string &docRoot);
+                    const std::string &docRoot,
+                    IFileHandler &fileHandler);
 
     uint16_t getBindedPort() const {
         return acceptor_.local_endpoint().port();

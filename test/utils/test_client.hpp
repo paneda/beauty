@@ -1,5 +1,6 @@
 #include <asio.hpp>
 #include <condition_variable>
+#include <deque>
 #include <functional>
 #include <iostream>
 #include <istream>
@@ -43,11 +44,13 @@ class TestClient {
             ReadContent,
             TimedOut
         } action_;
-        std::vector<std::string> content_;
+        std::deque<std::string> headers_;
+        std::vector<uint32_t> content_;
         int statusCode_;
     };
 
-    TestResult getResult() {
+    TestResult getResult(size_t expectedContentLength) {
+        expectedContentLength_ = expectedContentLength;
         std::unique_lock<std::mutex> lock(mutex_);
         auto test = gotResult_.wait_for(lock, std::chrono::seconds(2));
         if (test == std::cv_status::timeout) {
@@ -134,16 +137,20 @@ class TestClient {
             std::istream response_stream(&response_);
             std::string header;
             while (std::getline(response_stream, header) && header != "\r") {
-                std::cout << header << "\n";
+                testResult_.headers_.push_back(header);
             }
-            std::cout << "\n";
-
             testResult_.action_ = TestResult::ReadHeaders;
             gotResult_.notify_one();
 
             // Write whatever content we already have to output.
             if (response_.size() > 0) {
-                std::cout << &response_;
+                if (response_.size() == expectedContentLength_) {
+                    testResult_.content_.resize(response_.size() /
+                                                sizeof(decltype(testResult_.content_)::value_type));
+                    asio::buffer_copy(asio::buffer(testResult_.content_), response_.data());
+                    testResult_.action_ = TestResult::ReadContent;
+                    gotResult_.notify_one();
+                }
             }
 
             // Start reading remaining data until EOF.
@@ -159,11 +166,13 @@ class TestClient {
 
     void handleReadContent(const std::error_code& err) {
         if (!err) {
-            // Write all of the data that has been read so far.
-            std::cout << &response_;
-
-            testResult_.action_ = TestResult::ReadContent;
-            gotResult_.notify_one();
+            if (response_.size() == expectedContentLength_) {
+                testResult_.content_.resize(response_.size() /
+                                            sizeof(decltype(testResult_.content_)::value_type));
+                asio::buffer_copy(asio::buffer(testResult_.content_), response_.data());
+                testResult_.action_ = TestResult::ReadContent;
+                gotResult_.notify_one();
+            }
 
             // Continue reading remaining data until EOF.
             asio::async_read(
@@ -180,6 +189,7 @@ class TestClient {
     asio::ip::tcp::socket socket_;
     asio::streambuf request_;
     asio::streambuf response_;
+    size_t expectedContentLength_;
     std::mutex mutex_;
     std::condition_variable gotResult_;
     TestResult testResult_;

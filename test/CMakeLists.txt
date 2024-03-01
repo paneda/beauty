@@ -7,6 +7,7 @@ add_executable(asio_web_test
 	${CMAKE_SOURCE_DIR}/src/reply.cpp
 	${CMAKE_SOURCE_DIR}/src/request_handler.cpp
 	${CMAKE_SOURCE_DIR}/src/request_parser.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/utils/mock_file_handler.cpp
 )
 target_link_libraries(asio_web_test PRIVATE Catch2::Catch2WithMain asio::asio)
 include_directories(
