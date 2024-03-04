@@ -72,7 +72,7 @@ const char crlf[] = {'\r', '\n'};
 
 }  // namespace misc_strings
 
-std::vector<asio::const_buffer> Reply::toBuffers() {
+std::vector<asio::const_buffer> Reply::headerToBuffers() {
     std::vector<asio::const_buffer> buffers;
     buffers.push_back(status_strings::toBuffer(status));
     for (std::size_t i = 0; i < headers_.size(); ++i) {
@@ -83,6 +83,11 @@ std::vector<asio::const_buffer> Reply::toBuffers() {
         buffers.push_back(asio::buffer(misc_strings::crlf));
     }
     buffers.push_back(asio::buffer(misc_strings::crlf));
+    return buffers;
+}
+
+std::vector<asio::const_buffer> Reply::contentToBuffers() {
+    std::vector<asio::const_buffer> buffers;
     buffers.push_back(asio::buffer(content_));
     return buffers;
 }
@@ -166,42 +171,47 @@ const char service_unavailable[] =
     "<body><h1>503 Service Unavailable</h1></body>"
     "</html>";
 
-std::string to_string(Reply::status_type status) {
+std::vector<char> toArray(Reply::status_type status) {
     switch (status) {
         case Reply::ok:
-            return ok;
+            return std::vector<char>(ok, ok + sizeof(ok));
         case Reply::created:
-            return created;
+            return std::vector<char>(created, created + sizeof(created));
         case Reply::accepted:
-            return accepted;
+            return std::vector<char>(accepted, accepted + sizeof(accepted));
         case Reply::no_content:
-            return no_content;
+            return std::vector<char>(no_content, no_content + sizeof(no_content));
         case Reply::multiple_choices:
-            return multiple_choices;
+            return std::vector<char>(multiple_choices, multiple_choices + sizeof(multiple_choices));
         case Reply::moved_permanently:
-            return moved_permanently;
+            return std::vector<char>(moved_permanently,
+                                     moved_permanently + sizeof(moved_permanently));
         case Reply::moved_temporarily:
-            return moved_temporarily;
+            return std::vector<char>(moved_temporarily,
+                                     moved_temporarily + sizeof(moved_temporarily));
         case Reply::not_modified:
-            return not_modified;
+            return std::vector<char>(not_modified, not_modified + sizeof(not_modified));
         case Reply::bad_request:
-            return bad_request;
+            return std::vector<char>(bad_request, bad_request + sizeof(bad_request));
         case Reply::unauthorized:
-            return unauthorized;
+            return std::vector<char>(unauthorized, unauthorized + sizeof(unauthorized));
         case Reply::forbidden:
-            return forbidden;
+            return std::vector<char>(forbidden, forbidden + sizeof(forbidden));
         case Reply::not_found:
-            return not_found;
+            return std::vector<char>(not_found, not_found + sizeof(not_found));
         case Reply::internal_server_error:
-            return internal_server_error;
+            return std::vector<char>(internal_server_error,
+                                     internal_server_error + sizeof(internal_server_error));
         case Reply::not_implemented:
-            return not_implemented;
+            return std::vector<char>(not_implemented, not_implemented + sizeof(not_implemented));
         case Reply::bad_gateway:
-            return bad_gateway;
+            return std::vector<char>(bad_gateway, bad_gateway + sizeof(bad_gateway));
         case Reply::service_unavailable:
-            return service_unavailable;
+            return std::vector<char>(service_unavailable,
+                                     service_unavailable + sizeof(service_unavailable));
         default:
-            return internal_server_error;
+            return std::vector<char>(internal_server_error,
+                                     internal_server_error + sizeof(internal_server_error));
     }
 }
 
@@ -210,7 +220,7 @@ std::string to_string(Reply::status_type status) {
 Reply Reply::stockReply(Reply::status_type status) {
     Reply rep;
     rep.status = status;
-    rep.content_ = stock_replies::to_string(status);
+    rep.content_ = stock_replies::toArray(status);
     rep.headers_.resize(2);
     rep.headers_[0].name = "Content-Length";
     rep.headers_[0].value = std::to_string(rep.content_.size());

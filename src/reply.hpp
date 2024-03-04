@@ -34,13 +34,18 @@ struct Reply {
     /// The headers to be included in the reply.
     std::vector<header> headers_;
 
+    /// For http chunking (using content-length, not "http chunking")
+    bool useChunking_ = false;
+    bool finalChunk_ = false;
+
     /// The content to be sent in the reply.
-    std::string content_;
+    std::vector<char> content_;
 
     /// Convert the reply into a vector of buffers. The buffers do not own the
     /// underlying memory blocks, therefore the reply object must remain valid
     /// and not be changed until the write operation has completed.
-    std::vector<asio::const_buffer> toBuffers();
+    std::vector<asio::const_buffer> headerToBuffers();
+    std::vector<asio::const_buffer> contentToBuffers();
 
     /// Get a stock reply.
     static Reply stockReply(status_type status);

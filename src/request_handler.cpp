@@ -7,6 +7,10 @@
 #include "reply.hpp"
 #include "request.hpp"
 
+namespace {
+const size_t MaxChunkSize = 1024;
+}
+
 namespace http {
 namespace server {
 
@@ -48,21 +52,37 @@ void RequestHandler::handleRequest(const Request &req, Reply &rep) {
         return;
     }
 
-    // Fill out the reply to be sent to the client.
+    size_t fileSize = fileHandler_.getFileSize();
+    rep.useChunking_ = fileSize > MaxChunkSize;
     rep.status = Reply::ok;
-    char buf[512];
-    int readBytes = 0;
-    do {
-        readBytes = fileHandler_.readFile(buf, sizeof(buf));
-        rep.content_.append(buf, readBytes);
-    } while (readBytes > 0);
-    fileHandler_.closeFile();
+    // fill initial content
+    readChunkFromFile(rep);
+    if (!rep.useChunking_) {
+        // all data fits in initial content
+        fileHandler_.closeFile();
+    }
 
     rep.headers_.resize(2);
     rep.headers_[0].name = "Content-Length";
-    rep.headers_[0].value = std::to_string(rep.content_.size());
+    rep.headers_[0].value = std::to_string(fileSize);
     rep.headers_[1].name = "Content-Type";
     rep.headers_[1].value = mime_types::extensionToType(extension);
+}
+
+void RequestHandler::handleChunk(Reply &rep) {
+    size_t nrReadBytes = readChunkFromFile(rep);
+
+    if (nrReadBytes < MaxChunkSize) {
+        rep.finalChunk_ = true;
+        fileHandler_.closeFile();
+    }
+}
+
+size_t RequestHandler::readChunkFromFile(Reply &rep) {
+    rep.content_.resize(MaxChunkSize);
+    int nrReadBytes = fileHandler_.readFile(rep.content_.data(), rep.content_.size());
+    rep.content_.resize(nrReadBytes);
+    return nrReadBytes;
 }
 
 bool RequestHandler::urlDecode(const std::string &in, std::string &out) {

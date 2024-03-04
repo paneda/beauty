@@ -25,6 +25,10 @@ void MockFileHandler::closeFile() {
     readIt_ = mockFileData_.begin();
 }
 
+size_t MockFileHandler::getFileSize() {
+    return mockFileData_.size();
+}
+
 int MockFileHandler::readFile(char* buf, size_t maxSize) {
     countReadFileCalls_++;
     size_t leftBytes = std::distance(readIt_, mockFileData_.end());

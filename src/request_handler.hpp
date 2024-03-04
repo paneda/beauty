@@ -21,11 +21,14 @@ class RequestHandler {
 
     /// Handle a request and produce a reply.
     void handleRequest(const Request &req, Reply &rep);
+    void handleChunk(Reply &rep);
 
    private:
     /// The directory containing the files to be served.
     std::string docRoot_;
     IFileHandler &fileHandler_;
+
+    size_t readChunkFromFile(Reply &rep);
 
     /// Perform URL-decoding on a string. Returns false if the encoding was
     /// invalid.

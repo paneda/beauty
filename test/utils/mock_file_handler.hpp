@@ -13,6 +13,7 @@ class MockFileHandler : public http::server::IFileHandler {
 
     virtual bool openFile(std::string path) override;
     virtual void closeFile() override;
+    virtual size_t getFileSize() override;
     virtual int readFile(char* buf, size_t maxSize) override;
 
     void createMockFile(uint32_t size);

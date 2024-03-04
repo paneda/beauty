@@ -105,7 +105,24 @@ TEST_CASE("server connection", "[server]") {
         REQUIRE(res.headers_[1] == "Content-Type: text/html\r");
     }
 
-    SECTION("it should return content") {
+    SECTION("it should return content less than chunk size") {
+        openConnection(c, "/index.html", port);
+
+        const size_t fileSizeBytes = 10000;
+        mockFileHandler.createMockFile(fileSizeBytes);
+        std::future<TestClient::TestResult> futs[3] = {
+            createFutureResult(c), createFutureResult(c), createFutureResult(c, fileSizeBytes)};
+        c.sendRequest(GetRequest);
+        futs[0].get();             // status
+        futs[1].get();             // headers
+        auto res = futs[2].get();  // content
+        REQUIRE(res.action_ == TestClient::TestResult::ReadContent);
+        std::vector<uint32_t> expectedContent(fileSizeBytes / sizeof(uint32_t));
+        std::iota(expectedContent.begin(), expectedContent.end(), 0);
+        REQUIRE(res.content_ == expectedContent);
+    }
+
+    SECTION("it should return content larger than chunk size") {
         openConnection(c, "/index.html", port);
 
         const size_t fileSizeBytes = 10000;

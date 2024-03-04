@@ -1,6 +1,5 @@
 #pragma once
 #include <fstream>
-#include <string>
 
 #include "i_file_handler.hpp"
 
@@ -14,10 +13,12 @@ class FileHandler : public IFileHandler {
 
     virtual bool openFile(std::string path) override;
     virtual void closeFile() override;
+    virtual size_t getFileSize() override;
     virtual int readFile(char* buf, size_t maxSize) override;
 
    private:
     std::ifstream is_;
+    size_t fileSize_ = 0;
 };
 
 }  // namespace server

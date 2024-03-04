@@ -36,7 +36,8 @@ class Connection : public std::enable_shared_from_this<Connection> {
     void doRead();
 
     /// Perform an asynchronous write operation.
-    void doWrite();
+    void doWriteHeaders();
+    void doWriteContent();
 
     /// Socket for the connection.
     asio::ip::tcp::socket socket_;

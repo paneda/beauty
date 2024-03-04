@@ -12,6 +12,7 @@ class IFileHandler {
 
     virtual bool openFile(std::string path) = 0;
     virtual void closeFile() = 0;
+    virtual size_t getFileSize() = 0;
     virtual int readFile(char* buf, size_t maxSize) = 0;
 };
 
