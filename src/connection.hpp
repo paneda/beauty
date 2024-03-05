@@ -23,7 +23,8 @@ class Connection : public std::enable_shared_from_this<Connection> {
     /// Construct a connection with the given socket.
     explicit Connection(asio::ip::tcp::socket socket,
                         ConnectionManager &manager,
-                        RequestHandler &handler);
+                        RequestHandler &handler,
+                        unsigned connectionId);
 
     /// Start the first asynchronous operation for the connection.
     void start();
@@ -59,6 +60,8 @@ class Connection : public std::enable_shared_from_this<Connection> {
 
     /// The reply to be sent back to the client.
     Reply reply_;
+
+    unsigned connectionId_;
 };
 
 typedef std::shared_ptr<Connection> connection_ptr;

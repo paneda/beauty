@@ -12,8 +12,12 @@ namespace server {
 
 Connection::Connection(asio::ip::tcp::socket socket,
                        ConnectionManager &manager,
-                       RequestHandler &handler)
-    : socket_(std::move(socket)), connectionManager_(manager), requestHandler_(handler) {}
+                       RequestHandler &handler,
+                       unsigned connectionId)
+    : socket_(std::move(socket)),
+      connectionManager_(manager),
+      requestHandler_(handler),
+      connectionId_(connectionId) {}
 
 void Connection::start() {
     doRead();
@@ -33,7 +37,7 @@ void Connection::doRead() {
                     request_, buffer_.data(), buffer_.data() + bytes_transferred);
 
                 if (result == RequestParser::good) {
-                    requestHandler_.handleRequest(request_, reply_);
+                    requestHandler_.handleRequest(connectionId_, request_, reply_);
                     doWriteHeaders();
                 } else if (result == RequestParser::bad) {
                     reply_ = Reply::stockReply(Reply::bad_request);
@@ -71,7 +75,7 @@ void Connection::doWriteContent() {
                         socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
                         connectionManager_.stop(shared_from_this());
                     } else {
-                        requestHandler_.handleChunk(reply_);
+                        requestHandler_.handleChunk(connectionId_, reply_);
                         doWriteContent();
                     }
                 } else {

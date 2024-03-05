@@ -50,6 +50,8 @@ class Server {
 
     /// The handler for all incoming requests.
     RequestHandler requestHandler_;
+
+    unsigned connectionId_ = 0;
 };
 
 }  // namespace server

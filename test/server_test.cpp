@@ -70,7 +70,7 @@ TEST_CASE("server connection", "[server]") {
     }
 
     SECTION("it should return 404") {
-        mockFileHandler.setMockFailToOpenFile();
+        mockFileHandler.setMockFailToOpenFile(0);
         openConnection(c, "/index.html", port);
 
         auto fut = createFutureResult(c);
@@ -86,14 +86,14 @@ TEST_CASE("server connection", "[server]") {
         auto fut = createFutureResult(c);
         c.sendRequest(GetRequest);
         fut.get();
-        REQUIRE(mockFileHandler.getOpenFileCalls() == 1);
-        REQUIRE(mockFileHandler.getCloseFileCalls() == 1);
+        REQUIRE(mockFileHandler.getOpenFileCalls(0) == 1);
+        REQUIRE(mockFileHandler.getCloseFileCalls(0) == 1);
     }
 
     SECTION("it should return headers") {
         openConnection(c, "/index.html", port);
 
-        mockFileHandler.createMockFile(100);
+        mockFileHandler.createMockFile(0, 100);
         std::future<TestClient::TestResult> futs[2] = {createFutureResult(c),
                                                        createFutureResult(c)};
         c.sendRequest(GetRequest);
@@ -109,7 +109,7 @@ TEST_CASE("server connection", "[server]") {
         openConnection(c, "/index.html", port);
 
         const size_t fileSizeBytes = 10000;
-        mockFileHandler.createMockFile(fileSizeBytes);
+        mockFileHandler.createMockFile(0, fileSizeBytes);
         std::future<TestClient::TestResult> futs[3] = {
             createFutureResult(c), createFutureResult(c), createFutureResult(c, fileSizeBytes)};
         c.sendRequest(GetRequest);
@@ -126,7 +126,7 @@ TEST_CASE("server connection", "[server]") {
         openConnection(c, "/index.html", port);
 
         const size_t fileSizeBytes = 10000;
-        mockFileHandler.createMockFile(fileSizeBytes);
+        mockFileHandler.createMockFile(0, fileSizeBytes);
         std::future<TestClient::TestResult> futs[3] = {
             createFutureResult(c), createFutureResult(c), createFutureResult(c, fileSizeBytes)};
         c.sendRequest(GetRequest);

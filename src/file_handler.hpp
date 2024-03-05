@@ -1,5 +1,6 @@
 #pragma once
 #include <fstream>
+#include <unordered_map>
 
 #include "i_file_handler.hpp"
 
@@ -11,14 +12,17 @@ class FileHandler : public IFileHandler {
     FileHandler() = default;
     virtual ~FileHandler() = default;
 
-    virtual bool openFile(std::string path) override;
-    virtual void closeFile() override;
-    virtual size_t getFileSize() override;
-    virtual int readFile(char* buf, size_t maxSize) override;
+    virtual bool openFile(unsigned id, const std::string &path) override;
+    virtual void closeFile(unsigned id) override;
+    virtual size_t getFileSize(unsigned id) override;
+    virtual int readFile(unsigned id, char *buf, size_t maxSize) override;
 
    private:
-    std::ifstream is_;
-    size_t fileSize_ = 0;
+    struct OpenFile {
+        std::ifstream is_;
+        size_t fileSize_ = 0;
+    };
+    std::unordered_map<unsigned, OpenFile> openFiles_;
 };
 
 }  // namespace server

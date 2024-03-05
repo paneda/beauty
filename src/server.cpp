@@ -49,7 +49,7 @@ void Server::doAccept() {
 
         if (!ec) {
             connectionManager_.start(std::make_shared<Connection>(
-                std::move(socket), connectionManager_, requestHandler_));
+                std::move(socket), connectionManager_, requestHandler_, connectionId_++));
         }
 
         doAccept();

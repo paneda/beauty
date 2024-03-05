@@ -17,7 +17,7 @@ namespace server {
 RequestHandler::RequestHandler(const std::string &docRoot, IFileHandler &fileHandler)
     : docRoot_(docRoot), fileHandler_(fileHandler) {}
 
-void RequestHandler::handleRequest(const Request &req, Reply &rep) {
+void RequestHandler::handleRequest(unsigned connectionId, const Request &req, Reply &rep) {
     // Decode url to path.
     std::string requestPath;
     if (!urlDecode(req.uri_, requestPath)) {
@@ -47,19 +47,19 @@ void RequestHandler::handleRequest(const Request &req, Reply &rep) {
 
     // Open the file to send back.
     std::string fullPath = docRoot_ + requestPath;
-    if (!fileHandler_.openFile(fullPath)) {
+    if (!fileHandler_.openFile(connectionId, fullPath)) {
         rep = Reply::stockReply(Reply::not_found);
         return;
     }
 
-    size_t fileSize = fileHandler_.getFileSize();
+    size_t fileSize = fileHandler_.getFileSize(connectionId);
     rep.useChunking_ = fileSize > MaxChunkSize;
     rep.status = Reply::ok;
     // fill initial content
-    readChunkFromFile(rep);
+    readChunkFromFile(connectionId, rep);
     if (!rep.useChunking_) {
         // all data fits in initial content
-        fileHandler_.closeFile();
+        fileHandler_.closeFile(connectionId);
     }
 
     rep.headers_.resize(2);
@@ -69,18 +69,18 @@ void RequestHandler::handleRequest(const Request &req, Reply &rep) {
     rep.headers_[1].value = mime_types::extensionToType(extension);
 }
 
-void RequestHandler::handleChunk(Reply &rep) {
-    size_t nrReadBytes = readChunkFromFile(rep);
+void RequestHandler::handleChunk(unsigned connectionId, Reply &rep) {
+    size_t nrReadBytes = readChunkFromFile(connectionId, rep);
 
     if (nrReadBytes < MaxChunkSize) {
         rep.finalChunk_ = true;
-        fileHandler_.closeFile();
+        fileHandler_.closeFile(connectionId);
     }
 }
 
-size_t RequestHandler::readChunkFromFile(Reply &rep) {
+size_t RequestHandler::readChunkFromFile(unsigned connectionId, Reply &rep) {
     rep.content_.resize(MaxChunkSize);
-    int nrReadBytes = fileHandler_.readFile(rep.content_.data(), rep.content_.size());
+    int nrReadBytes = fileHandler_.readFile(connectionId, rep.content_.data(), rep.content_.size());
     rep.content_.resize(nrReadBytes);
     return nrReadBytes;
 }

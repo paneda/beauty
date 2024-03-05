@@ -20,15 +20,15 @@ class RequestHandler {
     explicit RequestHandler(const std::string &doc_root, IFileHandler &fileHandler);
 
     /// Handle a request and produce a reply.
-    void handleRequest(const Request &req, Reply &rep);
-    void handleChunk(Reply &rep);
+    void handleRequest(unsigned connectionId, const Request &req, Reply &rep);
+    void handleChunk(unsigned connectionId, Reply &rep);
 
    private:
     /// The directory containing the files to be served.
     std::string docRoot_;
     IFileHandler &fileHandler_;
 
-    size_t readChunkFromFile(Reply &rep);
+    size_t readChunkFromFile(unsigned connectionId, Reply &rep);
 
     /// Perform URL-decoding on a string. Returns false if the encoding was
     /// invalid.
