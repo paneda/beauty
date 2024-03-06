@@ -12,7 +12,11 @@ bool FileHandler::openFile(unsigned id, const std::string &path) {
     openFile.fileSize_ = openFile.is_.gcount();
     openFile.is_.clear();  //  since ignore will have set eof.
     openFile.is_.seekg(0, std::ios_base::beg);
-    return openFile.is_.is_open();
+    if (openFile.is_.is_open()) {
+        return true;
+    }
+    openFiles_.erase(id);
+    return false;
 }
 
 void FileHandler::closeFile(unsigned id) {

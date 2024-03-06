@@ -70,8 +70,8 @@ TEST_CASE("mock_file_handler.cpp", "[file_handler]") {
     size_t typeSize = sizeof(decltype(arr)::value_type);
     std::iota(arr.begin(), arr.end(), 0);
     MockFileHandler fh;
-    fh.createMockFile(0, 100 * typeSize);
-    fh.createMockFile(1, 100 * typeSize);
+    fh.createMockFile(100 * typeSize);
+    fh.createMockFile(100 * typeSize);
 
     SECTION("should open file") {
         // FileHandler fh;

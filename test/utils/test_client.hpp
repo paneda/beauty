@@ -13,7 +13,7 @@ class TestClient {
     TestClient(asio::io_context& ioc) : resolver_(ioc), socket_(ioc) {}
     TestClient(const TestClient&) = delete;
     TestClient& operator=(const TestClient&) = delete;
-    void connect(const std::string& server, const std::string& port, const std::string& path) {
+    void connect(const std::string& server, const std::string& port) {
         // Start an asynchronous resolve to translate the server and service names
         // into a list of endpoints.
         resolver_.async_resolve(server,
@@ -70,7 +70,7 @@ class TestClient {
                 endpoints,
                 std::bind(&TestClient::handleConnect, this, asio::placeholders::error));
         } else {
-            std::cout << "Error: " << err.message() << "\n";
+            std::cout << "Error1: " << err.message() << ":" << err.value() << "\n";
         }
     }
 
@@ -79,7 +79,7 @@ class TestClient {
             testResult_.action_ = TestResult::Opened;
             gotResult_.notify_one();
         } else {
-            std::cout << "Error: " << err.message() << "\n";
+            std::cout << "Error2: " << err.message() << ":" << err.value() << "\n";
         }
     }
 
@@ -94,7 +94,7 @@ class TestClient {
                 "\r\n",
                 std::bind(&TestClient::handleReadStatusLine, this, asio::placeholders::error));
         } else {
-            std::cout << "Error: " << err.message() << "\n";
+            std::cout << "Error3: " << err.message() << ":" << err.value() << "\n";
         }
     }
 
@@ -127,7 +127,7 @@ class TestClient {
                 "\r\n\r\n",
                 std::bind(&TestClient::handleReadHeaders, this, asio::placeholders::error));
         } else {
-            std::cout << "Error: " << err << "\n";
+            std::cout << "Error4: " << err.message() << ":" << err.value() << "\n";
         }
     }
 
@@ -160,7 +160,7 @@ class TestClient {
                 asio::transfer_at_least(1),
                 std::bind(&TestClient::handleReadContent, this, asio::placeholders::error));
         } else {
-            std::cout << "Error: " << err << "\n";
+            std::cout << "Error5: " << err.message() << ":" << err.value() << "\n";
         }
     }
 
@@ -181,7 +181,7 @@ class TestClient {
                 asio::transfer_at_least(1),
                 std::bind(&TestClient::handleReadContent, this, asio::placeholders::error));
         } else if (err != asio::error::eof) {
-            std::cout << "Error: " << err << "\n";
+            std::cout << "Error6: " << err.message() << ":" << err.value() << "\n";
         }
     }
 

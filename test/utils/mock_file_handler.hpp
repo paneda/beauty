@@ -17,31 +17,26 @@ class MockFileHandler : public http::server::IFileHandler {
     virtual size_t getFileSize(unsigned id) override;
     virtual int readFile(unsigned id, char* buf, size_t maxSize) override;
 
-    void createMockFile(unsigned id, uint32_t size);
-    void setMockFailToOpenFile(unsigned id);
+    void createMockFile(uint32_t size);
+    void setMockFailToOpenRequestedFile();
+    void setMockFailToOpenGzFile();
 
-    int getOpenFileCalls(unsigned id);
-    int getReadFileCalls(unsigned id);
-    int getCloseFileCalls(unsigned id);
+    int getOpenFileCalls();
+    int getReadFileCalls();
+    int getCloseFileCalls();
 
    private:
     struct OpenFile {
-        std::vector<char> mockFileData_;
         std::vector<char>::iterator readIt_;
         size_t fileSize_ = 0;
         bool isOpen_ = false;
-        int countOpenFileCalls_ = 0;
-        int countReadFileCalls_ = 0;
-        int countCloseFileCalls_ = 0;
-        bool mockFailToOpenFile_ = false;
     };
     std::unordered_map<unsigned, OpenFile> openFiles_;
-    // int countOpenFileCalls_ = 0;
-    // int countReadFileCalls_ = 0;
-    // int countCloseFileCalls_ = 0;
-    // bool isOpen_ = false;
-    // std::vector<char> mockFileData_;
-    // std::vector<char>::iterator readIt_;
-    // bool mockFailToOpenFile_ = false;
+    std::vector<char> mockFileData_;
+    int countOpenFileCalls_ = 0;
+    int countReadFileCalls_ = 0;
+    int countCloseFileCalls_ = 0;
+    bool mockFailToOpenRequestedFile_ = false;
+    bool mockFailToOpenGzFile_ = false;
 };
 

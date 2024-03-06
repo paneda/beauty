@@ -20,9 +20,9 @@ std::future<TestClient::TestResult> createFutureResult(TestClient& client,
     return fut;
 }
 
-TestClient::TestResult openConnection(TestClient& c, const std::string& path, uint16_t port) {
+TestClient::TestResult openConnection(TestClient& c, const std::string& host, uint16_t port) {
     auto fut = createFutureResult(c);
-    c.connect("127.0.0.1", std::to_string(port), path);
+    c.connect(host, std::to_string(port));
     return fut.get();
 }
 
@@ -32,6 +32,8 @@ TestClient::TestResult openConnection(TestClient& c, const std::string& path, ui
 // up until the EOF as the content.
 const std::string GetRequest =
     "GET /index.html HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: */*\r\nConnection: close\r\n\r\n";
+const std::string GetRequest2 =
+    "GET /main.css HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: */*\r\nConnection: close\r\n\r\n";
 // HTTTP
 const std::string MalformadRequest =
     "GET /index.html HTTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: */*\r\nConnection: close\r\n\r\n";
@@ -49,18 +51,18 @@ TEST_CASE("server should return binded port", "[server]") {
 TEST_CASE("server connection", "[server]") {
     asio::io_context ioc;
     MockFileHandler mockFileHandler;
+    TestClient c(ioc);
     http::server::Server s(ioc, "127.0.0.1", "0", ".", mockFileHandler);
     uint16_t port = s.getBindedPort();
     auto t = std::thread(&asio::io_context::run, &ioc);
-    TestClient c(ioc);
 
     SECTION("it should accept client connection") {
-        auto res = openConnection(c, "/index.html", port);
+        auto res = openConnection(c, "127.0.0.1", port);
         REQUIRE(res.action_ == TestClient::TestResult::Opened);
     }
 
     SECTION("it should return 400 for malformad requests") {
-        openConnection(c, "/index.html", port);
+        openConnection(c, "127.0.0.1", port);
 
         auto fut = createFutureResult(c);
         c.sendRequest(MalformadRequest);
@@ -70,8 +72,9 @@ TEST_CASE("server connection", "[server]") {
     }
 
     SECTION("it should return 404") {
-        mockFileHandler.setMockFailToOpenFile(0);
-        openConnection(c, "/index.html", port);
+        mockFileHandler.setMockFailToOpenRequestedFile();
+        mockFileHandler.setMockFailToOpenGzFile();
+        openConnection(c, "127.0.0.1", port);
 
         auto fut = createFutureResult(c);
         c.sendRequest(GetRequest);
@@ -81,19 +84,20 @@ TEST_CASE("server connection", "[server]") {
     }
 
     SECTION("it should call fileHandler open/close") {
-        openConnection(c, "/index.html", port);
+        openConnection(c, "127.0.0.1", port);
 
         auto fut = createFutureResult(c);
         c.sendRequest(GetRequest);
         fut.get();
-        REQUIRE(mockFileHandler.getOpenFileCalls(0) == 1);
-        REQUIRE(mockFileHandler.getCloseFileCalls(0) == 1);
+        REQUIRE(mockFileHandler.getOpenFileCalls() == 1);
+        REQUIRE(mockFileHandler.getCloseFileCalls() == 1);
     }
 
-    SECTION("it should return headers") {
-        openConnection(c, "/index.html", port);
+    SECTION("it should return correct headers when gz file not found") {
+        openConnection(c, "127.0.0.1", port);
 
-        mockFileHandler.createMockFile(0, 100);
+        mockFileHandler.createMockFile(100);
+        mockFileHandler.setMockFailToOpenGzFile();
         std::future<TestClient::TestResult> futs[2] = {createFutureResult(c),
                                                        createFutureResult(c)};
         c.sendRequest(GetRequest);
@@ -105,11 +109,27 @@ TEST_CASE("server connection", "[server]") {
         REQUIRE(res.headers_[1] == "Content-Type: text/html\r");
     }
 
+    SECTION("it should return correct headers when gz file is found") {
+        openConnection(c, "127.0.0.1", port);
+
+        mockFileHandler.createMockFile(100);
+        std::future<TestClient::TestResult> futs[2] = {createFutureResult(c),
+                                                       createFutureResult(c)};
+        c.sendRequest(GetRequest);
+        futs[0].get();             // status
+        auto res = futs[1].get();  // headers
+        REQUIRE(res.action_ == TestClient::TestResult::ReadHeaders);
+        REQUIRE(res.headers_.size() == 3);
+        REQUIRE(res.headers_[0] == "Content-Length: 100\r");
+        REQUIRE(res.headers_[1] == "Content-Type: text/html\r");
+        REQUIRE(res.headers_[2] == "Content-Encoding: gzip\r");
+    }
+
     SECTION("it should return content less than chunk size") {
-        openConnection(c, "/index.html", port);
+        openConnection(c, "127.0.0.1", port);
 
         const size_t fileSizeBytes = 10000;
-        mockFileHandler.createMockFile(0, fileSizeBytes);
+        mockFileHandler.createMockFile(fileSizeBytes);
         std::future<TestClient::TestResult> futs[3] = {
             createFutureResult(c), createFutureResult(c), createFutureResult(c, fileSizeBytes)};
         c.sendRequest(GetRequest);
@@ -123,10 +143,10 @@ TEST_CASE("server connection", "[server]") {
     }
 
     SECTION("it should return content larger than chunk size") {
-        openConnection(c, "/index.html", port);
+        openConnection(c, "127.0.0.1", port);
 
         const size_t fileSizeBytes = 10000;
-        mockFileHandler.createMockFile(0, fileSizeBytes);
+        mockFileHandler.createMockFile(fileSizeBytes);
         std::future<TestClient::TestResult> futs[3] = {
             createFutureResult(c), createFutureResult(c), createFutureResult(c, fileSizeBytes)};
         c.sendRequest(GetRequest);
@@ -141,5 +161,4 @@ TEST_CASE("server connection", "[server]") {
 
     ioc.stop();
     t.join();
-    // std::raise(SIGTERM);
 }
