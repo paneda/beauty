@@ -22,8 +22,16 @@ TEST_CASE("file_handler.cpp", "[file_handler]") {
     }
     FileHandler fh;
 
-    SECTION("should open file") {
+    SECTION("should open file idempotent") {
         REQUIRE(fh.openFile(0, "testfile.bin"));
+        REQUIRE(fh.openFile(0, "testfile.bin"));
+        REQUIRE(fh.openFile(0, "testfile.bin"));
+    }
+    SECTION("should close file idempotent") {
+        fh.openFile(0, "testfile.bin");
+        fh.closeFile(0);
+        fh.closeFile(0);
+        fh.closeFile(0);
     }
     SECTION("should provide correct size") {
         fh.openFile(0, "testfile.bin");

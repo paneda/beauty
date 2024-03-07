@@ -8,5 +8,6 @@ add_executable(asio_web
 	connection_manager.cpp
 	connection.cpp
 	file_handler.cpp
+	route_handler.cpp
 )
 target_link_libraries(asio_web PRIVATE asio::asio)

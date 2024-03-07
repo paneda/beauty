@@ -74,9 +74,9 @@ const char crlf[] = {'\r', '\n'};
 
 std::vector<asio::const_buffer> Reply::headerToBuffers() {
     std::vector<asio::const_buffer> buffers;
-    buffers.push_back(status_strings::toBuffer(status));
+    buffers.push_back(status_strings::toBuffer(status_));
     for (std::size_t i = 0; i < headers_.size(); ++i) {
-        header &h = headers_[i];
+        Header &h = headers_[i];
         buffers.push_back(asio::buffer(h.name));
         buffers.push_back(asio::buffer(misc_strings::name_value_separator));
         buffers.push_back(asio::buffer(h.value));
@@ -219,7 +219,7 @@ std::vector<char> toArray(Reply::status_type status) {
 
 Reply Reply::stockReply(Reply::status_type status) {
     Reply rep;
-    rep.status = status;
+    rep.status_ = status;
     rep.content_ = stock_replies::toArray(status);
     rep.headers_.resize(2);
     rep.headers_[0].name = "Content-Length";

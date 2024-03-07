@@ -14,7 +14,7 @@ struct Request {
     std::string uri_;
     int http_version_major_;
     int http_version_minor_;
-    std::vector<header> headers_;
+    std::vector<Header> headers_;
 };
 
 }  // namespace server

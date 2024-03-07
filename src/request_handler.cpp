@@ -3,84 +3,118 @@
 #include <sstream>
 #include <string>
 
+#include "file_handler.hpp"
+#include "header.hpp"
 #include "mime_types.hpp"
 #include "reply.hpp"
 #include "request.hpp"
+#include "route_handler.hpp"
 
 namespace {
 const size_t MaxChunkSize = 1024;
+void defaultAddHeaderCallback(std::vector<http::server::Header> &) {}
+
+bool startsWith(const std::string &s, const std::string &sv) {
+    return s.rfind(sv, 0) == 0;
+}
+
 }
 
 namespace http {
 namespace server {
 
-RequestHandler::RequestHandler(const std::string &docRoot, IFileHandler &fileHandler)
-    : docRoot_(docRoot), fileHandler_(fileHandler) {}
+RequestHandler::RequestHandler(const std::string &fileRoot,
+                               IFileHandler *fileHandler,
+                               const std::string &routeRoot,
+                               IRouteHandler *routeHandler)
+    : fileRoot_(fileRoot),
+      fileHandler_(fileHandler),
+      routeRoot_(routeRoot),
+      routeHandler_(routeHandler),
+      addHeaderCb_(defaultAddHeaderCallback) {}
+
+void RequestHandler::addHeaderHandler(addHeaderCallback cb) {
+    addHeaderCb_ = cb;
+}
 
 void RequestHandler::handleRequest(unsigned connectionId, const Request &req, Reply &rep) {
-    // Decode url to path.
+    // decode url to path
     std::string requestPath;
     if (!urlDecode(req.uri_, requestPath)) {
         rep = Reply::stockReply(Reply::bad_request);
         return;
     }
 
-    // Request path must be absolute and not contain "..".
+    // request path must be absolute and not contain ".."
     if (requestPath.empty() || requestPath[0] != '/' ||
         requestPath.find("..") != std::string::npos) {
         rep = Reply::stockReply(Reply::bad_request);
         return;
     }
 
-    // If path ends in slash (i.e. is a directory) then add "index.html".
+    // if path ends in slash (i.e. is a directory) then add "index.html"
     if (requestPath[requestPath.size() - 1] == '/') {
         requestPath += "index.html";
     }
 
-    // Determine the file extension.
-    std::size_t lastSlashPos = requestPath.find_last_of("/");
-    std::size_t lastDotPos = requestPath.find_last_of(".");
-    std::string extension;
-    if (lastDotPos != std::string::npos && lastDotPos > lastSlashPos) {
-        extension = requestPath.substr(lastDotPos + 1);
+    if (fileHandler_ == nullptr && routeHandler_ == nullptr) {
+        rep = Reply::stockReply(Reply::not_found);
+        return;
     }
 
-    // Open the file to send back.
-    std::string fullPath = docRoot_ + requestPath;
-    // If extension was found, attempt gz version first
-    bool foundGz = false;
-    if (!extension.empty()) {
-        std::string fullPathGz = fullPath;
-        lastDotPos = fullPath.find_last_of(".");
-        fullPathGz.replace(lastDotPos + 1, fullPathGz.npos, "gz");
-        if (fileHandler_.openFile(connectionId, fullPathGz)) {
-            foundGz = true;
+    std::string contentType;
+    size_t contentSize = 0;
+    // check route handler first and avoid invoking fileHandler_ if not needed
+    bool useRouteHandler = false;
+    if (routeHandler_ != nullptr) {
+        std::string actualPath = requestPath;
+        if (startsWith(requestPath, routeRoot_)) {
+            actualPath = requestPath.substr(routeRoot_.size(), std::string::npos);
+            routeHandler_->handleRoute(actualPath, rep, contentType);
+            contentSize = rep.content_.size();
+            useRouteHandler = true;
         }
     }
 
-    if (!foundGz) {
-        if (!fileHandler_.openFile(connectionId, fullPath)) {
+    bool isGz = false;
+    if (!useRouteHandler && fileHandler_ != nullptr) {
+        // determine the file extension.
+        std::string extension;
+        std::size_t lastSlashPos = requestPath.find_last_of("/");
+        std::size_t lastDotPos = requestPath.find_last_of(".");
+        if (lastDotPos != std::string::npos && lastDotPos > lastSlashPos) {
+            extension = requestPath.substr(lastDotPos + 1);
+            contentType = mime_types::extensionToType(extension);
+        }
+
+        // open the file to send back
+        std::string fullPath = fileRoot_ + requestPath;
+        // attempt .gz first
+        std::string fullPathGz = fullPath + ".gz";
+        if (fileHandler_->openFile(connectionId, fullPathGz)) {
+            isGz = true;
+        } else if (!fileHandler_->openFile(connectionId, fullPath)) {
             rep = Reply::stockReply(Reply::not_found);
             return;
         }
-    }
 
-    size_t fileSize = fileHandler_.getFileSize(connectionId);
-    rep.useChunking_ = fileSize > MaxChunkSize;
-    rep.status = Reply::ok;
-    // fill initial content
-    readChunkFromFile(connectionId, rep);
-    if (!rep.useChunking_) {
-        // all data fits in initial content
-        fileHandler_.closeFile(connectionId);
+        contentSize = fileHandler_->getFileSize(connectionId);
+        rep.useChunking_ = contentSize > MaxChunkSize;
+        rep.status_ = Reply::ok;
+        // fill initial content
+        readChunkFromFile(connectionId, rep);
+        if (!rep.useChunking_) {
+            // all data fits in initial content
+            fileHandler_->closeFile(connectionId);
+        }
     }
 
     rep.headers_.resize(2);
     rep.headers_[0].name = "Content-Length";
-    rep.headers_[0].value = std::to_string(fileSize);
+    rep.headers_[0].value = std::to_string(contentSize);
     rep.headers_[1].name = "Content-Type";
-    rep.headers_[1].value = mime_types::extensionToType(extension);
-    if (foundGz) {
+    rep.headers_[1].value = contentType;
+    if (isGz) {
         rep.headers_.push_back({"Content-Encoding", "gzip"});
     }
 }
@@ -90,13 +124,20 @@ void RequestHandler::handleChunk(unsigned connectionId, Reply &rep) {
 
     if (nrReadBytes < MaxChunkSize) {
         rep.finalChunk_ = true;
-        fileHandler_.closeFile(connectionId);
+        fileHandler_->closeFile(connectionId);
+    }
+}
+
+void RequestHandler::closeFile(unsigned connectionId) {
+    if (fileHandler_ != nullptr) {
+        fileHandler_->closeFile(connectionId);
     }
 }
 
 size_t RequestHandler::readChunkFromFile(unsigned connectionId, Reply &rep) {
     rep.content_.resize(MaxChunkSize);
-    int nrReadBytes = fileHandler_.readFile(connectionId, rep.content_.data(), rep.content_.size());
+    int nrReadBytes =
+        fileHandler_->readFile(connectionId, rep.content_.data(), rep.content_.size());
     rep.content_.resize(nrReadBytes);
     return nrReadBytes;
 }

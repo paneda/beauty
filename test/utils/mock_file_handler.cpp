@@ -1,4 +1,3 @@
-
 #include "mock_file_handler.hpp"
 
 #include <cstring>

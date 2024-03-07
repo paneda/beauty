@@ -45,7 +45,7 @@ class TestClient {
             TimedOut
         } action_;
         std::deque<std::string> headers_;
-        std::vector<uint32_t> content_;
+        std::vector<char> content_;
         int statusCode_;
     };
 
@@ -113,8 +113,12 @@ class TestClient {
             gotResult_.notify_one();
             testResult_.statusCode_ = statusCode;
 
-            if (!response_stream || httpVersion.substr(0, 5) != "HTTP/") {
-                std::cout << "Invalid response\n";
+            if (!response_stream) {
+                std::cout << "Invalid response stream\n";
+                return;
+            }
+            if (httpVersion.substr(0, 5) != "HTTP/") {
+                std::cout << "Invalid protocol\n";
                 return;
             }
             if (statusCode != 200) {

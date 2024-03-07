@@ -5,7 +5,7 @@
 namespace http {
 namespace server {
 
-struct header {
+struct Header {
     std::string name;
     std::string value;
 };

@@ -1,8 +1,13 @@
 #pragma once
+// clang-format off
+#include "environment.hpp"
+// clang-format on
 
 #include <asio.hpp>
+#include <memory>
 #include <string>
 
+#include "beauty_common.hpp"
 #include "connection.hpp"
 #include "connection_manager.hpp"
 #include "i_file_handler.hpp"
@@ -16,41 +21,37 @@ class Server {
     Server(const Server &) = delete;
     Server &operator=(const Server &) = delete;
 
-    /// Construct the server to listen on the specified TCP address and port,
-    /// and serve up files from the given directory.
+    // simple constructor, use for ESP32
+    explicit Server(asio::io_context &ioContext,
+                    uint16_t port,
+                    const std::string &fileRoot,
+                    IFileHandler *fileHandler,
+                    const std::string &routeRoot,
+                    IRouteHandler *routeHandler);
+
+    // advanced constructor use for OS:s supporting signal_set
     explicit Server(asio::io_context &ioContext,
                     const std::string &address,
                     const std::string &port,
-                    const std::string &docRoot,
-                    IFileHandler &fileHandler);
+                    const std::string &fileRoot,
+                    IFileHandler *fileHandler,
+                    const std::string &routeRoot,
+                    IRouteHandler *routeHandler);
 
-    uint16_t getBindedPort() const {
-        return acceptor_.local_endpoint().port();
-    }
+    uint16_t getBindedPort() const;
+
+    // handlers to be implemented by each specific project
+    void addHeaderHandler(addHeaderCallback cb);
 
    private:
-    /// Perform an asynchronous accept operation.
     void doAccept();
-
-    /// Wait for a request to stop the server.
     void doAwaitStop();
 
-    /// The io_context used to perform asynchronous operations.
-    // asio::io_context ioContext_;
-
-    /// The signal_set is used to register for process termination
-    /// notifications.
-    asio::signal_set signals_;
-
-    /// Acceptor used to listen for incoming connections.
+    std::shared_ptr<asio::signal_set> signals_;
     asio::ip::tcp::acceptor acceptor_;
-
-    /// The connection manager which owns all live connections.
     ConnectionManager connectionManager_;
-
-    /// The handler for all incoming requests.
     RequestHandler requestHandler_;
-
+    // each connection gets a unique internal id
     unsigned connectionId_ = 0;
 };
 

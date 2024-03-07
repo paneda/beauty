@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 
+#include "file_handler.hpp"
 #include "server.hpp"
 
 int main(int argc, char *argv[]) {
@@ -19,7 +20,7 @@ int main(int argc, char *argv[]) {
         asio::io_context ioc;
         // Initialise the server.
         http::server::FileHandler fileHandler;
-        http::server::Server s(ioc, argv[1], argv[2], argv[3], fileHandler);
+        http::server::Server s(ioc, argv[1], argv[2], argv[3], &fileHandler, "", nullptr);
 
         // Run the server until stopped.
         ioc.run();

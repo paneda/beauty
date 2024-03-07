@@ -1,4 +1,7 @@
 #pragma once
+// clang-format off
+#include "environment.hpp"
+// clang-format on
 
 #include <asio.hpp>
 #include <string>
@@ -9,9 +12,13 @@
 namespace http {
 namespace server {
 
-/// A reply to be sent to a client.
-struct Reply {
-    /// The status of the reply.
+class RequestHandler;
+
+class Reply {
+    friend class RequestHandler;
+    friend class Connection;
+
+   public:
     enum status_type {
         ok = 200,
         created = 201,
@@ -29,26 +36,27 @@ struct Reply {
         not_implemented = 501,
         bad_gateway = 502,
         service_unavailable = 503
-    } status;
+    } status_;
 
-    /// The headers to be included in the reply.
-    std::vector<header> headers_;
+    // content to be sent in the reply.
+    std::vector<char> content_;
 
-    /// For http chunking (using content-length, not "http chunking")
+    // helper to provide standard replies
+    static Reply stockReply(status_type status);
+
+   private:
+    // headers to be included in the reply.
+    std::vector<Header> headers_;
+
+    // for http chunking (using content-length, not "http chunking")
     bool useChunking_ = false;
     bool finalChunk_ = false;
 
-    /// The content to be sent in the reply.
-    std::vector<char> content_;
-
-    /// Convert the reply into a vector of buffers. The buffers do not own the
-    /// underlying memory blocks, therefore the reply object must remain valid
-    /// and not be changed until the write operation has completed.
+    // Convert the reply into a vector of buffers. The buffers do not own the
+    // underlying memory blocks, therefore the reply object must remain valid
+    // and not be changed until the write operation has completed.
     std::vector<asio::const_buffer> headerToBuffers();
     std::vector<asio::const_buffer> contentToBuffers();
-
-    /// Get a stock reply.
-    static Reply stockReply(status_type status);
 };
 
 }  // namespace server

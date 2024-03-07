@@ -1,4 +1,7 @@
 #pragma once
+// clang-format off
+#include "environment.hpp"
+// clang-format on
 
 #include "asio.hpp"
 
