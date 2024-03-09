@@ -5,32 +5,28 @@
 namespace http {
 namespace server {
 
-bool FileHandler::openFile(unsigned id, const std::string &path) {
-    OpenFile &openFile = openFiles_[id];
-    openFile.is_.open(path.c_str(), std::ios::in | std::ios::binary);
-    openFile.is_.ignore(std::numeric_limits<std::streamsize>::max());
-    openFile.fileSize_ = openFile.is_.gcount();
-    openFile.is_.clear();  //  since ignore will have set eof.
-    openFile.is_.seekg(0, std::ios_base::beg);
-    if (openFile.is_.is_open()) {
-        return true;
+size_t FileHandler::openFile(unsigned id, const std::string &path) {
+    std::ifstream &is = openFiles_[id];
+    is.open(path.c_str(), std::ios::in | std::ios::binary);
+    is.ignore(std::numeric_limits<std::streamsize>::max());
+    size_t fileSize = is.gcount();
+    is.clear();  //  since ignore will have set eof.
+    is.seekg(0, std::ios_base::beg);
+    if (is.is_open()) {
+        return fileSize;
     }
     openFiles_.erase(id);
-    return false;
+    return 0;
 }
 
 void FileHandler::closeFile(unsigned id) {
-    openFiles_[id].is_.close();
+    openFiles_[id].close();
     openFiles_.erase(id);
 }
 
-size_t FileHandler::getFileSize(unsigned id) {
-    return openFiles_[id].fileSize_;
-}
-
 int FileHandler::readFile(unsigned id, char *buf, size_t maxSize) {
-    openFiles_[id].is_.read(buf, maxSize);
-    return openFiles_[id].is_.gcount();
+    openFiles_[id].read(buf, maxSize);
+    return openFiles_[id].gcount();
 }
 
 }  // namespace server

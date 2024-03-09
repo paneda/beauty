@@ -22,9 +22,7 @@ TEST_CASE("file_handler.cpp", "[file_handler]") {
     }
     FileHandler fh;
 
-    SECTION("should open file idempotent") {
-        REQUIRE(fh.openFile(0, "testfile.bin"));
-        REQUIRE(fh.openFile(0, "testfile.bin"));
+    SECTION("should open file") {
         REQUIRE(fh.openFile(0, "testfile.bin"));
     }
     SECTION("should close file idempotent") {
@@ -34,8 +32,8 @@ TEST_CASE("file_handler.cpp", "[file_handler]") {
         fh.closeFile(0);
     }
     SECTION("should provide correct size") {
-        fh.openFile(0, "testfile.bin");
-        REQUIRE(fh.getFileSize(0) == arr.size() * typeSize);
+        size_t fileSize = fh.openFile(0, "testfile.bin");
+        REQUIRE(fileSize == arr.size() * typeSize);
     }
     SECTION("should read chunks") {
         fh.openFile(0, "testfile.bin");
@@ -82,16 +80,22 @@ TEST_CASE("mock_file_handler.cpp", "[file_handler]") {
     fh.createMockFile(100 * typeSize);
 
     SECTION("should open file") {
-        // FileHandler fh;
         REQUIRE(fh.openFile(0, "testfile.bin"));
     }
+    SECTION("should throw if call open() when already opened") {
+        REQUIRE(fh.openFile(0, "testfile.bin"));
+        REQUIRE_THROWS_AS(fh.openFile(0, "testfile2.bin"), std::runtime_error);
+    }
     SECTION("should provide correct size") {
-        // FileHandler fh;
-        fh.openFile(0, "testfile.bin");
-        REQUIRE(fh.getFileSize(0) == arr.size() * typeSize);
+        size_t fileSize = fh.openFile(0, "testfile.bin");
+        REQUIRE(fileSize == arr.size() * typeSize);
+    }
+    SECTION("should throw if call read() before opened") {
+        std::vector<uint32_t> readData(10);
+        REQUIRE_THROWS_AS(fh.readFile(0, (char*)readData.data(), readData.size() * typeSize),
+                          std::runtime_error);
     }
     SECTION("should read chunks") {
-        // FileHandler fh;
         fh.openFile(0, "testfile.bin");
         std::vector<uint32_t> readData(10);
 

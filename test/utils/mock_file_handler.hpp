@@ -12,9 +12,8 @@ class MockFileHandler : public http::server::IFileHandler {
     MockFileHandler() = default;
     virtual ~MockFileHandler() = default;
 
-    virtual bool openFile(unsigned id, const std::string& path) override;
+    virtual size_t openFile(unsigned id, const std::string& path) override;
     virtual void closeFile(unsigned id) override;
-    virtual size_t getFileSize(unsigned id) override;
     virtual int readFile(unsigned id, char* buf, size_t maxSize) override;
 
     void createMockFile(uint32_t size);
@@ -28,7 +27,6 @@ class MockFileHandler : public http::server::IFileHandler {
    private:
     struct OpenFile {
         std::vector<char>::iterator readIt_;
-        size_t fileSize_ = 0;
         bool isOpen_ = false;
     };
     std::unordered_map<unsigned, OpenFile> openFiles_;

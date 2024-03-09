@@ -15,8 +15,9 @@ bool ends_with(std::string const& value, std::string const& ending) {
 }
 }
 
-bool MockFileHandler::openFile(unsigned id, const std::string& path) {
+size_t MockFileHandler::openFile(unsigned id, const std::string& path) {
     OpenFile& openFile = openFiles_[id];
+    countOpenFileCalls_++;
     if (openFile.isOpen_) {
         throw std::runtime_error("MockFileHandler test error: File already opened");
     }
@@ -24,32 +25,20 @@ bool MockFileHandler::openFile(unsigned id, const std::string& path) {
     if (ends_with(path, "gz")) {
         if (mockFailToOpenGzFile_) {
             openFiles_.erase(id);
-            return false;
+            return 0;
         }
     } else if (mockFailToOpenRequestedFile_) {
         openFiles_.erase(id);
-        return false;
+        return 0;
     }
     openFile.readIt_ = mockFileData_.begin();
     openFile.isOpen_ = true;
-    openFile.fileSize_ = mockFileData_.size();
-    countOpenFileCalls_++;
-    return openFile.isOpen_;
+    return mockFileData_.size();
 }
 
 void MockFileHandler::closeFile(unsigned id) {
-    if (!openFiles_[id].isOpen_) {
-        throw std::runtime_error("MockFileHandler test error: closeFile() called on closed file");
-    }
     countCloseFileCalls_++;
     openFiles_.erase(id);
-}
-
-size_t MockFileHandler::getFileSize(unsigned id) {
-    if (!openFiles_[id].isOpen_) {
-        throw std::runtime_error("MockFileHandler test error: getFileSize() called on closed file");
-    }
-    return openFiles_[id].fileSize_;
 }
 
 int MockFileHandler::readFile(unsigned id, char* buf, size_t maxSize) {

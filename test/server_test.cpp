@@ -152,9 +152,20 @@ TEST_CASE("server with file handler", "[server]") {
         REQUIRE(res.statusCode_ == 404);
     }
 
-    SECTION("it should call fileHandler open/close") {
+    SECTION("it should call fileHandler open/close when no file exists") {
         openConnection(c, "127.0.0.1", port);
 
+        auto fut = createFutureResult(c);
+        c.sendRequest(GetIndexRequest);
+        fut.get();
+        REQUIRE(mockFileHandler.getOpenFileCalls() == 2);
+        REQUIRE(mockFileHandler.getCloseFileCalls() == 2);
+    }
+
+    SECTION("it should call fileHandler open/close when file exists") {
+        openConnection(c, "127.0.0.1", port);
+
+        mockFileHandler.createMockFile(100);
         auto fut = createFutureResult(c);
         c.sendRequest(GetIndexRequest);
         fut.get();

@@ -91,14 +91,19 @@ void RequestHandler::handleRequest(unsigned connectionId, const Request &req, Re
         std::string fullPath = fileRoot_ + requestPath;
         // attempt .gz first
         std::string fullPathGz = fullPath + ".gz";
-        if (fileHandler_->openFile(connectionId, fullPathGz)) {
+        contentSize = fileHandler_->openFile(connectionId, fullPathGz);
+        if (contentSize > 0) {
             isGz = true;
-        } else if (!fileHandler_->openFile(connectionId, fullPath)) {
-            rep = Reply::stockReply(Reply::not_found);
-            return;
+        } else {
+            fileHandler_->closeFile(connectionId);
+            contentSize = fileHandler_->openFile(connectionId, fullPath);
+            if (contentSize == 0) {
+                fileHandler_->closeFile(connectionId);
+                rep = Reply::stockReply(Reply::not_found);
+                return;
+            }
         }
 
-        contentSize = fileHandler_->getFileSize(connectionId);
         rep.useChunking_ = contentSize > MaxChunkSize;
         rep.status_ = Reply::ok;
         // fill initial content
