@@ -8,10 +8,15 @@
 #include <thread>
 
 #include "utils/mock_file_handler.hpp"
-#include "utils/mock_route_handler.hpp"
+#include "utils/mock_not_found_handler.hpp"
+#include "utils/mock_request_handler.hpp"
 #include "utils/test_client.hpp"
 
+#include "request_handler.hpp"
+
 using namespace std::literals::chrono_literals;
+using namespace http::server;
+
 namespace {
 std::future<TestClient::TestResult> createFutureResult(TestClient& client,
                                                        size_t expectedContentLength = 0) {
@@ -27,9 +32,13 @@ TestClient::TestResult openConnection(TestClient& c, const std::string& host, ui
     return fut.get();
 }
 
-std::vector<char> converToCharVec(std::vector<uint32_t> v) {
+std::vector<char> convertToCharVec(const std::vector<uint32_t> v) {
     std::vector<char> ret(v.size() * sizeof(decltype(v)::value_type));
     std::memcpy(ret.data(), v.data(), v.size() * sizeof(decltype(v)::value_type));
+    return ret;
+}
+std::vector<char> convertToCharVec(const std::string& s) {
+    std::vector<char> ret(s.begin(), s.end());
     return ret;
 }
 
@@ -46,7 +55,7 @@ const std::string GetApiRequest =
 
 TEST_CASE("server should return binded port", "[server]") {
     asio::io_context ioc;
-    http::server::Server s(ioc, "127.0.0.1", "0", "", nullptr, "", nullptr);
+    Server s(ioc, "127.0.0.1", "0", nullptr);
     uint16_t port = s.getBindedPort();
     REQUIRE(port != 0);
 }
@@ -54,7 +63,7 @@ TEST_CASE("server should return binded port", "[server]") {
 TEST_CASE("contruction", "[server]") {
     SECTION("it should allow connection with simple constructor") {
         asio::io_context ioc;
-        http::server::Server s(ioc, 0, "", nullptr, "", nullptr);
+        Server s(ioc, 0, nullptr);
         uint16_t port = s.getBindedPort();
         REQUIRE(port != 0);
 
@@ -68,7 +77,7 @@ TEST_CASE("contruction", "[server]") {
     }
     SECTION("it should allow connection with advanced constructor", "[server]") {
         asio::io_context ioc;
-        http::server::Server s(ioc, "127.0.0.1", "0", "", nullptr, "", nullptr);
+        Server s(ioc, "127.0.0.1", "0", nullptr);
         uint16_t port = s.getBindedPort();
         REQUIRE(port != 0);
 
@@ -87,7 +96,7 @@ TEST_CASE("server without handlers", "[server]") {
     TestClient c(ioc);
 
     MockFileHandler mockFileHandler;
-    http::server::Server s(ioc, "127.0.0.1", "0", "", nullptr, "", nullptr);
+    Server s(ioc, "127.0.0.1", "0", nullptr);
     uint16_t port = s.getBindedPort();
     auto t = std::thread(&asio::io_context::run, &ioc);
 
@@ -136,13 +145,12 @@ TEST_CASE("server with file handler", "[server]") {
     TestClient c(ioc);
 
     MockFileHandler mockFileHandler;
-    http::server::Server s(ioc, "127.0.0.1", "0", ".", &mockFileHandler, "", nullptr);
-    uint16_t port = s.getBindedPort();
+    Server dut(ioc, "127.0.0.1", "0", &mockFileHandler);
+    uint16_t port = dut.getBindedPort();
     auto t = std::thread(&asio::io_context::run, &ioc);
 
     SECTION("it should return 404") {
         mockFileHandler.setMockFailToOpenRequestedFile();
-        mockFileHandler.setMockFailToOpenGzFile();
         openConnection(c, "127.0.0.1", port);
 
         auto fut = createFutureResult(c);
@@ -152,14 +160,14 @@ TEST_CASE("server with file handler", "[server]") {
         REQUIRE(res.statusCode_ == 404);
     }
 
-    SECTION("it should call fileHandler open/close when no file exists") {
+    SECTION("it should call fileHandler open but not close when no file exists") {
         openConnection(c, "127.0.0.1", port);
 
         auto fut = createFutureResult(c);
         c.sendRequest(GetIndexRequest);
         fut.get();
-        REQUIRE(mockFileHandler.getOpenFileCalls() == 2);
-        REQUIRE(mockFileHandler.getCloseFileCalls() == 2);
+        REQUIRE(mockFileHandler.getOpenFileCalls() == 1);
+        REQUIRE(mockFileHandler.getCloseFileCalls() == 0);
     }
 
     SECTION("it should call fileHandler open/close when file exists") {
@@ -173,11 +181,10 @@ TEST_CASE("server with file handler", "[server]") {
         REQUIRE(mockFileHandler.getCloseFileCalls() == 1);
     }
 
-    SECTION("it should return correct headers when gz file not found") {
+    SECTION("it should return correct headers") {
         openConnection(c, "127.0.0.1", port);
 
         mockFileHandler.createMockFile(100);
-        mockFileHandler.setMockFailToOpenGzFile();
         std::future<TestClient::TestResult> futs[2] = {createFutureResult(c),
                                                        createFutureResult(c)};
         c.sendRequest(GetIndexRequest);
@@ -187,22 +194,6 @@ TEST_CASE("server with file handler", "[server]") {
         REQUIRE(res.headers_.size() == 2);
         REQUIRE(res.headers_[0] == "Content-Length: 100\r");
         REQUIRE(res.headers_[1] == "Content-Type: text/html\r");
-    }
-
-    SECTION("it should return correct headers when gz file is found") {
-        openConnection(c, "127.0.0.1", port);
-
-        mockFileHandler.createMockFile(100);
-        std::future<TestClient::TestResult> futs[2] = {createFutureResult(c),
-                                                       createFutureResult(c)};
-        c.sendRequest(GetIndexRequest);
-        futs[0].get();             // status
-        auto res = futs[1].get();  // headers
-        REQUIRE(res.action_ == TestClient::TestResult::ReadHeaders);
-        REQUIRE(res.headers_.size() == 3);
-        REQUIRE(res.headers_[0] == "Content-Length: 100\r");
-        REQUIRE(res.headers_[1] == "Content-Type: text/html\r");
-        REQUIRE(res.headers_[2] == "Content-Encoding: gzip\r");
     }
 
     SECTION("it should return content less than chunk size") {
@@ -219,7 +210,7 @@ TEST_CASE("server with file handler", "[server]") {
         REQUIRE(res.action_ == TestClient::TestResult::ReadContent);
         std::vector<uint32_t> expectedContent(fileSizeBytes / sizeof(uint32_t));
         std::iota(expectedContent.begin(), expectedContent.end(), 0);
-        REQUIRE(res.content_ == converToCharVec(expectedContent));
+        REQUIRE(res.content_ == convertToCharVec(expectedContent));
     }
 
     SECTION("it should return content larger than chunk size") {
@@ -236,7 +227,54 @@ TEST_CASE("server with file handler", "[server]") {
         REQUIRE(res.action_ == TestClient::TestResult::ReadContent);
         std::vector<uint32_t> expectedContent(fileSizeBytes / sizeof(uint32_t));
         std::iota(expectedContent.begin(), expectedContent.end(), 0);
-        REQUIRE(res.content_ == converToCharVec(expectedContent));
+        REQUIRE(res.content_ == convertToCharVec(expectedContent));
+    }
+    SECTION("it should return reply from fileNotFoundHandler") {
+        std::string mockedContent = "This is mocked content";
+        MockNotFoundHandler mockNotFoundHandler;
+        mockNotFoundHandler.setMockedContent(mockedContent);
+        mockFileHandler.setMockFailToOpenRequestedFile();
+        dut.setFileNotFoundHandler(std::bind(
+            &MockNotFoundHandler::handleNotFound, &mockNotFoundHandler, std::placeholders::_1));
+        openConnection(c, "127.0.0.1", port);
+
+        std::future<TestClient::TestResult> futs[3] = {createFutureResult(c),
+                                                       createFutureResult(c),
+                                                       createFutureResult(c, mockedContent.size())};
+
+        c.sendRequest(GetIndexRequest);
+
+        futs[0].get();             // status
+        futs[1].get();             // headers
+        auto res = futs[2].get();  // content
+        REQUIRE(res.action_ == TestClient::TestResult::ReadContent);
+        REQUIRE(mockNotFoundHandler.getNoCalls() == 1);
+        REQUIRE(res.statusCode_ == 200);
+        REQUIRE(res.headers_.size() == 2);
+        REQUIRE(res.headers_[0] == "Content-Length: 22\r");
+        REQUIRE(res.headers_[1] == "Content-Type: text/plain\r");
+        REQUIRE(res.content_ == convertToCharVec(mockedContent));
+    }
+    SECTION("it should call addFileHeaderHandler when defined") {
+        openConnection(c, "127.0.0.1", port);
+        dut.addFileHeaderHandler([](std::vector<Header>& headers) {
+            headers.push_back({"Content-Encoding", "gzip"});
+        });
+
+        const size_t fileSizeBytes = 100;
+        mockFileHandler.createMockFile(fileSizeBytes);
+        std::future<TestClient::TestResult> futs[3] = {
+            createFutureResult(c), createFutureResult(c), createFutureResult(c, fileSizeBytes)};
+        c.sendRequest(GetIndexRequest);
+        futs[0].get();             // status
+        futs[1].get();             // headers
+        auto res = futs[2].get();  // content
+        REQUIRE(res.action_ == TestClient::TestResult::ReadContent);
+        REQUIRE(res.statusCode_ == 200);
+        REQUIRE(res.headers_.size() == 3);
+        REQUIRE(res.headers_[0] == "Content-Length: 100\r");
+        REQUIRE(res.headers_[1] == "Content-Type: text/html\r");
+        REQUIRE(res.headers_[2] == "Content-Encoding: gzip\r");
     }
 
     ioc.stop();
@@ -247,12 +285,17 @@ TEST_CASE("server with route handler", "[server]") {
     asio::io_context ioc;
     TestClient c(ioc);
 
-    http::server::MockRouteHandler mockRouteHandler;
-    http::server::Server s(ioc, "127.0.0.1", "0", "", nullptr, "/api", &mockRouteHandler);
-    uint16_t port = s.getBindedPort();
+    MockRequestHandler mockRequestHandler;
+    Server dut(ioc, "127.0.0.1", "0", nullptr);
+    uint16_t port = dut.getBindedPort();
+    dut.addRequestHandler(std::bind(&MockRequestHandler::handleRequest,
+                                    &mockRequestHandler,
+                                    std::placeholders::_1,
+                                    std::placeholders::_2));
     auto t = std::thread(&asio::io_context::run, &ioc);
 
-    SECTION("it should respond with 500 when route handler not implemented") {
+    SECTION("it should call request handler when defined") {
+        mockRequestHandler.setMockedReturnVal(false);
         openConnection(c, "127.0.0.1", port);
 
         auto fut = createFutureResult(c);
@@ -260,12 +303,11 @@ TEST_CASE("server with route handler", "[server]") {
         c.sendRequest(GetApiRequest);
 
         auto res = fut.get();
-        REQUIRE(res.action_ == TestClient::TestResult::ReadRequestStatus);
-        REQUIRE(res.statusCode_ == 500);
+        REQUIRE(mockRequestHandler.getNoCalls() == 1);
     }
-
     SECTION("it should respond with status code") {
-        mockRouteHandler.setMockedReponseStatus(http::server::Reply::status_type::not_found);
+        mockRequestHandler.setMockedReturnVal(false);
+        mockRequestHandler.setMockedReply(Reply::status_type::unauthorized, "some content");
         openConnection(c, "127.0.0.1", port);
 
         auto fut = createFutureResult(c);
@@ -274,14 +316,11 @@ TEST_CASE("server with route handler", "[server]") {
 
         auto res = fut.get();
         REQUIRE(res.action_ == TestClient::TestResult::ReadRequestStatus);
-        REQUIRE(res.statusCode_ == 404);
+        REQUIRE(res.statusCode_ == 401);
     }
     SECTION("it should respond with headers") {
-        std::string content = "this is some content";
-        std::vector<char> expectedContent(content.begin(), content.end());
-
-        mockRouteHandler.setMockedReponseStatus(http::server::Reply::status_type::ok);
-        mockRouteHandler.setMockedContent(content);
+        mockRequestHandler.setMockedReply(Reply::status_type::ok, "some content");
+        mockRequestHandler.setMockedReturnVal(false);
         openConnection(c, "127.0.0.1", port);
 
         std::future<TestClient::TestResult> futs[2] = {createFutureResult(c),
@@ -290,37 +329,67 @@ TEST_CASE("server with route handler", "[server]") {
         c.sendRequest(GetApiRequest);
 
         auto res = futs[0].get();  // status
-        REQUIRE(res.action_ == TestClient::TestResult::ReadRequestStatus);
-        REQUIRE(res.statusCode_ == 200);
-        res = futs[1].get();  // headers
+        res = futs[1].get();       // headers
         REQUIRE(res.action_ == TestClient::TestResult::ReadHeaders);
+        REQUIRE(res.statusCode_ == 200);
         REQUIRE(res.headers_.size() == 2);
-        REQUIRE(res.headers_[0] == "Content-Length: 20\r");
-        REQUIRE(res.headers_[1] == "Content-Type: application/json\r");
+        REQUIRE(res.headers_[0] == "Content-Length: 12\r");
+        REQUIRE(res.headers_[1] == "Content-Type: text/plain\r");
     }
     SECTION("it should respond with content") {
         std::string content = "this is some content";
-        std::vector<char> expectedContent(content.begin(), content.end());
 
-        mockRouteHandler.setMockedReponseStatus(http::server::Reply::status_type::ok);
-        mockRouteHandler.setMockedContent(content);
+        mockRequestHandler.setMockedReply(Reply::status_type::ok, content);
+        mockRequestHandler.setMockedReturnVal(false);
         openConnection(c, "127.0.0.1", port);
 
         std::future<TestClient::TestResult> futs[3] = {
-            createFutureResult(c),
-            createFutureResult(c),
-            createFutureResult(c, expectedContent.size())};
+            createFutureResult(c), createFutureResult(c), createFutureResult(c, content.size())};
 
         c.sendRequest(GetApiRequest);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         futs[0].get();  // status
         futs[1].get();  // headers
         auto res = futs[2].get();
         REQUIRE(res.action_ == TestClient::TestResult::ReadContent);
-        REQUIRE(res.content_ == expectedContent);
+        REQUIRE(res.content_ == convertToCharVec(content));
+    }
+    SECTION("it should call all handlers if they return true") {
+        MockRequestHandler mockRequestHandler2;
+        dut.addRequestHandler(std::bind(&MockRequestHandler::handleRequest,
+                                        &mockRequestHandler2,
+                                        std::placeholders::_1,
+                                        std::placeholders::_2));
+        openConnection(c, "127.0.0.1", port);
+
+        auto fut = createFutureResult(c);
+
+        c.sendRequest(GetApiRequest);
+
+        auto res = fut.get();
+        REQUIRE(mockRequestHandler.getNoCalls() == 1);
+        REQUIRE(mockRequestHandler2.getNoCalls() == 1);
+    }
+    SECTION("it should only call all handlers until one returns false") {
+        mockRequestHandler.setMockedReturnVal(false);
+        MockRequestHandler mockRequestHandler2;
+        dut.addRequestHandler(std::bind(&MockRequestHandler::handleRequest,
+                                        &mockRequestHandler2,
+                                        std::placeholders::_1,
+                                        std::placeholders::_2));
+        openConnection(c, "127.0.0.1", port);
+
+        auto fut = createFutureResult(c);
+
+        c.sendRequest(GetApiRequest);
+
+        auto res = fut.get();
+        REQUIRE(mockRequestHandler.getNoCalls() == 1);
+        REQUIRE(mockRequestHandler2.getNoCalls() == 0);
     }
 
     ioc.stop();
     t.join();
 }
+
+TEST_CASE("server with addFileHeaderHandler", "[server]") {}

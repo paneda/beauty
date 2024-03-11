@@ -19,8 +19,8 @@ int main(int argc, char *argv[]) {
 
         asio::io_context ioc;
         // Initialise the server.
-        http::server::FileHandler fileHandler;
-        http::server::Server s(ioc, argv[1], argv[2], argv[3], &fileHandler, "", nullptr);
+        http::server::FileHandler fileHandler(argv[3]);
+        http::server::Server s(ioc, argv[1], argv[2], &fileHandler);
 
         // Run the server until stopped.
         ioc.run();

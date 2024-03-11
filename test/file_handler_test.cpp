@@ -20,7 +20,7 @@ TEST_CASE("file_handler.cpp", "[file_handler]") {
             of.write((char*)&val, sizeof(val));
         }
     }
-    FileHandler fh;
+    FileHandler fh("./");
 
     SECTION("should open file") {
         REQUIRE(fh.openFile(0, "testfile.bin"));

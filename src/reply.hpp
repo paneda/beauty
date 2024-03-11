@@ -38,16 +38,23 @@ class Reply {
         service_unavailable = 503
     } status_;
 
-    // content to be sent in the reply.
+    // Content to be sent in the reply.
     std::vector<char> content_;
 
-    // helper to provide standard replies
+    // Helper to provide standard replies
     static Reply stockReply(status_type status);
 
-   private:
-    // headers to be included in the reply.
+    // Headers to be included in the reply.
     std::vector<Header> headers_;
 
+    // Parsed request path.
+    // TODO: add const
+    std::string requestPath_;
+
+    // File path to open (possibly modified requestPath_).
+    std::string filePath_;
+
+   private:
     // for http chunking (using content-length, not "http chunking")
     bool useChunking_ = false;
     bool finalChunk_ = false;

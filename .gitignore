@@ -6,3 +6,4 @@ testfile.bin
 .tags
 Session.vim
 .gdb_history
+.cache
