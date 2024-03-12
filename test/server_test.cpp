@@ -295,7 +295,7 @@ TEST_CASE("server with route handler", "[server]") {
     auto t = std::thread(&asio::io_context::run, &ioc);
 
     SECTION("it should call request handler when defined") {
-        mockRequestHandler.setMockedReturnVal(false);
+        mockRequestHandler.setReturnToClient(true);
         openConnection(c, "127.0.0.1", port);
 
         auto fut = createFutureResult(c);
@@ -306,7 +306,7 @@ TEST_CASE("server with route handler", "[server]") {
         REQUIRE(mockRequestHandler.getNoCalls() == 1);
     }
     SECTION("it should respond with status code") {
-        mockRequestHandler.setMockedReturnVal(false);
+        mockRequestHandler.setReturnToClient(true);
         mockRequestHandler.setMockedReply(Reply::status_type::unauthorized, "some content");
         openConnection(c, "127.0.0.1", port);
 
@@ -320,7 +320,7 @@ TEST_CASE("server with route handler", "[server]") {
     }
     SECTION("it should respond with headers") {
         mockRequestHandler.setMockedReply(Reply::status_type::ok, "some content");
-        mockRequestHandler.setMockedReturnVal(false);
+        mockRequestHandler.setReturnToClient(true);
         openConnection(c, "127.0.0.1", port);
 
         std::future<TestClient::TestResult> futs[2] = {createFutureResult(c),
@@ -340,7 +340,7 @@ TEST_CASE("server with route handler", "[server]") {
         std::string content = "this is some content";
 
         mockRequestHandler.setMockedReply(Reply::status_type::ok, content);
-        mockRequestHandler.setMockedReturnVal(false);
+        mockRequestHandler.setReturnToClient(true);
         openConnection(c, "127.0.0.1", port);
 
         std::future<TestClient::TestResult> futs[3] = {
@@ -371,7 +371,7 @@ TEST_CASE("server with route handler", "[server]") {
         REQUIRE(mockRequestHandler2.getNoCalls() == 1);
     }
     SECTION("it should only call all handlers until one returns false") {
-        mockRequestHandler.setMockedReturnVal(false);
+        mockRequestHandler.setReturnToClient(true);
         MockRequestHandler mockRequestHandler2;
         dut.addRequestHandler(std::bind(&MockRequestHandler::handleRequest,
                                         &mockRequestHandler2,

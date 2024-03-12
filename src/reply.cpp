@@ -72,11 +72,31 @@ const char crlf[] = {'\r', '\n'};
 
 }  // namespace misc_strings
 
+Reply::Reply() {
+    headers_.reserve(5);
+}
+
+void Reply::addHeader(const std::string& name, const std::string& val) {
+    headers_.push_back({name, val});
+}
+
+void Reply::send(status_type status) {
+    status_ = status;
+    returnToClient_ = true;
+}
+
+void Reply::send(status_type status, char* data, size_t size) {
+    status_ = status;
+    data_ = data;
+    size_ = size;
+    returnToClient_ = true;
+}
+
 std::vector<asio::const_buffer> Reply::headerToBuffers() {
     std::vector<asio::const_buffer> buffers;
     buffers.push_back(status_strings::toBuffer(status_));
     for (std::size_t i = 0; i < headers_.size(); ++i) {
-        Header &h = headers_[i];
+        Header& h = headers_[i];
         buffers.push_back(asio::buffer(h.name));
         buffers.push_back(asio::buffer(misc_strings::name_value_separator));
         buffers.push_back(asio::buffer(h.value));

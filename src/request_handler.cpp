@@ -1,5 +1,6 @@
 #include "request_handler.hpp"
 
+#include <iostream>
 #include <sstream>
 #include <string>
 
@@ -59,19 +60,20 @@ void RequestHandler::handleRequest(unsigned connectionId, const Request &req, Re
         return;
     }
 
+    // if path ends in slash (i.e. is a directory) then add "index.html"
+    if (rep.requestPath_[rep.requestPath_.size() - 1] == '/') {
+        rep.requestPath_ += "index.html";
+    }
+
     // initiate filePath with requestPath
     rep.filePath_ = rep.requestPath_;
 
     for (const auto &requestHandler_ : requestHandlers_) {
-        if (!requestHandler_(req, rep)) {
+        requestHandler_(req, rep);
+        if (rep.returnToClient_) {
             return;
         }
     }
-
-    // // if path ends in slash (i.e. is a directory) then add "index.html"
-    // if (requestPath[requestPath.size() - 1] == '/') {
-    //     requestPath += "index.html";
-    // }
 
     if (fileHandler_ != nullptr) {
         // open the file to send back

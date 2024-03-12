@@ -9,7 +9,7 @@
 namespace http {
 namespace server {
 
-using requestHandlerCallback = std::function<bool(const Request &req, Reply &rep)>;
+using requestHandlerCallback = std::function<void(const Request &req, Reply &rep)>;
 using fileNotFoundHandlerCallback = std::function<void(Reply &rep)>;
 using addFileHeaderCallback = std::function<void(std::vector<Header> &headers)>;
 
