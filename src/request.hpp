@@ -8,13 +8,15 @@
 namespace http {
 namespace server {
 
-/// A request received from a client.
+// A request received from a client.
 struct Request {
     std::string method_;
     std::string uri_;
-    int http_version_major_;
-    int http_version_minor_;
+    int httpVersionMajor_ = 0;
+    int httpVersionMinor_ = 0;
     std::vector<Header> headers_;
+    std::vector<char> body_;
+    bool keepAlive_ = false;
 };
 
 }  // namespace server

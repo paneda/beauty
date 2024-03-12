@@ -1,12 +1,12 @@
 #include "mock_request_handler.hpp"
 
-#include "reply.hpp"
-
 namespace http {
 namespace server {
 
 void MockRequestHandler::handleRequest(const Request& req, Reply& rep) {
     noCalls_++;
+	receivedRequest_ = req;
+	receivedReply_ = rep;
     if (returnToClient_) {
         if (!mockedContent_.empty()) {
             // handle reply and return to client
@@ -31,6 +31,14 @@ void MockRequestHandler::setMockedReply(Reply::status_type status, const std::st
 
 int MockRequestHandler::getNoCalls() {
     return noCalls_;
+}
+
+Request MockRequestHandler::getReceivedRequest() const {
+    return receivedRequest_;
+}
+
+Reply MockRequestHandler::getReceivedReply() const {
+    return receivedReply_;
 }
 
 }  // namespace server

@@ -1,6 +1,7 @@
 add_executable(asio_web_test
 	server_test.cpp
 	file_handler_test.cpp
+	request_parser_test.cpp
 	${CMAKE_SOURCE_DIR}/src/server.cpp
 	${CMAKE_SOURCE_DIR}/src/connection.cpp
 	${CMAKE_SOURCE_DIR}/src/connection_manager.cpp

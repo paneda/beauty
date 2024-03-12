@@ -97,9 +97,9 @@ std::vector<asio::const_buffer> Reply::headerToBuffers() {
     buffers.push_back(status_strings::toBuffer(status_));
     for (std::size_t i = 0; i < headers_.size(); ++i) {
         Header& h = headers_[i];
-        buffers.push_back(asio::buffer(h.name));
+        buffers.push_back(asio::buffer(h.name_));
         buffers.push_back(asio::buffer(misc_strings::name_value_separator));
-        buffers.push_back(asio::buffer(h.value));
+        buffers.push_back(asio::buffer(h.value_));
         buffers.push_back(asio::buffer(misc_strings::crlf));
     }
     buffers.push_back(asio::buffer(misc_strings::crlf));
@@ -242,10 +242,10 @@ Reply Reply::stockReply(Reply::status_type status) {
     rep.status_ = status;
     rep.content_ = stock_replies::toArray(status);
     rep.headers_.resize(2);
-    rep.headers_[0].name = "Content-Length";
-    rep.headers_[0].value = std::to_string(rep.content_.size());
-    rep.headers_[1].name = "Content-Type";
-    rep.headers_[1].value = "text/html";
+    rep.headers_[0].name_ = "Content-Length";
+    rep.headers_[0].value_ = std::to_string(rep.content_.size());
+    rep.headers_[1].name_ = "Content-Type";
+    rep.headers_[1].value_ = "text/html";
     return rep;
 }
 

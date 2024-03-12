@@ -29,7 +29,9 @@ class RequestHandler {
 
    private:
     size_t readChunkFromFile(unsigned connectionId, Reply &rep);
-    static bool urlDecode(const std::string &in, std::string &out);
+    static bool urlDecode(const std::string &in, std::string &path, std::string &query);
+    static void keyValDecode(const std::string &in,
+                             std::vector<std::pair<std::string, std::string>> &params);
 
     // Provided FileHandler to be implemented by each specific projects.
     IFileHandler *fileHandler_ = nullptr;
