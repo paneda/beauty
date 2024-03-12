@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include "request.hpp"
+#include "url_parser.hpp"
 
 namespace http {
 namespace server {
