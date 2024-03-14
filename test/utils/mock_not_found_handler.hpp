@@ -11,10 +11,7 @@ class MockNotFoundHandler {
     void handleNotFound(http::server::Reply &rep) {
         noCalls_++;
         rep.content_.insert(rep.content_.begin(), mockedContent_.begin(), mockedContent_.end());
-
-        rep.addHeader("Content-Length", std::to_string(mockedContent_.size()));
-        rep.addHeader("Content-Type", "text/plain");
-        rep.send(http::server::Reply::ok);
+        rep.send(http::server::Reply::ok, "text/plain");
     }
 
     void setMockedContent(const std::string &mockedContent) {

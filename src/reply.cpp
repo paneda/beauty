@@ -73,30 +73,64 @@ const char crlf[] = {'\r', '\n'};
 }  // namespace misc_strings
 
 Reply::Reply() {
-    headers_.reserve(5);
+    defaultHeaders_.reserve(2);
+    addedHeaders_.reserve(2);
 }
 
 void Reply::addHeader(const std::string& name, const std::string& val) {
-    headers_.push_back({name, val});
+    addedHeaders_.push_back({name, val});
 }
 
 void Reply::send(status_type status) {
     status_ = status;
+    defaultHeaders_.resize(1);
+    defaultHeaders_[0].name_ = "Content-Length";
+    defaultHeaders_[0].value_ = "0";
+    content_.clear();
+    contentPtr_ = nullptr;
+
     returnToClient_ = true;
 }
 
-void Reply::send(status_type status, char* data, size_t size) {
+void Reply::send(status_type status, const std::string& contentType) {
     status_ = status;
-    data_ = data;
-    size_ = size;
+    defaultHeaders_.resize(2);
+    defaultHeaders_[0].name_ = "Content-Length";
+    defaultHeaders_[0].value_ = std::to_string(content_.size());
+    defaultHeaders_[1].name_ = "Content-Type";
+    defaultHeaders_[1].value_ = contentType;
+
+    returnToClient_ = true;
+}
+
+void Reply::sendPtr(status_type status,
+                    const std::string& contentType,
+                    const char* data,
+                    size_t size) {
+    status_ = status;
+    defaultHeaders_.resize(2);
+    defaultHeaders_[0].name_ = "Content-Length";
+    defaultHeaders_[0].value_ = std::to_string(size);
+    defaultHeaders_[1].name_ = "Content-Type";
+    defaultHeaders_[1].value_ = contentType;
+    contentPtr_ = data;
+    contentSize_ = size;
+
     returnToClient_ = true;
 }
 
 std::vector<asio::const_buffer> Reply::headerToBuffers() {
     std::vector<asio::const_buffer> buffers;
     buffers.push_back(status_strings::toBuffer(status_));
-    for (std::size_t i = 0; i < headers_.size(); ++i) {
-        Header& h = headers_[i];
+    for (std::size_t i = 0; i < defaultHeaders_.size(); ++i) {
+        Header& h = defaultHeaders_[i];
+        buffers.push_back(asio::buffer(h.name_));
+        buffers.push_back(asio::buffer(misc_strings::name_value_separator));
+        buffers.push_back(asio::buffer(h.value_));
+        buffers.push_back(asio::buffer(misc_strings::crlf));
+    }
+    for (std::size_t i = 0; i < addedHeaders_.size(); ++i) {
+        Header& h = addedHeaders_[i];
         buffers.push_back(asio::buffer(h.name_));
         buffers.push_back(asio::buffer(misc_strings::name_value_separator));
         buffers.push_back(asio::buffer(h.value_));
@@ -108,7 +142,11 @@ std::vector<asio::const_buffer> Reply::headerToBuffers() {
 
 std::vector<asio::const_buffer> Reply::contentToBuffers() {
     std::vector<asio::const_buffer> buffers;
-    buffers.push_back(asio::buffer(content_));
+    if (contentPtr_ != nullptr) {
+        buffers.push_back(asio::buffer(contentPtr_, contentSize_));
+    } else {
+        buffers.push_back(asio::buffer(content_));
+    }
     return buffers;
 }
 
@@ -241,11 +279,11 @@ Reply Reply::stockReply(Reply::status_type status) {
     Reply rep;
     rep.status_ = status;
     rep.content_ = stock_replies::toArray(status);
-    rep.headers_.resize(2);
-    rep.headers_[0].name_ = "Content-Length";
-    rep.headers_[0].value_ = std::to_string(rep.content_.size());
-    rep.headers_[1].name_ = "Content-Type";
-    rep.headers_[1].value_ = "text/html";
+    rep.defaultHeaders_.resize(2);
+    rep.defaultHeaders_[0].name_ = "Content-Length";
+    rep.defaultHeaders_[0].value_ = std::to_string(rep.content_.size());
+    rep.defaultHeaders_[1].name_ = "Content-Type";
+    rep.defaultHeaders_[1].value_ = "text/html";
     return rep;
 }
 

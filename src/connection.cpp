@@ -57,13 +57,14 @@ void Connection::doWriteHeaders() {
     asio::async_write(
         socket_, reply_.headerToBuffers(), [this, self](std::error_code ec, std::size_t) {
             if (!ec) {
-                doWriteContent();
+                if (!reply_.content_.empty() || reply_.contentPtr_ != nullptr) {
+                    doWriteContent();
+                } else {
+                    handleWriteCompleted();
+                }
             } else {
                 std::cout << "doWriteHeaders: " << ec.message() << ':' << ec.value() << std::endl;
-                std::error_code ignored_ec;
-                socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
-                connectionManager_.stop(shared_from_this());
-                requestHandler_.closeFile(connectionId_);
+                shutdown();
             }
         });
 }
@@ -75,28 +76,35 @@ void Connection::doWriteContent() {
             if (!ec) {
                 if (reply_.useChunking_) {
                     if (reply_.finalChunk_) {
-                        // Initiate graceful connection closure.
-                        std::error_code ignored_ec;
-                        socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
-                        connectionManager_.stop(shared_from_this());
+                        handleWriteCompleted();
                     } else {
                         requestHandler_.handleChunk(connectionId_, reply_);
                         doWriteContent();
                     }
                 } else {
-                    // initiate graceful connection closure.
-                    std::error_code ignored_ec;
-                    socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
-                    connectionManager_.stop(shared_from_this());
+                    handleWriteCompleted();
                 }
             } else {
                 std::cout << "doWriteContent: " << ec.message() << ':' << ec.value() << std::endl;
-                std::error_code ignored_ec;
-                socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
-                connectionManager_.stop(shared_from_this());
-                requestHandler_.closeFile(connectionId_);
+                shutdown();
             }
         });
+}
+
+void Connection::handleWriteCompleted() {
+    // TODO: handle keep-alive
+    // initiate graceful connection closure.
+    std::error_code ignored_ec;
+    socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
+    connectionManager_.stop(shared_from_this());
+}
+
+void Connection::shutdown() {
+    // initiate graceful connection closure.
+    std::error_code ignored_ec;
+    socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
+    connectionManager_.stop(shared_from_this());
+    requestHandler_.closeFile(connectionId_);
 }
 
 }  // namespace server

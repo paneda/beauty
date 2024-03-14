@@ -5,18 +5,14 @@ namespace server {
 
 void MockRequestHandler::handleRequest(const Request& req, Reply& rep) {
     noCalls_++;
-	receivedRequest_ = req;
-	receivedReply_ = rep;
+    receivedRequest_ = req;
+    receivedReply_ = rep;
     if (returnToClient_) {
         if (!mockedContent_.empty()) {
-            // handle reply and return to client
-            rep.content_.insert(rep.content_.begin(), mockedContent_.begin(), mockedContent_.end());
-
-            rep.addHeader("Content-Length", std::to_string(mockedContent_.size()));
-            rep.addHeader("Content-Type", "text/plain");
+            rep.sendPtr(status_, "text/plain", &mockedContent_[0], mockedContent_.size());
+        } else {
+            rep.send(status_);
         }
-
-        rep.send(status_);
     }
 }
 

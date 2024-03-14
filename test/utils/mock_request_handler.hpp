@@ -28,7 +28,7 @@ class MockRequestHandler {
     Reply::status_type status_ = Reply::status_type::internal_server_error;
     std::string mockedContent_;
     Request receivedRequest_;
-	Reply receivedReply_;
+    Reply receivedReply_;
 };
 
 }  // namespace server

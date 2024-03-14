@@ -62,17 +62,19 @@ class Reply {
     std::vector<std::pair<std::string, std::string>> formParams_;
 
     void send(status_type status);
-    void send(status_type status, char* data, size_t size);
+    void send(status_type status, const std::string &contentType);
+    void sendPtr(status_type status, const std::string &contentType, const char* data, size_t size);
     void addHeader(const std::string& name, const std::string& val);
 
    private:
     // Headers to be included in the reply.
     status_type status_;
-    std::vector<Header> headers_;
+    std::vector<Header> defaultHeaders_;
+    std::vector<Header> addedHeaders_;
 
     bool returnToClient_ = false;
-    char* data_ = nullptr;
-    size_t size_;
+    const char* contentPtr_ = nullptr;
+    size_t contentSize_;
 
     // for http chunking (using content-length, not "http chunking")
     bool useChunking_ = false;

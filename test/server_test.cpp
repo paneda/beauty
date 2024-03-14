@@ -50,7 +50,8 @@ const std::string GetIndexRequest =
     "GET /index.html HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: */*\r\nConnection: close\r\n\r\n";
 
 const std::string GetUriWithQueryRequest =
-    "GET /file.bin?myKey=myVal HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: */*\r\nConnection: keep-alive\r\n\r\n";
+    "GET /file.bin?myKey=myVal HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: */*\r\nConnection: "
+    "keep-alive\r\n\r\n";
 
 const std::string GetApiRequest =
     "GET /api/status HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: */*\r\nConnection: close\r\n\r\n";
@@ -173,7 +174,7 @@ TEST_CASE("server with file handler", "[server]") {
         REQUIRE(mockFileHandler.getCloseFileCalls() == 0);
     }
 
-    SECTION("it should call fileHandler open/close when file exists") {
+    SECTION("it should call fileHandler open and close when file exists") {
         openConnection(c, "127.0.0.1", port);
 
         mockFileHandler.createMockFile(100);
@@ -317,19 +318,19 @@ TEST_CASE("server with route handler", "[server]") {
         c.sendRequest(GetUriWithQueryRequest);
 
         auto res = fut.get();
-		
-		Request req = mockRequestHandler.getReceivedRequest();
-		REQUIRE(req.method_ == "GET");
-		REQUIRE(req.uri_ == "/file.bin?myKey=myVal");
-		REQUIRE(req.httpVersionMajor_ == 1);
-		REQUIRE(req.httpVersionMinor_ == 1);
-		REQUIRE(req.headers_.size() == 3);
-		REQUIRE(req.headers_[0].name_ == "Host");
-		REQUIRE(req.headers_[0].value_ == "127.0.0.1");
-		REQUIRE(req.headers_[1].name_ == "Accept");
-		REQUIRE(req.headers_[1].value_ == "*/*");
-		REQUIRE(req.headers_[2].name_ == "Connection");
-		REQUIRE(req.headers_[2].value_ == "keep-alive");
+
+        Request req = mockRequestHandler.getReceivedRequest();
+        REQUIRE(req.method_ == "GET");
+        REQUIRE(req.uri_ == "/file.bin?myKey=myVal");
+        REQUIRE(req.httpVersionMajor_ == 1);
+        REQUIRE(req.httpVersionMinor_ == 1);
+        REQUIRE(req.headers_.size() == 3);
+        REQUIRE(req.headers_[0].name_ == "Host");
+        REQUIRE(req.headers_[0].value_ == "127.0.0.1");
+        REQUIRE(req.headers_[1].name_ == "Accept");
+        REQUIRE(req.headers_[1].value_ == "*/*");
+        REQUIRE(req.headers_[2].name_ == "Connection");
+        REQUIRE(req.headers_[2].value_ == "keep-alive");
     }
     SECTION("it should provide correct Reply object") {
         mockRequestHandler.setReturnToClient(true);
@@ -340,12 +341,12 @@ TEST_CASE("server with route handler", "[server]") {
         c.sendRequest(GetUriWithQueryRequest);
 
         auto res = fut.get();
-		
-		Reply rep = mockRequestHandler.getReceivedReply();
-		REQUIRE(rep.requestPath_ == "/file.bin");
-		REQUIRE(rep.filePath_ == "/file.bin");
-		REQUIRE(rep.queryParams_.size() == 1);
-		REQUIRE(rep.queryParams_[0] == std::make_pair<std::string, std::string>("myKey", "myVal"));
+
+        Reply rep = mockRequestHandler.getReceivedReply();
+        REQUIRE(rep.requestPath_ == "/file.bin");
+        REQUIRE(rep.filePath_ == "/file.bin");
+        REQUIRE(rep.queryParams_.size() == 1);
+        REQUIRE(rep.queryParams_[0] == std::make_pair<std::string, std::string>("myKey", "myVal"));
     }
     SECTION("it should respond with status code") {
         mockRequestHandler.setReturnToClient(true);

@@ -43,6 +43,10 @@ class Connection : public std::enable_shared_from_this<Connection> {
     void doWriteHeaders();
     void doWriteContent();
 
+    void handleWriteCompleted();
+
+    void shutdown();
+
     // Socket for the connection.
     asio::ip::tcp::socket socket_;
 

@@ -98,12 +98,12 @@ void RequestHandler::handleRequest(unsigned connectionId, const Request &req, Re
                 fileHandler_->closeFile(connectionId);
             }
 
-            rep.headers_.resize(2);
-            rep.headers_[0].name_ = "Content-Length";
-            rep.headers_[0].value_ = std::to_string(contentSize);
-            rep.headers_[1].name_ = "Content-Type";
-            rep.headers_[1].value_ = mime_types::extensionToType(extension);
-            addFileHeaderCallback_(rep.headers_);
+            rep.defaultHeaders_.resize(2);
+            rep.defaultHeaders_[0].name_ = "Content-Length";
+            rep.defaultHeaders_[0].value_ = std::to_string(contentSize);
+            rep.defaultHeaders_[1].name_ = "Content-Type";
+            rep.defaultHeaders_[1].value_ = mime_types::extensionToType(extension);
+            addFileHeaderCallback_(rep.addedHeaders_);
             return;
         }
     }
