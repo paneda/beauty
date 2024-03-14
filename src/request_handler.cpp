@@ -1,7 +1,6 @@
 #include "request_handler.hpp"
 
 #include <iostream>
-#include <sstream>
 #include <string>
 
 #include "beauty_common.hpp"
@@ -47,28 +46,13 @@ void RequestHandler::addFileHeaderHandler(const addFileHeaderCallback &cb) {
 }
 
 void RequestHandler::handleRequest(unsigned connectionId, const Request &req, Reply &rep) {
-    // decode url to path
-    std::string queryStr;
-    if (!urlDecode(req.uri_, rep.requestPath_, queryStr)) {
-        rep = Reply::stockReply(Reply::bad_request);
-        return;
-    }
-    // request path must be absolute and not contain ".."
-    if (rep.requestPath_.empty() || rep.requestPath_[0] != '/' ||
-        rep.requestPath_.find("..") != std::string::npos) {
-        rep = Reply::stockReply(Reply::bad_request);
-        return;
-    }
-
-    keyValDecode(queryStr, rep.queryParams_);
+    // initiate filePath with requestPath
+    rep.filePath_ = req.requestPath_;
 
     // if path ends in slash (i.e. is a directory) then add "index.html"
-    if (rep.requestPath_[rep.requestPath_.size() - 1] == '/') {
-        rep.requestPath_ += "index.html";
+    if (rep.filePath_[rep.filePath_.size() - 1] == '/') {
+        rep.filePath_ += "index.html";
     }
-
-    // initiate filePath with requestPath
-    rep.filePath_ = rep.requestPath_;
 
     for (const auto &requestHandler_ : requestHandlers_) {
         requestHandler_(req, rep);
@@ -83,10 +67,15 @@ void RequestHandler::handleRequest(unsigned connectionId, const Request &req, Re
         if (contentSize > 0) {
             // determine the file extension.
             std::string extension;
-            std::size_t lastSlashPos = rep.requestPath_.find_last_of("/");
-            std::size_t lastDotPos = rep.requestPath_.find_last_of(".");
-            if (lastDotPos != std::string::npos && lastDotPos > lastSlashPos) {
-                extension = rep.requestPath_.substr(lastDotPos + 1);
+            // ..again if directory, then extension is provided by index.html
+            if (req.requestPath_[req.requestPath_.size() - 1] == '/') {
+                extension = "html";
+            } else {
+                std::size_t lastSlashPos = req.requestPath_.find_last_of("/");
+                std::size_t lastDotPos = req.requestPath_.find_last_of(".");
+                if (lastDotPos != std::string::npos && lastDotPos > lastSlashPos) {
+                    extension = req.requestPath_.substr(lastDotPos + 1);
+                }
             }
 
             // fill initial content
@@ -132,58 +121,6 @@ size_t RequestHandler::readChunkFromFile(unsigned connectionId, Reply &rep) {
         fileHandler_->readFile(connectionId, rep.content_.data(), rep.content_.size());
     rep.content_.resize(nrReadBytes);
     return nrReadBytes;
-}
-
-bool RequestHandler::urlDecode(const std::string &in, std::string &path, std::string &query) {
-    path.clear();
-    path.reserve(in.size());
-    query.clear();
-    query.reserve(in.size());
-    auto out = &path;
-    for (std::size_t i = 0; i < in.size(); ++i) {
-        if (in[i] == '%') {
-            if (i + 3 <= in.size()) {
-                int value = 0;
-                std::istringstream is(in.substr(i + 1, 2));
-                if (is >> std::hex >> value) {
-                    *out += static_cast<char>(value);
-                    i += 2;
-                } else {
-                    return false;
-                }
-            } else {
-                return false;
-            }
-        } else if (in[i] == '+') {
-            *out += ' ';
-        } else if (in[i] == '?') {
-            out = &query;
-        } else {
-            *out += in[i];
-        }
-    }
-    return true;
-}
-
-void RequestHandler::keyValDecode(const std::string &in,
-                                  std::vector<std::pair<std::string, std::string>> &params) {
-    std::string key, val;
-    auto out = &key;
-    for (std::size_t i = 0; i < in.size(); ++i) {
-        if (in[i] == '=') {
-            out = &val;
-        } else if (in[i] == '&') {
-            params.push_back({key, val});
-            out = &key;
-            key.clear();
-            val.clear();
-        } else if (i == in.size() - 1) {
-            *out += in[i];
-            params.push_back({key, val});
-        } else {
-            *out += in[i];
-        }
-    }
 }
 
 }  // namespace server

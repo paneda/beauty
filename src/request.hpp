@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "header.hpp"
@@ -17,6 +18,13 @@ struct Request {
     std::vector<Header> headers_;
     std::vector<char> body_;
     bool keepAlive_ = false;
+    std::string requestPath_;
+
+    // Parsed query params in the request
+    std::vector<std::pair<std::string, std::string>> queryParams_;
+
+    // Parsed form params in the request
+    std::vector<std::pair<std::string, std::string>> formParams_;
 };
 
 }  // namespace server

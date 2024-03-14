@@ -5,7 +5,6 @@
 
 #include <asio.hpp>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "header.hpp"
@@ -48,22 +47,12 @@ class Reply {
     // Helper to provide standard replies
     static Reply stockReply(status_type status);
 
-    // Parsed request path.
-    // TODO: add const
-    std::string requestPath_;
-
-    // File path to open (possibly modified requestPath_).
+    // File path to open.
     std::string filePath_;
 
-    // Parsed query params in the request
-    std::vector<std::pair<std::string, std::string>> queryParams_;
-
-    // Parsed form params in the request
-    std::vector<std::pair<std::string, std::string>> formParams_;
-
     void send(status_type status);
-    void send(status_type status, const std::string &contentType);
-    void sendPtr(status_type status, const std::string &contentType, const char* data, size_t size);
+    void send(status_type status, const std::string& contentType);
+    void sendPtr(status_type status, const std::string& contentType, const char* data, size_t size);
     void addHeader(const std::string& name, const std::string& val);
 
    private:

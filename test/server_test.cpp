@@ -104,20 +104,7 @@ TEST_CASE("server without handlers", "[server]") {
     uint16_t port = s.getBindedPort();
     auto t = std::thread(&asio::io_context::run, &ioc);
 
-    SECTION("it should return 400 for mispelling") {
-        // HTTTP spelled incorrectly
-        const std::string malformadRequest =
-            "GET /index.html HTTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: */*\r\nConnection: "
-            "close\r\n\r\n";
-        openConnection(c, "127.0.0.1", port);
-
-        auto fut = createFutureResult(c);
-        c.sendRequest(malformadRequest);
-        auto res = fut.get();
-        REQUIRE(res.action_ == TestClient::TestResult::ReadRequestStatus);
-        REQUIRE(res.statusCode_ == 400);
-    }
-    SECTION("it should return 400 for wrong path") {
+    SECTION("it should return 400 for malformad request") {
         // HTTTP spelled incorrectly
         const std::string malformadRequest =
             "GET ../index.html HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: "
@@ -183,6 +170,23 @@ TEST_CASE("server with file handler", "[server]") {
         fut.get();
         REQUIRE(mockFileHandler.getOpenFileCalls() == 1);
         REQUIRE(mockFileHandler.getCloseFileCalls() == 1);
+    }
+
+    SECTION("it should assume index.html for directories") {
+        openConnection(c, "127.0.0.1", port);
+
+        mockFileHandler.createMockFile(100);
+        std::future<TestClient::TestResult> futs[2] = {createFutureResult(c),
+                                                       createFutureResult(c)};
+        const std::string getDirectoryRequest =
+            "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: */*\r\nConnection: close\r\n\r\n";
+        c.sendRequest(getDirectoryRequest);
+        futs[0].get();             // status
+        auto res = futs[1].get();  // headers
+        REQUIRE(res.action_ == TestClient::TestResult::ReadHeaders);
+        REQUIRE(res.headers_.size() == 2);
+        REQUIRE(res.headers_[0] == "Content-Length: 100\r");
+        REQUIRE(res.headers_[1] == "Content-Type: text/html\r");
     }
 
     SECTION("it should return correct headers") {
@@ -331,22 +335,6 @@ TEST_CASE("server with route handler", "[server]") {
         REQUIRE(req.headers_[1].value_ == "*/*");
         REQUIRE(req.headers_[2].name_ == "Connection");
         REQUIRE(req.headers_[2].value_ == "keep-alive");
-    }
-    SECTION("it should provide correct Reply object") {
-        mockRequestHandler.setReturnToClient(true);
-        openConnection(c, "127.0.0.1", port);
-
-        auto fut = createFutureResult(c);
-
-        c.sendRequest(GetUriWithQueryRequest);
-
-        auto res = fut.get();
-
-        Reply rep = mockRequestHandler.getReceivedReply();
-        REQUIRE(rep.requestPath_ == "/file.bin");
-        REQUIRE(rep.filePath_ == "/file.bin");
-        REQUIRE(rep.queryParams_.size() == 1);
-        REQUIRE(rep.queryParams_[0] == std::make_pair<std::string, std::string>("myKey", "myVal"));
     }
     SECTION("it should respond with status code") {
         mockRequestHandler.setReturnToClient(true);

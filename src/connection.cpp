@@ -37,8 +37,13 @@ void Connection::doRead() {
                     request_, buffer_.data(), buffer_.data() + bytes_transferred);
 
                 if (result == RequestParser::good) {
-                    requestHandler_.handleRequest(connectionId_, request_, reply_);
-                    doWriteHeaders();
+                    if (requestDecoder_.decodeRequest(request_)) {
+                        requestHandler_.handleRequest(connectionId_, request_, reply_);
+                        doWriteHeaders();
+                    } else {
+                        reply_ = Reply::stockReply(Reply::bad_request);
+                        doWriteHeaders();
+                    }
                 } else if (result == RequestParser::bad) {
                     reply_ = Reply::stockReply(Reply::bad_request);
                     doWriteHeaders();
