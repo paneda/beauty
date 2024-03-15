@@ -5,9 +5,12 @@
 namespace http {
 namespace server {
 
+FileHandler::FileHandler(const std::string &docRoot) : docRoot_(docRoot) {}
+
 size_t FileHandler::openFile(unsigned id, const std::string &path) {
+    std::string fullPath = docRoot_ + path;
     std::ifstream &is = openFiles_[id];
-    is.open(path.c_str(), std::ios::in | std::ios::binary);
+    is.open(fullPath.c_str(), std::ios::in | std::ios::binary);
     is.ignore(std::numeric_limits<std::streamsize>::max());
     size_t fileSize = is.gcount();
     is.clear();  //  since ignore will have set eof.

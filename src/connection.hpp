@@ -9,6 +9,7 @@
 
 #include "reply.hpp"
 #include "request.hpp"
+#include "request_decoder.hpp"
 #include "request_handler.hpp"
 #include "request_parser.hpp"
 
@@ -43,6 +44,10 @@ class Connection : public std::enable_shared_from_this<Connection> {
     void doWriteHeaders();
     void doWriteContent();
 
+    void handleWriteCompleted();
+
+    void shutdown();
+
     // Socket for the connection.
     asio::ip::tcp::socket socket_;
 
@@ -60,6 +65,9 @@ class Connection : public std::enable_shared_from_this<Connection> {
 
     // The parser for the incoming request.
     RequestParser requestParser_;
+
+    // The decoder for the incoming request.
+    RequestDecoder requestDecoder_;
 
     // The reply to be sent back to the client.
     Reply reply_;

@@ -19,6 +19,9 @@ class Reply {
     friend class Connection;
 
    public:
+    Reply();
+    virtual ~Reply() = default;
+
     enum status_type {
         ok = 200,
         created = 201,
@@ -36,17 +39,31 @@ class Reply {
         not_implemented = 501,
         bad_gateway = 502,
         service_unavailable = 503
-    } status_;
+    };
 
-    // content to be sent in the reply.
+    // Content to be sent in the reply.
     std::vector<char> content_;
 
-    // helper to provide standard replies
+    // Helper to provide standard replies
     static Reply stockReply(status_type status);
 
+    // File path to open.
+    std::string filePath_;
+
+    void send(status_type status);
+    void send(status_type status, const std::string& contentType);
+    void sendPtr(status_type status, const std::string& contentType, const char* data, size_t size);
+    void addHeader(const std::string& name, const std::string& val);
+
    private:
-    // headers to be included in the reply.
-    std::vector<Header> headers_;
+    // Headers to be included in the reply.
+    status_type status_;
+    std::vector<Header> defaultHeaders_;
+    std::vector<Header> addedHeaders_;
+
+    bool returnToClient_ = false;
+    const char* contentPtr_ = nullptr;
+    size_t contentSize_;
 
     // for http chunking (using content-length, not "http chunking")
     bool useChunking_ = false;

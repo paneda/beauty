@@ -1,5 +1,6 @@
 #pragma once
 
+#include <deque>
 #include <string>
 
 #include "beauty_common.hpp"
@@ -17,34 +18,32 @@ class RequestHandler {
     RequestHandler(const RequestHandler &) = delete;
     RequestHandler &operator=(const RequestHandler &) = delete;
 
-    explicit RequestHandler(const std::string &fileRoot,
-                            IFileHandler *fileHandler,
-                            const std::string &routeRoot,
-                            IRouteHandler *routeHandler);
+    explicit RequestHandler(IFileHandler *fileHandler);
 
-    void addHeaderHandler(addHeaderCallback cb);
+    void addRequestHandler(const requestHandlerCallback &cb);
+    void setFileNotFoundHandler(const fileNotFoundHandlerCallback &cb);
+    void addFileHeaderHandler(const addFileHeaderCallback &cb);
     void handleRequest(unsigned connectionId, const Request &req, Reply &rep);
     void handleChunk(unsigned connectionId, Reply &rep);
     void closeFile(unsigned connectionId);
 
    private:
     size_t readChunkFromFile(unsigned connectionId, Reply &rep);
-    static bool urlDecode(const std::string &in, std::string &out);
-
-    // Directory containing the files to be served.
-    std::string fileRoot_;
+    static bool urlDecode(const std::string &in, std::string &path, std::string &query);
+    static void keyValDecode(const std::string &in,
+                             std::vector<std::pair<std::string, std::string>> &params);
 
     // Provided FileHandler to be implemented by each specific projects.
     IFileHandler *fileHandler_ = nullptr;
 
-    // Root for provided RouteHandler.
-    std::string routeRoot_;
+    // Added request handler callbacks
+    std::deque<requestHandlerCallback> requestHandlers_;
 
-    // Provided RouteHandler to be implemented by each specific projects.
-    IRouteHandler *routeHandler_ = nullptr;
+    // Callback to handle post file access, e.g. a custom not found handler.
+    fileNotFoundHandlerCallback fileNotFoundCb_;
 
-    // Callback to add custom headers.
-    addHeaderCallback addHeaderCb_;
+    // Callback to add custom http headers for returned files.
+    addFileHeaderCallback addFileHeaderCallback_;
 };
 
 }  // namespace server

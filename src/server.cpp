@@ -8,28 +8,18 @@
 namespace http {
 namespace server {
 
-Server::Server(asio::io_context &ioContext,
-               uint16_t port,
-               const std::string &fileRoot,
-               IFileHandler *fileHandler,
-               const std::string &routeRoot,
-               IRouteHandler *routeHandler)
+Server::Server(asio::io_context &ioContext, uint16_t port, IFileHandler *fileHandler)
     : acceptor_(ioContext, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)),
       connectionManager_(),
-      requestHandler_(fileRoot, fileHandler, routeRoot, routeHandler) {
+      requestHandler_(fileHandler) {
     doAccept();
 }
 
 Server::Server(asio::io_context &ioContext,
                const std::string &address,
                const std::string &port,
-               const std::string &fileRoot,
-               IFileHandler *fileHandler,
-               const std::string &routeRoot,
-               IRouteHandler *routeHandler)
-    : acceptor_(ioContext),
-      connectionManager_(),
-      requestHandler_(fileRoot, fileHandler, routeRoot, routeHandler) {
+               IFileHandler *fileHandler)
+    : acceptor_(ioContext), connectionManager_(), requestHandler_(fileHandler) {
     // Register to handle the signals that indicate when the server should exit.
     // It is safe to register for the same signal multiple times in a program,
     // provided all registration for the specified signal is made through Asio.
@@ -58,8 +48,16 @@ uint16_t Server::getBindedPort() const {
     return acceptor_.local_endpoint().port();
 }
 
-void Server::addHeaderHandler(addHeaderCallback cb) {
-    requestHandler_.addHeaderHandler(cb);
+void Server::addRequestHandler(const requestHandlerCallback &cb) {
+    requestHandler_.addRequestHandler(cb);
+}
+
+void Server::setFileNotFoundHandler(const fileNotFoundHandlerCallback &cb) {
+    requestHandler_.setFileNotFoundHandler(cb);
+}
+
+void Server::addFileHeaderHandler(const addFileHeaderCallback &cb) {
+    requestHandler_.addFileHeaderHandler(cb);
 }
 
 void Server::doAccept() {

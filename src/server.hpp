@@ -22,26 +22,20 @@ class Server {
     Server &operator=(const Server &) = delete;
 
     // simple constructor, use for ESP32
-    explicit Server(asio::io_context &ioContext,
-                    uint16_t port,
-                    const std::string &fileRoot,
-                    IFileHandler *fileHandler,
-                    const std::string &routeRoot,
-                    IRouteHandler *routeHandler);
+    explicit Server(asio::io_context &ioContext, uint16_t port, IFileHandler *fileHandler);
 
     // advanced constructor use for OS:s supporting signal_set
     explicit Server(asio::io_context &ioContext,
                     const std::string &address,
                     const std::string &port,
-                    const std::string &fileRoot,
-                    IFileHandler *fileHandler,
-                    const std::string &routeRoot,
-                    IRouteHandler *routeHandler);
+                    IFileHandler *fileHandler);
 
     uint16_t getBindedPort() const;
 
-    // handlers to be implemented by each specific project
-    void addHeaderHandler(addHeaderCallback cb);
+    // handlers to be optionally implemented
+    void addRequestHandler(const requestHandlerCallback &cb);
+    void setFileNotFoundHandler(const fileNotFoundHandlerCallback &cb);
+    void addFileHeaderHandler(const addFileHeaderCallback &cb);
 
    private:
     void doAccept();

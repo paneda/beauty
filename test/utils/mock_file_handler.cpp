@@ -22,12 +22,7 @@ size_t MockFileHandler::openFile(unsigned id, const std::string& path) {
         throw std::runtime_error("MockFileHandler test error: File already opened");
     }
 
-    if (ends_with(path, "gz")) {
-        if (mockFailToOpenGzFile_) {
-            openFiles_.erase(id);
-            return 0;
-        }
-    } else if (mockFailToOpenRequestedFile_) {
+    if (mockFailToOpenRequestedFile_) {
         openFiles_.erase(id);
         return 0;
     }
@@ -74,10 +69,6 @@ void MockFileHandler::createMockFile(uint32_t size) {
 
 void MockFileHandler::setMockFailToOpenRequestedFile() {
     mockFailToOpenRequestedFile_ = true;
-}
-
-void MockFileHandler::setMockFailToOpenGzFile() {
-    mockFailToOpenGzFile_ = true;
 }
 
 int MockFileHandler::getOpenFileCalls() {

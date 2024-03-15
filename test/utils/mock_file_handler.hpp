@@ -18,7 +18,6 @@ class MockFileHandler : public http::server::IFileHandler {
 
     void createMockFile(uint32_t size);
     void setMockFailToOpenRequestedFile();
-    void setMockFailToOpenGzFile();
 
     int getOpenFileCalls();
     int getReadFileCalls();
@@ -35,6 +34,5 @@ class MockFileHandler : public http::server::IFileHandler {
     int countReadFileCalls_ = 0;
     int countCloseFileCalls_ = 0;
     bool mockFailToOpenRequestedFile_ = false;
-    bool mockFailToOpenGzFile_ = false;
 };
 
