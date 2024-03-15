@@ -8,19 +8,6 @@
 namespace http {
 namespace server {
 
-namespace {
-
-bool ichar_equals(char a, char b) {
-    return std::tolower(static_cast<unsigned char>(a)) ==
-           std::tolower(static_cast<unsigned char>(b));
-}
-
-bool iequals(const std::string &a, const std::string &b) {
-    return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), ichar_equals);
-}
-
-}  // namespace
-
 bool RequestDecoder::decodeRequest(Request &req) {
     // url decode uri
     urlDecode(req.uri_.begin(), req.uri_.end(), req.requestPath_);
@@ -42,12 +29,7 @@ bool RequestDecoder::decodeRequest(Request &req) {
     }
 
     if (req.method_ != "GET") {
-        // if header says so, decode form body
-        auto it = std::find_if(req.headers_.begin(), req.headers_.end(), [](const Header &h) {
-            return iequals(h.name_, "content-type") &&
-                   iequals(h.value_, "application/x-www-form-urlencoded");
-        });
-        if (it != req.headers_.end()) {
+        if (req.getHeaderValue("content-type") == "application/x-www-form-urlencoded") {
             std::string bodyStr;
             urlDecode(req.body_.begin(), req.body_.end(), bodyStr);
             keyValDecode(bodyStr, req.formParams_);
