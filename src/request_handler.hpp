@@ -4,6 +4,7 @@
 #include <string>
 
 #include "beauty_common.hpp"
+#include "multipart_parser.hpp"
 
 namespace http {
 namespace server {
@@ -23,15 +24,24 @@ class RequestHandler {
     void addRequestHandler(const requestHandlerCallback &cb);
     void setFileNotFoundHandler(const fileNotFoundHandlerCallback &cb);
     void addFileHeaderHandler(const addFileHeaderCallback &cb);
-    void handleRequest(unsigned connectionId, const Request &req, Reply &rep);
-    void handleChunk(unsigned connectionId, Reply &rep);
-    void closeFile(unsigned connectionId);
+    void handleRequest(unsigned connectionId,
+                       const Request &req,
+                       std::vector<char> &content,
+                       Reply &rep);
+    void handlePartialRead(unsigned connectionId, Reply &rep);
+    void handlePartialWrite(unsigned connectionId,
+                            const Request &req,
+                            std::vector<char> &content,
+                            Reply &rep);
+    void closeFile(Reply &rep, unsigned connectionId);
 
    private:
-    size_t readChunkFromFile(unsigned connectionId, Reply &rep);
-    static bool urlDecode(const std::string &in, std::string &path, std::string &query);
-    static void keyValDecode(const std::string &in,
-                             std::vector<std::pair<std::string, std::string>> &params);
+    bool openAndReadFile(unsigned connectionId, const Request &req, Reply &rep);
+    size_t readFromFile(unsigned connectionId, Reply &rep);
+    void writeFileParts(unsigned connectionId,
+                        const Request &req,
+                        Reply &rep,
+                        std::deque<MultiPartParser::ContentPart> &parts);
 
     // Provided FileHandler to be implemented by each specific projects.
     IFileHandler *fileHandler_ = nullptr;

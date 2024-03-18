@@ -1,5 +1,6 @@
 #include "file_handler.hpp"
 
+#include <iostream>
 #include <limits>
 
 namespace http {
@@ -7,9 +8,9 @@ namespace server {
 
 FileHandler::FileHandler(const std::string &docRoot) : docRoot_(docRoot) {}
 
-size_t FileHandler::openFile(unsigned id, const std::string &path) {
+size_t FileHandler::openFileForRead(const std::string &id, const std::string &path) {
     std::string fullPath = docRoot_ + path;
-    std::ifstream &is = openFiles_[id];
+    std::ifstream &is = openReadFiles_[id];
     is.open(fullPath.c_str(), std::ios::in | std::ios::binary);
     is.ignore(std::numeric_limits<std::streamsize>::max());
     size_t fileSize = is.gcount();
@@ -18,18 +19,39 @@ size_t FileHandler::openFile(unsigned id, const std::string &path) {
     if (is.is_open()) {
         return fileSize;
     }
-    openFiles_.erase(id);
+    openReadFiles_.erase(id);
     return 0;
 }
 
-void FileHandler::closeFile(unsigned id) {
-    openFiles_[id].close();
-    openFiles_.erase(id);
+Reply::status_type FileHandler::openFileForWrite(const std::string &id,
+                                                 const std::string &path,
+                                                 std::string &err) {
+    // TODO: error handling
+    std::string fullPath = docRoot_ + path;
+    std::ofstream &os = openWriteFiles_[id];
+    os.open(fullPath.c_str(), std::ios::out | std::ios::binary);
+    return Reply::status_type::ok;
 }
 
-int FileHandler::readFile(unsigned id, char *buf, size_t maxSize) {
-    openFiles_[id].read(buf, maxSize);
-    return openFiles_[id].gcount();
+int FileHandler::readFile(const std::string &id, char *buf, size_t maxSize) {
+    openReadFiles_[id].read(buf, maxSize);
+    return openReadFiles_[id].gcount();
+}
+
+Reply::status_type FileHandler::writeFile(const std::string &id,
+                                          const char *buf,
+                                          size_t size,
+                                          std::string &err) {
+    // TODO: error handling
+    openWriteFiles_[id].write(buf, size);
+    return Reply::status_type::ok;
+}
+
+void FileHandler::closeFile(const std::string &id) {
+    openReadFiles_[id].close();
+    openReadFiles_.erase(id);
+    openWriteFiles_[id].close();
+    openWriteFiles_.erase(id);
 }
 
 }  // namespace server

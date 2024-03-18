@@ -72,7 +72,9 @@ const char crlf[] = {'\r', '\n'};
 
 }  // namespace misc_strings
 
-Reply::Reply() {
+Reply::Reply(size_t maxContentSize)
+    : maxContentSize_(maxContentSize), multiPartParser_(content_) {
+    content_.reserve(maxContentSize);
     defaultHeaders_.reserve(2);
     addedHeaders_.reserve(2);
 }
@@ -275,16 +277,15 @@ std::vector<char> toArray(Reply::status_type status) {
 
 }  // namespace stock_replies
 
-Reply Reply::stockReply(Reply::status_type status) {
-    Reply rep;
-    rep.status_ = status;
-    rep.content_ = stock_replies::toArray(status);
-    rep.defaultHeaders_.resize(2);
-    rep.defaultHeaders_[0].name_ = "Content-Length";
-    rep.defaultHeaders_[0].value_ = std::to_string(rep.content_.size());
-    rep.defaultHeaders_[1].name_ = "Content-Type";
-    rep.defaultHeaders_[1].value_ = "text/html";
-    return rep;
+void Reply::stockReply(Reply::status_type status) {
+    status_ = status;
+    content_ = stock_replies::toArray(status);
+    defaultHeaders_.resize(2);
+    defaultHeaders_[0].name_ = "Content-Length";
+    defaultHeaders_[0].value_ = std::to_string(content_.size());
+    defaultHeaders_[1].name_ = "Content-Type";
+    defaultHeaders_[1].value_ = "text/html";
+	addedHeaders_.clear();
 }
 
 }  // namespace server

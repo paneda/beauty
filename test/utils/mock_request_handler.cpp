@@ -3,10 +3,15 @@
 namespace http {
 namespace server {
 
+MockRequestHandler::MockRequestHandler() : receivedReply_(1024) {}
+
 void MockRequestHandler::handleRequest(const Request& req, Reply& rep) {
     noCalls_++;
     receivedRequest_ = req;
-    receivedReply_ = rep;
+
+    receivedReply_.content_ = rep.content_;
+    receivedReply_.filePath_ = rep.filePath_;
+
     if (returnToClient_) {
         if (!mockedContent_.empty()) {
             rep.sendPtr(status_, "text/plain", &mockedContent_[0], mockedContent_.size());
@@ -33,7 +38,7 @@ Request MockRequestHandler::getReceivedRequest() const {
     return receivedRequest_;
 }
 
-Reply MockRequestHandler::getReceivedReply() const {
+Reply& MockRequestHandler::getReceivedReply() {
     return receivedReply_;
 }
 

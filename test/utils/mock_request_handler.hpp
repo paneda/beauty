@@ -11,7 +11,7 @@ namespace server {
 
 class MockRequestHandler {
    public:
-    MockRequestHandler() = default;
+    MockRequestHandler();
     virtual ~MockRequestHandler() = default;
 
     void handleRequest(const Request& req, Reply& rep);
@@ -20,7 +20,7 @@ class MockRequestHandler {
     void setMockedReply(Reply::status_type status, const std::string& content);
     int getNoCalls();
     Request getReceivedRequest() const;
-    Reply getReceivedReply() const;
+    Reply& getReceivedReply();
 
    private:
     int noCalls_ = 0;

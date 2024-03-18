@@ -3,7 +3,11 @@
 #include <string>
 
 #include "file_handler.hpp"
+#include "file_storage_handler.hpp"
 #include "server.hpp"
+
+using namespace http::server;
+using namespace std::placeholders;
 
 int main(int argc, char *argv[]) {
     try {
@@ -19,8 +23,11 @@ int main(int argc, char *argv[]) {
 
         asio::io_context ioc;
         // Initialise the server.
-        http::server::FileHandler fileHandler(argv[3]);
-        http::server::Server s(ioc, argv[1], argv[2], &fileHandler);
+        FileHandler fileHandler(argv[3]);
+        FileStorageHandler fileStorageHandler(argv[3]);
+        Server s(ioc, argv[1], argv[2], &fileHandler);
+        s.addRequestHandler(
+            std::bind(&FileStorageHandler::handleRequest, &fileStorageHandler, _1, _2));
 
         // Run the server until stopped.
         ioc.run();

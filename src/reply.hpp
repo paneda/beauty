@@ -1,13 +1,12 @@
 #pragma once
-// clang-format off
 #include "environment.hpp"
-// clang-format on
 
 #include <asio.hpp>
 #include <string>
 #include <vector>
 
 #include "header.hpp"
+#include "multipart_parser.hpp"
 
 namespace http {
 namespace server {
@@ -19,7 +18,10 @@ class Reply {
     friend class Connection;
 
    public:
-    Reply();
+    Reply(const Reply&) = delete;
+    Reply& operator=(const Reply&) = delete;
+
+    Reply(size_t maxContentSize);
     virtual ~Reply() = default;
 
     enum status_type {
@@ -44,8 +46,8 @@ class Reply {
     // Content to be sent in the reply.
     std::vector<char> content_;
 
-    // Helper to provide standard replies
-    static Reply stockReply(status_type status);
+    // Helper to provide standard replies.
+    void stockReply(status_type status);
 
     // File path to open.
     std::string filePath_;
@@ -65,9 +67,23 @@ class Reply {
     const char* contentPtr_ = nullptr;
     size_t contentSize_;
 
-    // for http chunking (using content-length, not "http chunking")
-    bool useChunking_ = false;
-    bool finalChunk_ = false;
+    // Keep track when replying with successive write buffers.
+    size_t maxContentSize_;
+    bool replyPartial_ = false;
+    bool finalPart_ = false;
+
+    // Keep track of the number of body bytes received in request body.
+    int noBodyBytesReceived_ = -1;
+
+    // Keep track if the body is a multi-part upload.
+    bool isMultiPart_ = false;
+
+    // Keep track of the last opened file in multi-part transfers.
+    std::string lastOpenFileForWriteId_;
+    unsigned multiPartCounter_ = 0;
+
+    // Parser to handle multipart uploads.
+    MultiPartParser multiPartParser_;
 
     // Convert the reply into a vector of buffers. The buffers do not own the
     // underlying memory blocks, therefore the reply object must remain valid
