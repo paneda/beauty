@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <chrono>
 #include <string>
 #include <utility>
 #include <vector>
@@ -12,6 +13,8 @@ namespace server {
 
 // A request received from a client.
 struct Request {
+    friend class Connection;
+
     std::string method_;
     std::string uri_;
     int httpVersionMajor_ = 0;
@@ -48,6 +51,14 @@ struct Request {
     }
 
    private:
+    void reset() {
+        method_.clear();
+        uri_.clear();
+        headers_.clear();
+        body_.clear();
+        requestPath_.clear();
+    }
+
     std::string getParamValue(const std::vector<std::pair<std::string, std::string>> &params,
                               const std::string &key) const {
         auto it = std::find_if(

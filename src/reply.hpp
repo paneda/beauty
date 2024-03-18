@@ -56,6 +56,16 @@ class Reply {
     void addHeader(const std::string& name, const std::string& val);
 
    private:
+    void reset() {
+        content_.clear();
+        filePath_.clear();
+        defaultHeaders_.clear();
+        addedHeaders_.clear();
+        returnToClient_ = false;
+        contentPtr_ = nullptr;
+        useChunking_ = false;
+        finalChunk_ = false;
+    }
     // Headers to be included in the reply.
     status_type status_;
     std::vector<Header> defaultHeaders_;

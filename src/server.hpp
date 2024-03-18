@@ -22,13 +22,17 @@ class Server {
     Server &operator=(const Server &) = delete;
 
     // simple constructor, use for ESP32
-    explicit Server(asio::io_context &ioContext, uint16_t port, IFileHandler *fileHandler);
+    explicit Server(asio::io_context &ioContext,
+                    uint16_t port,
+                    IFileHandler *fileHandler,
+                    HttpPersistence options);
 
     // advanced constructor use for OS:s supporting signal_set
     explicit Server(asio::io_context &ioContext,
                     const std::string &address,
                     const std::string &port,
-                    IFileHandler *fileHandler);
+                    IFileHandler *fileHandler,
+                    HttpPersistence options);
 
     uint16_t getBindedPort() const;
 
@@ -40,6 +44,7 @@ class Server {
    private:
     void doAccept();
     void doAwaitStop();
+    void doTick();
 
     std::shared_ptr<asio::signal_set> signals_;
     asio::ip::tcp::acceptor acceptor_;
@@ -47,6 +52,9 @@ class Server {
     RequestHandler requestHandler_;
     // each connection gets a unique internal id
     unsigned connectionId_ = 0;
+
+    // time to handle connection status
+    asio::steady_timer timer_;
 };
 
 }  // namespace server

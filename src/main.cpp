@@ -5,6 +5,9 @@
 #include "file_handler.hpp"
 #include "server.hpp"
 
+using namespace std::literals::chrono_literals;
+using namespace http::server;
+
 int main(int argc, char *argv[]) {
     try {
         // Check command line arguments.
@@ -19,8 +22,9 @@ int main(int argc, char *argv[]) {
 
         asio::io_context ioc;
         // Initialise the server.
-        http::server::FileHandler fileHandler(argv[3]);
-        http::server::Server s(ioc, argv[1], argv[2], &fileHandler);
+        FileHandler fileHandler(argv[3]);
+        HttpPersistence persistentOption(5s, 10, 100);
+        Server s(ioc, argv[1], argv[2], &fileHandler, persistentOption);
 
         // Run the server until stopped.
         ioc.run();

@@ -5,6 +5,7 @@
 
 #include <array>
 #include <asio.hpp>
+#include <chrono>
 #include <memory>
 
 #include "reply.hpp"
@@ -31,10 +32,13 @@ class Connection : public std::enable_shared_from_this<Connection> {
                         unsigned connectionId);
 
     // Start the first asynchronous operation for the connection.
-    void start();
+    void start(std::chrono::seconds keepAliveTimeout, size_t keepAliveMax);
 
     // Stop all asynchronous operations associated with the connection.
     void stop();
+
+    std::chrono::steady_clock::time_point getLastRequestTime() const;
+    size_t getNrOfRequests() const;
 
    private:
     // Perform an asynchronous read operation.
@@ -73,6 +77,12 @@ class Connection : public std::enable_shared_from_this<Connection> {
     Reply reply_;
 
     unsigned connectionId_;
+
+    std::chrono::steady_clock::time_point timestamp_;
+
+    std::chrono::seconds keepAliveTimeout_;
+    size_t keepAliveMax_;
+    size_t nrOfRequest_ = 0;
 };
 
 typedef std::shared_ptr<Connection> connection_ptr;

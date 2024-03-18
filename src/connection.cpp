@@ -7,6 +7,8 @@
 #include "connection_manager.hpp"
 #include "request_handler.hpp"
 
+using namespace std::literals::chrono_literals;
+
 namespace http {
 namespace server {
 
@@ -19,12 +21,23 @@ Connection::Connection(asio::ip::tcp::socket socket,
       requestHandler_(handler),
       connectionId_(connectionId) {}
 
-void Connection::start() {
+void Connection::start(std::chrono::seconds keepAliveTimeout, size_t keepAliveMax) {
+    timestamp_ = std::chrono::steady_clock::now();
+    keepAliveTimeout_ = keepAliveTimeout;
+    keepAliveMax_ = keepAliveMax;
     doRead();
 }
 
 void Connection::stop() {
     socket_.close();
+}
+
+std::chrono::steady_clock::time_point Connection::getLastRequestTime() const {
+    return timestamp_;
+}
+
+size_t Connection::getNrOfRequests() const {
+    return nrOfRequest_;
 }
 
 void Connection::doRead() {
@@ -37,8 +50,19 @@ void Connection::doRead() {
                     request_, buffer_.data(), buffer_.data() + bytes_transferred);
 
                 if (result == RequestParser::good) {
+                    timestamp_ = std::chrono::steady_clock::now();
+                    nrOfRequest_++;
                     if (requestDecoder_.decodeRequest(request_)) {
                         requestHandler_.handleRequest(connectionId_, request_, reply_);
+                        if (request_.keepAlive_ && keepAliveTimeout_ != 0s) {
+                            reply_.addHeader("Connection", "keep-alive");
+                            reply_.addHeader(
+                                "Keep-Alive",
+                                "timeout=" + std::to_string(keepAliveTimeout_.count()) +
+                                    ", max=" + std::to_string(keepAliveMax_));
+                        } else {
+                            reply_.addHeader("Connection", "close");
+                        }
                         doWriteHeaders();
                     } else {
                         reply_ = Reply::stockReply(Reply::bad_request);
@@ -97,11 +121,17 @@ void Connection::doWriteContent() {
 }
 
 void Connection::handleWriteCompleted() {
-    // TODO: handle keep-alive
-    // initiate graceful connection closure.
-    std::error_code ignored_ec;
-    socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
-    connectionManager_.stop(shared_from_this());
+    if (request_.keepAlive_ && keepAliveTimeout_ != 0s) {
+        requestParser_.reset();
+        request_.reset();
+        reply_.reset();
+        doRead();
+    } else {
+        // initiate graceful connection closure.
+        std::error_code ignored_ec;
+        socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
+        connectionManager_.stop(shared_from_this());
+    }
 }
 
 void Connection::shutdown() {

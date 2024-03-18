@@ -2,24 +2,36 @@
 
 #include <signal.h>
 
+#include <chrono>
 #include <iostream>
 #include <utility>
+
+using namespace std::literals::chrono_literals;
 
 namespace http {
 namespace server {
 
-Server::Server(asio::io_context &ioContext, uint16_t port, IFileHandler *fileHandler)
+Server::Server(asio::io_context &ioContext,
+               uint16_t port,
+               IFileHandler *fileHandler,
+               HttpPersistence options)
     : acceptor_(ioContext, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)),
-      connectionManager_(),
-      requestHandler_(fileHandler) {
+      connectionManager_(options),
+      requestHandler_(fileHandler),
+      timer_(ioContext) {
     doAccept();
+    doTick();
 }
 
 Server::Server(asio::io_context &ioContext,
                const std::string &address,
                const std::string &port,
-               IFileHandler *fileHandler)
-    : acceptor_(ioContext), connectionManager_(), requestHandler_(fileHandler) {
+               IFileHandler *fileHandler,
+               HttpPersistence options)
+    : acceptor_(ioContext),
+      connectionManager_(options),
+      requestHandler_(fileHandler),
+      timer_(ioContext) {
     // Register to handle the signals that indicate when the server should exit.
     // It is safe to register for the same signal multiple times in a program,
     // provided all registration for the specified signal is made through Asio.
@@ -42,6 +54,7 @@ Server::Server(asio::io_context &ioContext,
     acceptor_.listen();
 
     doAccept();
+    doTick();
 }
 
 uint16_t Server::getBindedPort() const {
@@ -81,11 +94,20 @@ void Server::doAccept() {
 
 void Server::doAwaitStop() {
     signals_->async_wait([this](std::error_code /*ec*/, int /*signo*/) {
-        // The server is stopped by cancelling all outstanding asynchronous
-        // operations. Once all operations have finished the
-        // io_context::run() call will exit.
+        timer_.cancel();
         acceptor_.close();
         connectionManager_.stopAll();
+    });
+}
+
+void Server::doTick() {
+    timer_.expires_after(1s);
+    timer_.async_wait([this](std::error_code ec) {
+        if (!ec) {
+            connectionManager_.tick();
+
+            doTick();
+        }
     });
 }
 
