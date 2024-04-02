@@ -1,10 +1,8 @@
-#include "file_storage_handler.hpp"
-
 #include <filesystem>
-#include <iostream>
 #include <string>
 
-#include "http_result2.hpp"
+#include "file_storage_handler.hpp"
+#include "http_result.hpp"
 
 namespace fs = std::filesystem;
 
@@ -29,8 +27,7 @@ FileStorageHandler::FileStorageHandler(const std::string &docRoot) : docRoot_(do
 }
 
 void FileStorageHandler::handleRequest(const Request &req, Reply &rep) {
-    HttpResult2 res(rep.content_);
-    std::cout << req.requestPath_ << std::endl;
+    HttpResult res(rep.content_);
     if (startsWith(req.requestPath_, "/list-files")) {
         res << "[";
         for (const auto &file : files_) {
