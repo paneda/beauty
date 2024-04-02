@@ -28,7 +28,7 @@ class RequestHandler {
                        const Request &req,
                        std::vector<char> &content,
                        Reply &rep);
-    void handlePartialRead(unsigned connectionId, Reply &rep);
+    void handlePartialRead(unsigned connectionId, const Request &req, Reply &rep);
     void handlePartialWrite(unsigned connectionId,
                             const Request &req,
                             std::vector<char> &content,
@@ -37,7 +37,7 @@ class RequestHandler {
 
    private:
     bool openAndReadFile(unsigned connectionId, const Request &req, Reply &rep);
-    size_t readFromFile(unsigned connectionId, Reply &rep);
+    size_t readFromFile(unsigned connectionId, const Request &req, Reply &rep);
     void writeFileParts(unsigned connectionId,
                         const Request &req,
                         Reply &rep,

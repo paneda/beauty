@@ -15,7 +15,9 @@ bool ends_with(std::string const& value, std::string const& ending) {
 }
 }
 
-size_t MockFileHandler::openFileForRead(const std::string& id, const std::string& path) {
+size_t MockFileHandler::openFileForRead(const http::server::Request& req,
+                                        const std::string& id,
+                                        const std::string& path) {
     OpenReadFile& openFile = openReadFiles_[id];
     countOpenFileForReadCalls_++;
     if (openFile.isOpen_) {
@@ -31,7 +33,10 @@ size_t MockFileHandler::openFileForRead(const std::string& id, const std::string
     return mockFileData_.size();
 }
 
-int MockFileHandler::readFile(const std::string& id, char* buf, size_t maxSize) {
+int MockFileHandler::readFile(const http::server::Request& req,
+                              const std::string& id,
+                              char* buf,
+                              size_t maxSize) {
     OpenReadFile& openFile = openReadFiles_[id];
     if (!openFile.isOpen_) {
         throw std::runtime_error("MockFileHandler test error: readFile() called on closed file");
@@ -49,7 +54,8 @@ void MockFileHandler::closeReadFile(const std::string& id) {
     openReadFiles_.erase(id);
 }
 
-http::server::Reply::status_type MockFileHandler::openFileForWrite(const std::string& id,
+http::server::Reply::status_type MockFileHandler::openFileForWrite(const http::server::Request& req,
+                                                                   const std::string& id,
                                                                    const std::string& path,
                                                                    std::string& err) {
     OpenWriteFile& openFile = openWriteFiles_[id];
@@ -65,17 +71,18 @@ http::server::Reply::status_type MockFileHandler::openFileForWrite(const std::st
     return http::server::Reply::status_type::created;
 }
 
-http::server::Reply::status_type MockFileHandler::writeFile(const std::string& id,
+http::server::Reply::status_type MockFileHandler::writeFile(const http::server::Request& req,
+                                                            const std::string& id,
                                                             const char* buf,
                                                             size_t size,
-															bool lastData,
+                                                            bool lastData,
                                                             std::string& err) {
     OpenWriteFile& openFile = openWriteFiles_[id];
     if (!openFile.isOpen_) {
         throw std::runtime_error("MockFileHandler test error: writeFile() called on closed file");
     }
     openFile.file_.insert(openFile.file_.end(), buf, buf + size);
-	openFile.lastData_ = lastData;
+    openFile.lastData_ = lastData;
     return http::server::Reply::status_type::ok;
 }
 

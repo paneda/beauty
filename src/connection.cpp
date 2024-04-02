@@ -146,7 +146,7 @@ void Connection::doWriteContent() {
                     if (reply_.finalPart_) {
                         handleWriteCompleted();
                     } else {
-                        requestHandler_.handlePartialRead(connectionId_, reply_);
+                        requestHandler_.handlePartialRead(connectionId_, request_, reply_);
                         doWriteContent();
                     }
                 } else {

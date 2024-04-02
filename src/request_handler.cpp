@@ -76,8 +76,8 @@ void RequestHandler::handleRequest(unsigned connectionId,
     fileNotFoundCb_(rep);
 }
 
-void RequestHandler::handlePartialRead(unsigned connectionId, Reply &rep) {
-    size_t nrReadBytes = readFromFile(connectionId, rep);
+void RequestHandler::handlePartialRead(unsigned connectionId, const Request &req, Reply &rep) {
+    size_t nrReadBytes = readFromFile(connectionId, req, rep);
 
     if (nrReadBytes < rep.maxContentSize_) {
         rep.finalPart_ = true;
@@ -119,7 +119,8 @@ void RequestHandler::closeFile(Reply &rep, unsigned connectionId) {
 
 bool RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, Reply &rep) {
     // open the file to send back
-    size_t contentSize = fileHandler_->openFileForRead(std::to_string(connectionId), rep.filePath_);
+    size_t contentSize =
+        fileHandler_->openFileForRead(req, std::to_string(connectionId), rep.filePath_);
     if (contentSize > 0) {
         // determine the file extension.
         std::string extension;
@@ -137,7 +138,7 @@ bool RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, 
         // fill initial content
         rep.replyPartial_ = contentSize > rep.maxContentSize_;
         rep.status_ = Reply::ok;
-        readFromFile(connectionId, rep);
+        readFromFile(connectionId, req, rep);
         if (!rep.replyPartial_) {
             // all data fits in initial content
             fileHandler_->closeReadFile(std::to_string(connectionId));
@@ -154,10 +155,10 @@ bool RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, 
     return false;
 }
 
-size_t RequestHandler::readFromFile(unsigned connectionId, Reply &rep) {
+size_t RequestHandler::readFromFile(unsigned connectionId, const Request &req, Reply &rep) {
     rep.content_.resize(rep.maxContentSize_);
     int nrReadBytes = fileHandler_->readFile(
-        std::to_string(connectionId), rep.content_.data(), rep.content_.size());
+        req, std::to_string(connectionId), rep.content_.data(), rep.content_.size());
     rep.content_.resize(nrReadBytes);
     return nrReadBytes;
 }
@@ -178,7 +179,7 @@ void RequestHandler::writeFileParts(unsigned connectionId,
             std::string filePath = req.requestPath_ + part.filename_;
             std::string err;
             rep.status_ = fileHandler_->openFileForWrite(
-                filePath + std::to_string(connectionId), filePath, err);
+                req, filePath + std::to_string(connectionId), filePath, err);
             rep.multiPartCounter_++;
             if (rep.status_ != Reply::status_type::ok &&
                 rep.status_ != Reply::status_type::created) {
@@ -203,7 +204,7 @@ void RequestHandler::writeFileParts(unsigned connectionId,
                 std::string filePath = req.requestPath_ + part.filename_;
                 rep.lastOpenFileForWriteId_ = filePath + std::to_string(connectionId);
                 rep.status_ =
-                    fileHandler_->openFileForWrite(rep.lastOpenFileForWriteId_, filePath, err);
+                    fileHandler_->openFileForWrite(req, rep.lastOpenFileForWriteId_, filePath, err);
                 rep.multiPartCounter_++;
                 if (rep.status_ != Reply::status_type::ok &&
                     rep.status_ != Reply::status_type::created) {
@@ -212,8 +213,8 @@ void RequestHandler::writeFileParts(unsigned connectionId,
                 }
             }
             size_t size = part.end_ - part.start_;
-            rep.status_ =
-                fileHandler_->writeFile(rep.lastOpenFileForWriteId_, &(*part.start_), size, part.foundEnd_, err);
+            rep.status_ = fileHandler_->writeFile(
+                req, rep.lastOpenFileForWriteId_, &(*part.start_), size, part.foundEnd_, err);
             if (rep.status_ != Reply::status_type::ok &&
                 rep.status_ != Reply::status_type::created) {
                 rep.lastOpenFileForWriteId_.clear();

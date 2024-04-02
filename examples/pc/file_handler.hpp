@@ -12,18 +12,25 @@ class FileHandler : public IFileHandler {
     FileHandler(const std::string &docRoot);
     virtual ~FileHandler() = default;
 
-    virtual size_t openFileForRead(const std::string &id, const std::string &path) override;
-    virtual int readFile(const std::string &id, char *buf, size_t maxSize) override;
+    virtual size_t openFileForRead(const Request &request,
+                                   const std::string &id,
+                                   const std::string &path) override;
+    virtual int readFile(const Request &request,
+                         const std::string &id,
+                         char *buf,
+                         size_t maxSize) override;
 
-    virtual Reply::status_type openFileForWrite(const std::string &id,
+    virtual Reply::status_type openFileForWrite(const Request &request,
+                                                const std::string &id,
                                                 const std::string &path,
                                                 std::string &err) override;
     virtual void closeReadFile(const std::string &id) override;
 
-    virtual Reply::status_type writeFile(const std::string &id,
+    virtual Reply::status_type writeFile(const Request &request,
+                                         const std::string &id,
                                          const char *buf,
                                          size_t size,
-										 bool lastData,
+                                         bool lastData,
                                          std::string &err) override;
 
    private:

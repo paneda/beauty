@@ -8,7 +8,9 @@ namespace server {
 
 FileHandler::FileHandler(const std::string &docRoot) : docRoot_(docRoot) {}
 
-size_t FileHandler::openFileForRead(const std::string &id, const std::string &path) {
+size_t FileHandler::openFileForRead(const Request &request,
+                                    const std::string &id,
+                                    const std::string &path) {
     std::string fullPath = docRoot_ + path;
     std::ifstream &is = openReadFiles_[id];
     is.open(fullPath.c_str(), std::ios::in | std::ios::binary);
@@ -23,7 +25,10 @@ size_t FileHandler::openFileForRead(const std::string &id, const std::string &pa
     return 0;
 }
 
-int FileHandler::readFile(const std::string &id, char *buf, size_t maxSize) {
+int FileHandler::readFile(const Request &request,
+                          const std::string &id,
+                          char *buf,
+                          size_t maxSize) {
     openReadFiles_[id].read(buf, maxSize);
     return openReadFiles_[id].gcount();
 }
@@ -33,7 +38,8 @@ void FileHandler::closeReadFile(const std::string &id) {
     openReadFiles_.erase(id);
 }
 
-Reply::status_type FileHandler::openFileForWrite(const std::string &id,
+Reply::status_type FileHandler::openFileForWrite(const Request &request,
+                                                 const std::string &id,
                                                  const std::string &path,
                                                  std::string &err) {
     // TODO: error handling
@@ -43,10 +49,11 @@ Reply::status_type FileHandler::openFileForWrite(const std::string &id,
     return Reply::status_type::ok;
 }
 
-Reply::status_type FileHandler::writeFile(const std::string &id,
+Reply::status_type FileHandler::writeFile(const Request &request,
+                                          const std::string &id,
                                           const char *buf,
                                           size_t size,
-										  bool lastData,
+                                          bool lastData,
                                           std::string &err) {
     // TODO: error handling
     openWriteFiles_[id].write(buf, size);
