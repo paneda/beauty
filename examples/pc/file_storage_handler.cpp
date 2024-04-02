@@ -48,6 +48,7 @@ void FileStorageHandler::handleRequest(const Request &req, Reply &rep) {
             used += file.second;
         }
 
+		// just a "made up" limit
         res << "{\"total\":100000,"
             << "\"used\":" << std::to_string(used) << "}";
         rep.send(res.statusCode_, "application/json");
