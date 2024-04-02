@@ -2,7 +2,6 @@
 
 #include "request_handler.hpp"
 #include "beauty_common.hpp"
-#include "file_handler.hpp"
 #include "header.hpp"
 #include "mime_types.hpp"
 #include "reply.hpp"
@@ -82,7 +81,7 @@ void RequestHandler::handlePartialRead(unsigned connectionId, Reply &rep) {
 
     if (nrReadBytes < rep.maxContentSize_) {
         rep.finalPart_ = true;
-        fileHandler_->closeFile(std::to_string(connectionId));
+        fileHandler_->closeReadFile(std::to_string(connectionId));
     }
 }
 
@@ -114,10 +113,7 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
 
 void RequestHandler::closeFile(Reply &rep, unsigned connectionId) {
     if (fileHandler_ != nullptr) {
-        if (!rep.lastOpenFileForWriteId_.empty()) {
-            fileHandler_->closeFile(rep.lastOpenFileForWriteId_);
-        }
-        fileHandler_->closeFile(std::to_string(connectionId));
+        fileHandler_->closeReadFile(std::to_string(connectionId));
     }
 }
 
@@ -144,7 +140,7 @@ bool RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, 
         readFromFile(connectionId, rep);
         if (!rep.replyPartial_) {
             // all data fits in initial content
-            fileHandler_->closeFile(std::to_string(connectionId));
+            fileHandler_->closeReadFile(std::to_string(connectionId));
         }
 
         rep.defaultHeaders_.resize(2);
@@ -217,16 +213,14 @@ void RequestHandler::writeFileParts(unsigned connectionId,
             }
             size_t size = part.end_ - part.start_;
             rep.status_ =
-                fileHandler_->writeFile(rep.lastOpenFileForWriteId_, &(*part.start_), size, err);
+                fileHandler_->writeFile(rep.lastOpenFileForWriteId_, &(*part.start_), size, part.foundEnd_, err);
             if (rep.status_ != Reply::status_type::ok &&
                 rep.status_ != Reply::status_type::created) {
-                fileHandler_->closeFile(rep.lastOpenFileForWriteId_);
                 rep.lastOpenFileForWriteId_.clear();
                 rep.content_.insert(rep.content_.begin(), err.begin(), err.end());
                 return;
             }
             if (part.foundEnd_) {
-                fileHandler_->closeFile(rep.lastOpenFileForWriteId_);
                 rep.lastOpenFileForWriteId_.clear();
             }
         }

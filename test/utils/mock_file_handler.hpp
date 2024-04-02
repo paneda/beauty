@@ -14,14 +14,15 @@ class MockFileHandler : public http::server::IFileHandler {
     virtual ~MockFileHandler() = default;
 
     virtual size_t openFileForRead(const std::string& id, const std::string& path) override;
-    virtual void closeFile(const std::string& id) override;
     virtual int readFile(const std::string& id, char* buf, size_t maxSize) override;
+    virtual void closeReadFile(const std::string& id) override;
     virtual http::server::Reply::status_type openFileForWrite(const std::string& id,
                                                               const std::string& path,
                                                               std::string& err) override;
     virtual http::server::Reply::status_type writeFile(const std::string& id,
                                                        const char* buf,
                                                        size_t size,
+													   bool lastData,
                                                        std::string& err) override;
 
     void createMockFile(uint32_t size);
@@ -32,7 +33,8 @@ class MockFileHandler : public http::server::IFileHandler {
     int getOpenFileForReadCalls();
     int getOpenFileForWriteCalls();
     int getReadFileCalls();
-    int getCloseFileCalls();
+    int getCloseReadFileCalls();
+	bool getLastData(const std::string& id);
 
    private:
     struct OpenReadFile {
@@ -42,6 +44,7 @@ class MockFileHandler : public http::server::IFileHandler {
     struct OpenWriteFile {
         std::vector<char> file_;
         bool isOpen_ = false;
+		bool lastData_ = false;
     };
     std::unordered_map<std::string, OpenReadFile> openReadFiles_;
     std::unordered_map<std::string, OpenWriteFile> openWriteFiles_;
@@ -49,7 +52,7 @@ class MockFileHandler : public http::server::IFileHandler {
     int countOpenFileForReadCalls_ = 0;
     int countOpenFileForWriteCalls_ = 0;
     int countReadFileCalls_ = 0;
-    int countCloseFileCalls_ = 0;
+    int countCloseReadFileCalls_ = 0;
     bool mockFailToOpenReadFile_ = false;
     bool mockFailToOpenWriteFile_ = false;
 };

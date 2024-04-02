@@ -31,11 +31,6 @@ size_t MockFileHandler::openFileForRead(const std::string& id, const std::string
     return mockFileData_.size();
 }
 
-void MockFileHandler::closeFile(const std::string& id) {
-    countCloseFileCalls_++;
-    openReadFiles_.erase(id);
-}
-
 int MockFileHandler::readFile(const std::string& id, char* buf, size_t maxSize) {
     OpenReadFile& openFile = openReadFiles_[id];
     if (!openFile.isOpen_) {
@@ -47,6 +42,11 @@ int MockFileHandler::readFile(const std::string& id, char* buf, size_t maxSize) 
     std::copy(openFile.readIt_, std::next(openFile.readIt_, bytesToCopy), buf);
     std::advance(openFile.readIt_, bytesToCopy);
     return bytesToCopy;
+}
+
+void MockFileHandler::closeReadFile(const std::string& id) {
+    countCloseReadFileCalls_++;
+    openReadFiles_.erase(id);
 }
 
 http::server::Reply::status_type MockFileHandler::openFileForWrite(const std::string& id,
@@ -68,12 +68,14 @@ http::server::Reply::status_type MockFileHandler::openFileForWrite(const std::st
 http::server::Reply::status_type MockFileHandler::writeFile(const std::string& id,
                                                             const char* buf,
                                                             size_t size,
+															bool lastData,
                                                             std::string& err) {
     OpenWriteFile& openFile = openWriteFiles_[id];
     if (!openFile.isOpen_) {
         throw std::runtime_error("MockFileHandler test error: writeFile() called on closed file");
     }
     openFile.file_.insert(openFile.file_.end(), buf, buf + size);
+	openFile.lastData_ = lastData;
     return http::server::Reply::status_type::ok;
 }
 
@@ -119,6 +121,10 @@ int MockFileHandler::getReadFileCalls() {
     return countReadFileCalls_;
 }
 
-int MockFileHandler::getCloseFileCalls() {
-    return countCloseFileCalls_;
+int MockFileHandler::getCloseReadFileCalls() {
+    return countCloseReadFileCalls_;
+}
+
+bool MockFileHandler::getLastData(const std::string& id) {
+    return openWriteFiles_[id].lastData_;
 }

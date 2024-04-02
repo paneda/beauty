@@ -1,0 +1,22 @@
+{
+  "name": "Beauty",
+  "version": "1.0.0",
+  "description": "A web server using asio (non-boost).",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/raspine/beauty.git"
+  },
+  "authors":
+  [
+    {
+      "email": "jorgen.scott@gmail.com"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "*",
+  "platforms": "*",
+  "build": {
+    "srcFilter": ["+<*.cpp>", "+<*.hpp>"]
+  }
+}

@@ -26,9 +26,9 @@ TEST_CASE("file_handler.cpp", "[file_handler]") {
     }
     SECTION("should close file idempotent") {
         fh.openFileForRead("0", "testfile.bin");
-        fh.closeFile("0");
-        fh.closeFile("0");
-        fh.closeFile("0");
+        fh.closeReadFile("0");
+        fh.closeReadFile("0");
+        fh.closeReadFile("0");
     }
     SECTION("should provide correct size") {
         size_t fileSize = fh.openFileForRead("0", "testfile.bin");
@@ -62,7 +62,7 @@ TEST_CASE("file_handler.cpp", "[file_handler]") {
         expected = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
         REQUIRE(readData == expected);
 
-        fh.closeFile("0");
+        fh.closeReadFile("0");
 
         fh.readFile("1", (char*)readData.data(), readData.size() * typeSize);
         expected = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
@@ -122,7 +122,7 @@ TEST_CASE("Reading from MockFileHandler", "[file_handler]") {
         expected = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
         REQUIRE(readData == expected);
 
-        fh.closeFile("0");
+        fh.closeReadFile("0");
 
         fh.readFile("1", (char*)readData.data(), readData.size() * typeSize);
         expected = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
@@ -144,7 +144,7 @@ TEST_CASE("Writing to MockFileHandler", "[file_handler]") {
     SECTION("should throw if call write() before opened") {
         std::vector<uint32_t> writeData(10);
         std::string err;
-        REQUIRE_THROWS_AS(fh.writeFile("0", (char*)writeData.data(), writeData.size(), err),
+        REQUIRE_THROWS_AS(fh.writeFile("0", (char*)writeData.data(), writeData.size(), false, err),
                           std::runtime_error);
     }
     SECTION("should write chunks") {
@@ -152,12 +152,12 @@ TEST_CASE("Writing to MockFileHandler", "[file_handler]") {
         fh.openFileForWrite("0", "testfile.bin", err);
         std::vector<char> writeData1 = {'a', 'b', 'c', 'd', 'e'};
 
-        fh.writeFile("0", writeData1.data(), writeData1.size(), err);
+        fh.writeFile("0", writeData1.data(), writeData1.size(), false, err);
         std::vector<char> result = fh.getMockWriteFile("0");
         REQUIRE(result == writeData1);
 
         std::vector<char> writeData2 = {'f', 'g', 'h'};
-        fh.writeFile("0", writeData2.data(), writeData2.size(), err);
+        fh.writeFile("0", writeData2.data(), writeData2.size(), true, err);
         result = fh.getMockWriteFile("0");
         writeData1.insert(writeData1.end(), writeData2.begin(), writeData2.end());
         REQUIRE(result == writeData1);
@@ -170,8 +170,8 @@ TEST_CASE("Writing to MockFileHandler", "[file_handler]") {
         std::vector<char> writeData1 = {'a', 'b', 'c', 'd', 'e'};
         std::vector<char> writeData2 = {'f', 'g', 'h'};
 
-        fh.writeFile("0", writeData1.data(), writeData1.size(), err);
-        fh.writeFile("1", writeData2.data(), writeData2.size(), err);
+        fh.writeFile("0", writeData1.data(), writeData1.size(), true, err);
+        fh.writeFile("1", writeData2.data(), writeData2.size(), true, err);
 
         std::vector<char> result = fh.getMockWriteFile("0");
         REQUIRE(result == writeData1);

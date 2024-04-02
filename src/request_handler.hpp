@@ -5,11 +5,11 @@
 
 #include "beauty_common.hpp"
 #include "multipart_parser.hpp"
+#include "i_file_handler.hpp"
 
 namespace http {
 namespace server {
 
-class IFileHandler;
 class IRouteHandler;
 struct Reply;
 struct Request;

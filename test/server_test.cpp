@@ -156,7 +156,7 @@ TEST_CASE("server with file handler", "[server]") {
         c.sendRequest(GetIndexRequest);
         fut.get();
         REQUIRE(mockFileHandler.getOpenFileForReadCalls() == 1);
-        REQUIRE(mockFileHandler.getCloseFileCalls() == 0);
+        REQUIRE(mockFileHandler.getCloseReadFileCalls() == 0);
     }
 
     SECTION("it should call fileHandler openFileForRead and close when file exists") {
@@ -167,7 +167,7 @@ TEST_CASE("server with file handler", "[server]") {
         c.sendRequest(GetIndexRequest);
         fut.get();
         REQUIRE(mockFileHandler.getOpenFileForReadCalls() == 1);
-        REQUIRE(mockFileHandler.getCloseFileCalls() == 1);
+        REQUIRE(mockFileHandler.getCloseReadFileCalls() == 1);
     }
 
     SECTION("it should assume index.html for directories") {
@@ -457,7 +457,7 @@ TEST_CASE("server with write filehandler", "[server]") {
         auto res = fut.get();
         REQUIRE(res.statusCode_ == 200);  // MockFileHandler::writeFile returns 200
         REQUIRE(mockFileHandler.getOpenFileForWriteCalls() == 1);
-        REQUIRE(mockFileHandler.getCloseFileCalls() == 1);
+        REQUIRE(mockFileHandler.getLastData("/firstpart.txt0") == true);
         std::vector<char> result = mockFileHandler.getMockWriteFile("/firstpart.txt0");
         std::vector<char> expected = {'F', 'i', 'r', 's', 't', ' ', 'p', 'a', 'r', 't'};
         REQUIRE(result == expected);
@@ -488,7 +488,7 @@ TEST_CASE("server with write filehandler", "[server]") {
         REQUIRE(res1.statusCode_ == 200);  // Header response
         REQUIRE(res2.statusCode_ == 200);  // MockFileHandler::writeFile returns 200
         REQUIRE(mockFileHandler.getOpenFileForWriteCalls() == 1);
-        REQUIRE(mockFileHandler.getCloseFileCalls() == 1);
+        REQUIRE(mockFileHandler.getLastData("/firstpart.txt0") == true);
         std::vector<char> result = mockFileHandler.getMockWriteFile("/firstpart.txt0");
         std::vector<char> expected = {'F', 'i', 'r', 's', 't', ' ', 'p', 'a', 'r', 't'};
         REQUIRE(result == expected);
@@ -520,7 +520,7 @@ TEST_CASE("server with write filehandler", "[server]") {
 
         REQUIRE(res2.statusCode_ == 200);  // MockFileHandler::writeFile returns 200
         REQUIRE(mockFileHandler.getOpenFileForWriteCalls() == 1);
-        REQUIRE(mockFileHandler.getCloseFileCalls() == 1);
+        REQUIRE(mockFileHandler.getLastData("/firstpart.txt0") == true);
         std::vector<char> result = mockFileHandler.getMockWriteFile("/firstpart.txt0");
         std::vector<char> expected = {'F', 'i', 'r', 's', 't', ' ', 'p', 'a', 'r', 't'};
         REQUIRE(result == expected);
@@ -580,7 +580,8 @@ TEST_CASE("server with write filehandler", "[server]") {
         REQUIRE(res2.statusCode_ == 201);  // MockFileHandler::openFileForWrite returns 201
         REQUIRE(res3.statusCode_ == 200);  // MockFileHandler::writeFile returns 200
         REQUIRE(mockFileHandler.getOpenFileForWriteCalls() == 2);
-        REQUIRE(mockFileHandler.getCloseFileCalls() == 2);
+        REQUIRE(mockFileHandler.getLastData("/firstpart.txt0") == true);
+        REQUIRE(mockFileHandler.getLastData("/secondpart.txt0") == true);
         std::vector<char> result = mockFileHandler.getMockWriteFile("/firstpart.txt0");
         std::vector<char> expected = {'F', 'i', 'r', 's', 't', ' ', 'p', 'a', 'r', 't', '.'};
         REQUIRE(result == expected);
