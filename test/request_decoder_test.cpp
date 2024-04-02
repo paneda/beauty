@@ -7,7 +7,8 @@ using namespace http::server;
 
 TEST_CASE("error handling", "[request_parser]") {
     RequestDecoder reqDecoder;
-    Request req;
+    std::vector<char> body;  // not used in tests
+    Request req(body);
 
     SECTION("it should false for invalid path") {
         req.uri_ =
@@ -21,7 +22,8 @@ TEST_CASE("error handling", "[request_parser]") {
 
 TEST_CASE("decode GET request", "[request_decoder]") {
     RequestDecoder reqDecoder;
-    Request getRequest;
+    std::vector<char> body;  // not used in tests
+    Request getRequest(body);
     getRequest.method_ = "GET";
     getRequest.uri_ = "/file.bin?myKey=my%20value";
     getRequest.httpVersionMajor_ = 1;
@@ -43,7 +45,8 @@ TEST_CASE("decode GET request", "[request_decoder]") {
 
 TEST_CASE("decode POST request", "[request_decoder]") {
     RequestDecoder reqDecoder;
-    Request postRequest;
+    std::vector<char> body;  // not used in tests
+    Request postRequest(body);
     postRequest.method_ = "POST";
     postRequest.uri_ = "/uri.cgi";
     postRequest.httpVersionMajor_ = 1;

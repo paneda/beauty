@@ -37,9 +37,8 @@ class Server {
     uint16_t getBindedPort() const;
 
     // handlers to be optionally implemented
-    void addRequestHandler(const requestHandlerCallback &cb);
-    void setFileNotFoundHandler(const fileNotFoundHandlerCallback &cb);
-    void addFileHeaderHandler(const addFileHeaderCallback &cb);
+    void addRequestHandler(const handlerCallback &cb);
+    void setFileNotFoundHandler(const handlerCallback &cb);
 
    private:
     void doAccept();

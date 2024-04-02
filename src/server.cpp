@@ -64,16 +64,12 @@ uint16_t Server::getBindedPort() const {
     return acceptor_.local_endpoint().port();
 }
 
-void Server::addRequestHandler(const requestHandlerCallback &cb) {
+void Server::addRequestHandler(const handlerCallback &cb) {
     requestHandler_.addRequestHandler(cb);
 }
 
-void Server::setFileNotFoundHandler(const fileNotFoundHandlerCallback &cb) {
+void Server::setFileNotFoundHandler(const handlerCallback &cb) {
     requestHandler_.setFileNotFoundHandler(cb);
-}
-
-void Server::addFileHeaderHandler(const addFileHeaderCallback &cb) {
-    requestHandler_.addFileHeaderHandler(cb);
 }
 
 void Server::doAccept() {

@@ -14,7 +14,7 @@ std::vector<char> convertToCharVec(const std::string &s) {
 }
 
 struct RequestFixture {
-    RequestFixture(size_t maxContentSize) {
+    RequestFixture(size_t maxContentSize) : request(content_) {
         content_.clear();
         content_.reserve(maxContentSize);
     }
@@ -23,8 +23,8 @@ struct RequestFixture {
         content_.insert(content_.begin(), text.begin(), text.begin() + content_.capacity());
         return parser.parse(request, content_);
     }
-    Request request;
     std::vector<char> content_;
+    Request request;
 };
 
 }  // namespace

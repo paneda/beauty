@@ -52,16 +52,19 @@ class Reply {
     // File path to open.
     std::string filePath_;
 
+    // Extension of the file to open
+    std::string fileExtension_;
+
     void send(status_type status);
     void send(status_type status, const std::string& contentType);
     void sendPtr(status_type status, const std::string& contentType, const char* data, size_t size);
     void addHeader(const std::string& name, const std::string& val);
+    bool hasHeaders() const;
 
    private:
     // Headers to be included in the reply.
     status_type status_;
-    std::vector<Header> defaultHeaders_;
-    std::vector<Header> addedHeaders_;
+    std::vector<Header> headers_;
 
     bool returnToClient_ = false;
     const char* contentPtr_ = nullptr;

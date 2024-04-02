@@ -15,6 +15,8 @@ struct Request {
     friend class RequestParser;
     friend class RequestHandler;
 
+    Request(std::vector<char> &body) : body_(body) {}
+
     std::string method_;
     std::string uri_;
     int httpVersionMajor_ = 0;
@@ -22,6 +24,7 @@ struct Request {
     std::vector<Header> headers_;
     bool keepAlive_ = false;
     std::string requestPath_;
+    std::vector<char> &body_;
     size_t bodySize_;
 
     // Parsed query params in the request
@@ -42,12 +45,18 @@ struct Request {
         return "";
     }
 
+	struct Param {
+		bool exist_;
+		std::string value_;
+	};
+
     // Note: below are case sensitive for speed
-    std::string getQueryParamValue(const std::string &key) const {
-        return getParamValue(queryParams_, key);
+    Param getQueryParam(const std::string &key) const {
+        return getParam(queryParams_, key);
     }
-    std::string getFormParamValue(const std::string &key) const {
-        return getParamValue(formParams_, key);
+
+    Param getFormParam(const std::string &key) const {
+        return getParam(formParams_, key);
     }
 
     int getBodySize() const {
@@ -59,16 +68,17 @@ struct Request {
     }
 
    private:
-    std::string getParamValue(const std::vector<std::pair<std::string, std::string>> &params,
-                              const std::string &key) const {
+    Param getParam(
+        const std::vector<std::pair<std::string, std::string>> &params,
+        const std::string &key) const {
         auto it = std::find_if(
             params.begin(), params.end(), [&](const std::pair<std::string, std::string> &param) {
                 return param.first == key;
             });
         if (it != params.end()) {
-            return it->second;
+            return {true, it->second};
         }
-        return "";
+        return {false, ""};
     }
 
     static bool ichar_equals(char a, char b) {

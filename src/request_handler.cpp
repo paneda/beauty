@@ -12,11 +12,9 @@ namespace server {
 
 namespace {
 
-void defaultFileNotFoundHandler(Reply &rep) {
+void defaultFileNotFoundHandler(const Request &req, Reply &rep) {
     rep.stockReply(Reply::not_found);
 }
-
-void defaultAddFileHeaderHandler(Reply &rep) {}
 
 bool startsWith(const std::string &s, const std::string &sv) {
     return s.rfind(sv, 0) == 0;
@@ -25,20 +23,14 @@ bool startsWith(const std::string &s, const std::string &sv) {
 }
 
 RequestHandler::RequestHandler(IFileHandler *fileHandler)
-    : fileHandler_(fileHandler),
-      fileNotFoundCb_(defaultFileNotFoundHandler),
-      addFileHeaderCallback_(defaultAddFileHeaderHandler) {}
+    : fileHandler_(fileHandler), fileNotFoundCb_(defaultFileNotFoundHandler) {}
 
-void RequestHandler::addRequestHandler(const requestHandlerCallback &cb) {
+void RequestHandler::addRequestHandler(const handlerCallback &cb) {
     requestHandlers_.push_back(cb);
 }
 
-void RequestHandler::setFileNotFoundHandler(const fileNotFoundHandlerCallback &cb) {
+void RequestHandler::setFileNotFoundHandler(const handlerCallback &cb) {
     fileNotFoundCb_ = cb;
-}
-
-void RequestHandler::addFileHeaderHandler(const addFileHeaderCallback &cb) {
-    addFileHeaderCallback_ = cb;
 }
 
 void RequestHandler::handleRequest(unsigned connectionId,
@@ -48,9 +40,17 @@ void RequestHandler::handleRequest(unsigned connectionId,
     // initiate filePath with requestPath
     rep.filePath_ = req.requestPath_;
 
+    // determine the file extension.
+    std::size_t lastSlashPos = req.requestPath_.find_last_of("/");
+    std::size_t lastDotPos = req.requestPath_.find_last_of(".");
+    if (lastDotPos != std::string::npos && lastDotPos > lastSlashPos) {
+        rep.fileExtension_ = req.requestPath_.substr(lastDotPos + 1);
+    }
+
     // if path ends in slash (i.e. is a directory) then add "index.html"
     if (req.method_ == "GET" && rep.filePath_[rep.filePath_.size() - 1] == '/') {
         rep.filePath_ += "index.html";
+        rep.fileExtension_ = "html";
     }
 
     for (const auto &requestHandler_ : requestHandlers_) {
@@ -73,7 +73,7 @@ void RequestHandler::handleRequest(unsigned connectionId,
         }
     }
 
-    fileNotFoundCb_(rep);
+    fileNotFoundCb_(req, rep);
 }
 
 void RequestHandler::handlePartialRead(unsigned connectionId, const Request &req, Reply &rep) {
@@ -119,22 +119,8 @@ void RequestHandler::closeFile(Reply &rep, unsigned connectionId) {
 
 bool RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, Reply &rep) {
     // open the file to send back
-    size_t contentSize =
-        fileHandler_->openFileForRead(req, std::to_string(connectionId), rep.filePath_);
+    size_t contentSize = fileHandler_->openFileForRead(std::to_string(connectionId), req, rep);
     if (contentSize > 0) {
-        // determine the file extension.
-        std::string extension;
-        // if directory, then extension is provided by index.html
-        if (req.requestPath_[req.requestPath_.size() - 1] == '/') {
-            extension = "html";
-        } else {
-            std::size_t lastSlashPos = req.requestPath_.find_last_of("/");
-            std::size_t lastDotPos = req.requestPath_.find_last_of(".");
-            if (lastDotPos != std::string::npos && lastDotPos > lastSlashPos) {
-                extension = req.requestPath_.substr(lastDotPos + 1);
-            }
-        }
-
         // fill initial content
         rep.replyPartial_ = contentSize > rep.maxContentSize_;
         rep.status_ = Reply::ok;
@@ -144,12 +130,16 @@ bool RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, 
             fileHandler_->closeReadFile(std::to_string(connectionId));
         }
 
-        rep.defaultHeaders_.resize(2);
-        rep.defaultHeaders_[0].name_ = "Content-Length";
-        rep.defaultHeaders_[0].value_ = std::to_string(contentSize);
-        rep.defaultHeaders_[1].name_ = "Content-Type";
-        rep.defaultHeaders_[1].value_ = mime_types::extensionToType(extension);
-        addFileHeaderCallback_(rep);
+        // Content-Length is always set by server
+        if (rep.headers_.empty()) {
+            rep.headers_.resize(2);
+            rep.headers_[0].name_ = "Content-Length";
+            rep.headers_[0].value_ = std::to_string(contentSize);
+            rep.headers_[1].name_ = "Content-Type";
+            rep.headers_[1].value_ = mime_types::extensionToType(rep.fileExtension_);
+        } else {
+            rep.addHeader("Content-Length", std::to_string(contentSize));
+        }
         return true;
     }
     return false;
@@ -158,7 +148,7 @@ bool RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, 
 size_t RequestHandler::readFromFile(unsigned connectionId, const Request &req, Reply &rep) {
     rep.content_.resize(rep.maxContentSize_);
     int nrReadBytes = fileHandler_->readFile(
-        req, std::to_string(connectionId), rep.content_.data(), rep.content_.size());
+        std::to_string(connectionId), req, rep.content_.data(), rep.content_.size());
     rep.content_.resize(nrReadBytes);
     return nrReadBytes;
 }
@@ -176,10 +166,10 @@ void RequestHandler::writeFileParts(unsigned connectionId,
     const std::deque<MultiPartParser::ContentPart> &peakParts = rep.multiPartParser_.peakLastPart();
     for (auto &part : peakParts) {
         if (part.headerOnly_ && !part.filename_.empty()) {
-            std::string filePath = req.requestPath_ + part.filename_;
+            rep.filePath_ = req.requestPath_ + part.filename_;
             std::string err;
             rep.status_ = fileHandler_->openFileForWrite(
-                req, filePath + std::to_string(connectionId), filePath, err);
+                rep.filePath_ + std::to_string(connectionId), req, rep, err);
             rep.multiPartCounter_++;
             if (rep.status_ != Reply::status_type::ok &&
                 rep.status_ != Reply::status_type::created) {
@@ -201,10 +191,10 @@ void RequestHandler::writeFileParts(unsigned connectionId,
                 // In case client did not issue "headerOnly", its OK, we open
                 // the file for writing here. However as we are one request too
                 // late, the response will be late too.
-                std::string filePath = req.requestPath_ + part.filename_;
-                rep.lastOpenFileForWriteId_ = filePath + std::to_string(connectionId);
+                rep.filePath_ = req.requestPath_ + part.filename_;
+                rep.lastOpenFileForWriteId_ = rep.filePath_ + std::to_string(connectionId);
                 rep.status_ =
-                    fileHandler_->openFileForWrite(req, rep.lastOpenFileForWriteId_, filePath, err);
+                    fileHandler_->openFileForWrite(rep.lastOpenFileForWriteId_, req, rep, err);
                 rep.multiPartCounter_++;
                 if (rep.status_ != Reply::status_type::ok &&
                     rep.status_ != Reply::status_type::created) {
@@ -214,7 +204,7 @@ void RequestHandler::writeFileParts(unsigned connectionId,
             }
             size_t size = part.end_ - part.start_;
             rep.status_ = fileHandler_->writeFile(
-                req, rep.lastOpenFileForWriteId_, &(*part.start_), size, part.foundEnd_, err);
+                rep.lastOpenFileForWriteId_, req, &(*part.start_), size, part.foundEnd_, err);
             if (rep.status_ != Reply::status_type::ok &&
                 rep.status_ != Reply::status_type::created) {
                 rep.lastOpenFileForWriteId_.clear();

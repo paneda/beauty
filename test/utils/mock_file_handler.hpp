@@ -13,24 +13,25 @@ class MockFileHandler : public http::server::IFileHandler {
     MockFileHandler() = default;
     virtual ~MockFileHandler() = default;
 
-    virtual size_t openFileForRead(const http::server::Request& req,
-                                   const std::string& id,
-                                   const std::string& path) override;
-    virtual int readFile(const http::server::Request& req,
-                         const std::string& id,
-                         char* buf,
-                         size_t maxSize) override;
-    virtual void closeReadFile(const std::string& id) override;
-    virtual http::server::Reply::status_type openFileForWrite(const http::server::Request& req,
-                                                              const std::string& id,
-                                                              const std::string& path,
-                                                              std::string& err) override;
-    virtual http::server::Reply::status_type writeFile(const http::server::Request& req,
-                                                       const std::string& id,
-                                                       const char* buf,
-                                                       size_t size,
-                                                       bool lastData,
-                                                       std::string& err) override;
+    size_t openFileForRead(const std::string& id,
+                           const http::server::Request& request,
+                           http::server::Reply& reply) override;
+    int readFile(const std::string& id,
+                 const http::server::Request& request,
+                 char* buf,
+                 size_t maxSize) override;
+    void closeReadFile(const std::string& id) override;
+
+    http::server::Reply::status_type openFileForWrite(const std::string& id,
+                                                      const http::server::Request& request,
+                                                      http::server::Reply& reply,
+                                                      std::string& err) override;
+    http::server::Reply::status_type writeFile(const std::string& id,
+                                               const http::server::Request& request,
+                                               const char* buf,
+                                               size_t size,
+                                               bool lastData,
+                                               std::string& err) override;
 
     void createMockFile(uint32_t size);
     void setMockFailToOpenReadFile();

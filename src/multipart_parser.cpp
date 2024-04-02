@@ -89,9 +89,9 @@ MultiPartParser::result_type MultiPartParser::parse(const Request &req,
             lastPart.end_ = lastBuffer_.end();
         } else {
             // lastPart.end_ is assigned +1 char after boundary so:
-            // "boundary size" + 2*'-' + 2*clrf = 6
-            // gives the correct position.
-            lastPart.end_ = lastPart.end_ - boundaryStr_.size() - 6;
+            // subtract "crlf--boundarySize" to get position after
+            // last data byte
+            lastPart.end_ = lastPart.end_ - (boundaryStr_.size() + 4);
             if (lastPart.end_ < lastPart.start_) {
                 // end was in the last part of the returned "parts".
                 // "Luckily" (actually the whole reason why we're having

@@ -20,6 +20,7 @@ Connection::Connection(asio::ip::tcp::socket socket,
       connectionId_(connectionId),
       maxContentSize_(maxContentSize),
       buffer_(maxContentSize),
+      request_(buffer_),
       reply_(maxContentSize) {}
 
 void Connection::start() {

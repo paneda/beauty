@@ -21,9 +21,8 @@ class RequestHandler {
 
     explicit RequestHandler(IFileHandler *fileHandler);
 
-    void addRequestHandler(const requestHandlerCallback &cb);
-    void setFileNotFoundHandler(const fileNotFoundHandlerCallback &cb);
-    void addFileHeaderHandler(const addFileHeaderCallback &cb);
+    void addRequestHandler(const handlerCallback &cb);
+    void setFileNotFoundHandler(const handlerCallback &cb);
     void handleRequest(unsigned connectionId,
                        const Request &req,
                        std::vector<char> &content,
@@ -47,13 +46,10 @@ class RequestHandler {
     IFileHandler *fileHandler_ = nullptr;
 
     // Added request handler callbacks
-    std::deque<requestHandlerCallback> requestHandlers_;
+    std::deque<handlerCallback> requestHandlers_;
 
     // Callback to handle post file access, e.g. a custom not found handler.
-    fileNotFoundHandlerCallback fileNotFoundCb_;
-
-    // Callback to add custom http headers for returned files.
-    addFileHeaderCallback addFileHeaderCallback_;
+    handlerCallback fileNotFoundCb_;
 };
 
 }  // namespace server

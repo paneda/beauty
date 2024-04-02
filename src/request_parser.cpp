@@ -237,6 +237,8 @@ RequestParser::result_type RequestParser::consume(Request &req,
                 }
             }
 
+            // start filling up body data
+            content.clear();
             if (contentSize_ == 0) {
                 if (input == '\n') {
                     return good_complete;
@@ -244,7 +246,6 @@ RequestParser::result_type RequestParser::consume(Request &req,
                     return bad;
                 }
             } else {
-                content.clear();
                 req.noInitialBodyBytesReceived_ = 0;
                 state_ = post;
             }
