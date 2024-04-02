@@ -263,9 +263,7 @@ TEST_CASE("server with file handler", "[server]") {
     }
     SECTION("it should call addFileHeaderHandler when defined") {
         openConnection(c, "127.0.0.1", port);
-        dut.addFileHeaderHandler([](std::vector<Header>& headers) {
-            headers.push_back({"Content-Encoding", "gzip"});
-        });
+        dut.addFileHeaderHandler([](Reply& rep) { rep.addHeader("Content-Encoding", "gzip"); });
 
         const size_t fileSizeBytes = 100;
         mockFileHandler.createMockFile(fileSizeBytes);

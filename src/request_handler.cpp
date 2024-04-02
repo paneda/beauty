@@ -16,7 +16,7 @@ void defaultFileNotFoundHandler(Reply &rep) {
     rep.stockReply(Reply::not_found);
 }
 
-void defaultAddFileHeaderHandler(std::vector<Header> &headers) {}
+void defaultAddFileHeaderHandler(Reply &rep) {}
 
 bool startsWith(const std::string &s, const std::string &sv) {
     return s.rfind(sv, 0) == 0;
@@ -149,7 +149,7 @@ bool RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, 
         rep.defaultHeaders_[0].value_ = std::to_string(contentSize);
         rep.defaultHeaders_[1].name_ = "Content-Type";
         rep.defaultHeaders_[1].value_ = mime_types::extensionToType(extension);
-        addFileHeaderCallback_(rep.addedHeaders_);
+        addFileHeaderCallback_(rep);
         return true;
     }
     return false;
