@@ -16,10 +16,6 @@ void defaultFileNotFoundHandler(const Request &req, Reply &rep) {
     rep.stockReply(Reply::not_found);
 }
 
-bool startsWith(const std::string &s, const std::string &sv) {
-    return s.rfind(sv, 0) == 0;
-}
-
 }
 
 RequestHandler::RequestHandler(IFileHandler *fileHandler)

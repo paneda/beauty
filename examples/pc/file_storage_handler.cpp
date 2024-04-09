@@ -6,14 +6,6 @@
 
 namespace fs = std::filesystem;
 
-namespace {
-
-bool startsWith(const std::string &s, const std::string &sv) {
-    return s.rfind(sv, 0) == 0;
-}
-
-}
-
 namespace http {
 namespace server {
 
@@ -28,7 +20,7 @@ FileStorageHandler::FileStorageHandler(const std::string &docRoot) : docRoot_(do
 
 void FileStorageHandler::handleRequest(const Request &req, Reply &rep) {
     HttpResult res(rep.content_);
-    if (startsWith(req.requestPath_, "/list-files")) {
+    if (req.startsWith("/list-files")) {
         res << "[";
         for (const auto &file : files_) {
             res << "{\"name\":\"" << file.first << "\",\"size\":" << std::to_string(file.second)
@@ -39,13 +31,13 @@ void FileStorageHandler::handleRequest(const Request &req, Reply &rep) {
         rep.send(res.statusCode_, "application/json");
         return;
     }
-    if (startsWith(req.requestPath_, "/file-storage")) {
+    if (req.startsWith("/file-storage")) {
         auto used = 0;
         for (const auto &file : files_) {
             used += file.second;
         }
 
-		// just a "made up" limit
+        // just a "made up" limit
         res << "{\"total\":100000,"
             << "\"used\":" << std::to_string(used) << "}";
         rep.send(res.statusCode_, "application/json");

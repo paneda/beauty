@@ -45,10 +45,10 @@ struct Request {
         return "";
     }
 
-	struct Param {
-		bool exist_;
-		std::string value_;
-	};
+    struct Param {
+        bool exist_;
+        std::string value_;
+    };
 
     // Note: below are case sensitive for speed
     Param getQueryParam(const std::string &key) const {
@@ -59,18 +59,24 @@ struct Request {
         return getParam(formParams_, key);
     }
 
+    // check if requestPath_ starts with specified string
+    bool startsWith(const std::string &sw) const {
+        return requestPath_.rfind(sw, 0) == 0;
+    }
+
+    // returns content-length value
     int getBodySize() const {
         return bodySize_;
     }
 
+    // returns number of body bytes in initial request buffer
     int getNoInitialBodyBytesReceived() const {
         return noInitialBodyBytesReceived_;
     }
 
    private:
-    Param getParam(
-        const std::vector<std::pair<std::string, std::string>> &params,
-        const std::string &key) const {
+    Param getParam(const std::vector<std::pair<std::string, std::string>> &params,
+                   const std::string &key) const {
         auto it = std::find_if(
             params.begin(), params.end(), [&](const std::pair<std::string, std::string> &param) {
                 return param.first == key;
