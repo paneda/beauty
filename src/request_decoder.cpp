@@ -1,14 +1,14 @@
-#include "request_decoder.hpp"
-
 #include <algorithm>
 #include <cctype>
 #include <iostream>
 #include <sstream>
 
+#include "request_decoder.hpp"
+
 namespace http {
 namespace server {
 
-bool RequestDecoder::decodeRequest(Request &req) {
+bool RequestDecoder::decodeRequest(Request &req, std::vector<char> &content) {
     // url decode uri
     urlDecode(req.uri_.begin(), req.uri_.end(), req.requestPath_);
 
@@ -31,7 +31,7 @@ bool RequestDecoder::decodeRequest(Request &req) {
     if (req.method_ != "GET") {
         if (req.getHeaderValue("content-type") == "application/x-www-form-urlencoded") {
             std::string bodyStr;
-            urlDecode(req.body_.begin(), req.body_.end(), bodyStr);
+            urlDecode(content.begin(), content.end(), bodyStr);
             keyValDecode(bodyStr, req.formParams_);
         }
     }

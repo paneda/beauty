@@ -3,10 +3,26 @@
 namespace http {
 namespace server {
 
+MockRequestHandler::MockRequestHandler(std::vector<char>& body)
+    : receivedRequest_(body), receivedReply_(1024) {}
+
 void MockRequestHandler::handleRequest(const Request& req, Reply& rep) {
     noCalls_++;
-    receivedRequest_ = req;
-    receivedReply_ = rep;
+    receivedRequest_.method_ = req.method_;
+    receivedRequest_.uri_ = req.uri_;
+    receivedRequest_.httpVersionMajor_ = req.httpVersionMajor_;
+    receivedRequest_.httpVersionMinor_ = req.httpVersionMinor_;
+    receivedRequest_.headers_ = req.headers_;
+    receivedRequest_.keepAlive_ = req.keepAlive_;
+    receivedRequest_.requestPath_ = req.requestPath_;
+    receivedRequest_.body_ = req.body_;
+    receivedRequest_.bodySize_ = req.bodySize_;
+    receivedRequest_.queryParams_ = req.queryParams_;
+    receivedRequest_.formParams_ = req.formParams_;
+
+    receivedReply_.content_ = rep.content_;
+    receivedReply_.filePath_ = rep.filePath_;
+
     if (returnToClient_) {
         if (!mockedContent_.empty()) {
             rep.sendPtr(status_, "text/plain", &mockedContent_[0], mockedContent_.size());
@@ -33,7 +49,7 @@ Request MockRequestHandler::getReceivedRequest() const {
     return receivedRequest_;
 }
 
-Reply MockRequestHandler::getReceivedReply() const {
+Reply& MockRequestHandler::getReceivedReply() {
     return receivedReply_;
 }
 

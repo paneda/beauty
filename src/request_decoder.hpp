@@ -12,7 +12,7 @@ class RequestDecoder {
     RequestDecoder() = default;
     virtual ~RequestDecoder() = default;
 
-    bool decodeRequest(Request &req);
+    bool decodeRequest(Request &req, std::vector<char> &content);
 
    private:
     void keyValDecode(const std::string &in,

@@ -1,8 +1,5 @@
-#include "server.hpp"
-
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
-#include <csignal>
 #include <future>
 #include <numeric>
 #include <thread>
@@ -12,6 +9,7 @@
 #include "utils/mock_request_handler.hpp"
 #include "utils/test_client.hpp"
 
+#include "server.hpp"
 #include "request_handler.hpp"
 
 using namespace std::literals::chrono_literals;
@@ -55,6 +53,7 @@ const std::string GetUriWithQueryRequest =
 
 const std::string GetApiRequest =
     "GET /api/status HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: */*\r\nConnection: close\r\n\r\n";
+
 }  // namespace
 
 TEST_CASE("server should return binded port", "[server]") {
@@ -99,13 +98,12 @@ TEST_CASE("server without handlers", "[server]") {
     asio::io_context ioc;
     TestClient c(ioc);
 
-    MockFileHandler mockFileHandler;
     Server s(ioc, "127.0.0.1", "0", nullptr);
     uint16_t port = s.getBindedPort();
     auto t = std::thread(&asio::io_context::run, &ioc);
 
     SECTION("it should return 400 for malformad request") {
-        // HTTTP spelled incorrectly
+        // relative path not allowed
         const std::string malformadRequest =
             "GET ../index.html HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: "
             "*/*\r\nConnection: "
@@ -141,7 +139,7 @@ TEST_CASE("server with file handler", "[server]") {
     auto t = std::thread(&asio::io_context::run, &ioc);
 
     SECTION("it should return 404") {
-        mockFileHandler.setMockFailToOpenRequestedFile();
+        mockFileHandler.setMockFailToOpenReadFile();
         openConnection(c, "127.0.0.1", port);
 
         auto fut = createFutureResult(c);
@@ -151,25 +149,25 @@ TEST_CASE("server with file handler", "[server]") {
         REQUIRE(res.statusCode_ == 404);
     }
 
-    SECTION("it should call fileHandler open but not close when no file exists") {
+    SECTION("it should call fileHandler openFileForRead but not close when no file exists") {
         openConnection(c, "127.0.0.1", port);
 
         auto fut = createFutureResult(c);
         c.sendRequest(GetIndexRequest);
         fut.get();
-        REQUIRE(mockFileHandler.getOpenFileCalls() == 1);
-        REQUIRE(mockFileHandler.getCloseFileCalls() == 0);
+        REQUIRE(mockFileHandler.getOpenFileForReadCalls() == 1);
+        REQUIRE(mockFileHandler.getCloseReadFileCalls() == 0);
     }
 
-    SECTION("it should call fileHandler open and close when file exists") {
+    SECTION("it should call fileHandler openFileForRead and close when file exists") {
         openConnection(c, "127.0.0.1", port);
 
         mockFileHandler.createMockFile(100);
         auto fut = createFutureResult(c);
         c.sendRequest(GetIndexRequest);
         fut.get();
-        REQUIRE(mockFileHandler.getOpenFileCalls() == 1);
-        REQUIRE(mockFileHandler.getCloseFileCalls() == 1);
+        REQUIRE(mockFileHandler.getOpenFileForReadCalls() == 1);
+        REQUIRE(mockFileHandler.getCloseReadFileCalls() == 1);
     }
 
     SECTION("it should assume index.html for directories") {
@@ -241,9 +239,9 @@ TEST_CASE("server with file handler", "[server]") {
         std::string mockedContent = "This is mocked content";
         MockNotFoundHandler mockNotFoundHandler;
         mockNotFoundHandler.setMockedContent(mockedContent);
-        mockFileHandler.setMockFailToOpenRequestedFile();
+        mockFileHandler.setMockFailToOpenReadFile();
         dut.setFileNotFoundHandler(std::bind(
-            &MockNotFoundHandler::handleNotFound, &mockNotFoundHandler, std::placeholders::_1));
+            &MockNotFoundHandler::handleNotFound, &mockNotFoundHandler, std::placeholders::_1, std::placeholders::_2));
         openConnection(c, "127.0.0.1", port);
 
         std::future<TestClient::TestResult> futs[3] = {createFutureResult(c),
@@ -263,27 +261,6 @@ TEST_CASE("server with file handler", "[server]") {
         REQUIRE(res.headers_[1] == "Content-Type: text/plain\r");
         REQUIRE(res.content_ == convertToCharVec(mockedContent));
     }
-    SECTION("it should call addFileHeaderHandler when defined") {
-        openConnection(c, "127.0.0.1", port);
-        dut.addFileHeaderHandler([](std::vector<Header>& headers) {
-            headers.push_back({"Content-Encoding", "gzip"});
-        });
-
-        const size_t fileSizeBytes = 100;
-        mockFileHandler.createMockFile(fileSizeBytes);
-        std::future<TestClient::TestResult> futs[3] = {
-            createFutureResult(c), createFutureResult(c), createFutureResult(c, fileSizeBytes)};
-        c.sendRequest(GetIndexRequest);
-        futs[0].get();             // status
-        futs[1].get();             // headers
-        auto res = futs[2].get();  // content
-        REQUIRE(res.action_ == TestClient::TestResult::ReadContent);
-        REQUIRE(res.statusCode_ == 200);
-        REQUIRE(res.headers_.size() == 3);
-        REQUIRE(res.headers_[0] == "Content-Length: 100\r");
-        REQUIRE(res.headers_[1] == "Content-Type: text/html\r");
-        REQUIRE(res.headers_[2] == "Content-Encoding: gzip\r");
-    }
 
     ioc.stop();
     t.join();
@@ -293,7 +270,8 @@ TEST_CASE("server with route handler", "[server]") {
     asio::io_context ioc;
     TestClient c(ioc);
 
-    MockRequestHandler mockRequestHandler;
+    std::vector<char> buffer;
+    MockRequestHandler mockRequestHandler(buffer);
     Server dut(ioc, "127.0.0.1", "0", nullptr);
     uint16_t port = dut.getBindedPort();
     dut.addRequestHandler(std::bind(&MockRequestHandler::handleRequest,
@@ -335,6 +313,8 @@ TEST_CASE("server with route handler", "[server]") {
         REQUIRE(req.headers_[1].value_ == "*/*");
         REQUIRE(req.headers_[2].name_ == "Connection");
         REQUIRE(req.headers_[2].value_ == "keep-alive");
+        REQUIRE(req.bodySize_ == 0);
+        REQUIRE(req.body_.size() == 0);
     }
     SECTION("it should respond with status code") {
         mockRequestHandler.setReturnToClient(true);
@@ -386,7 +366,8 @@ TEST_CASE("server with route handler", "[server]") {
         REQUIRE(res.content_ == convertToCharVec(content));
     }
     SECTION("it should call all handlers if they return true") {
-        MockRequestHandler mockRequestHandler2;
+        std::vector<char> buffer2;  // not used in test
+        MockRequestHandler mockRequestHandler2(buffer2);
         dut.addRequestHandler(std::bind(&MockRequestHandler::handleRequest,
                                         &mockRequestHandler2,
                                         std::placeholders::_1,
@@ -403,7 +384,8 @@ TEST_CASE("server with route handler", "[server]") {
     }
     SECTION("it should only call all handlers until one returns false") {
         mockRequestHandler.setReturnToClient(true);
-        MockRequestHandler mockRequestHandler2;
+        std::vector<char> buffer2;  // not used in test
+        MockRequestHandler mockRequestHandler2(buffer2);
         dut.addRequestHandler(std::bind(&MockRequestHandler::handleRequest,
                                         &mockRequestHandler2,
                                         std::placeholders::_1,
@@ -423,4 +405,176 @@ TEST_CASE("server with route handler", "[server]") {
     t.join();
 }
 
-TEST_CASE("server with addFileHeaderHandler", "[server]") {}
+TEST_CASE("server with write filehandler", "[server]") {
+    asio::io_context ioc;
+    TestClient c(ioc);
+
+    std::vector<char> buffer;  // not used in test
+    MockRequestHandler mockRequestHandler(buffer);
+    MockFileHandler mockFileHandler;
+    Server dut(ioc, "127.0.0.1", "0", &mockFileHandler);
+    uint16_t port = dut.getBindedPort();
+    auto t = std::thread(&asio::io_context::run, &ioc);
+
+    SECTION("it should handle a complete multipart request") {
+        // Note: It seems that clients typically post upto the end of each
+        // multi-part header section, then make a new request for the file data
+        // (First part). However this tests also checks that a complete post is
+        // handled.
+        const std::string request =
+            "POST / HTTP/1.1\r\n"
+            "Host: 127.0.0.1:8081\r\n"
+            "Accept-Encoding: gzip, deflate, br\r\n"
+            "Connection: keep-alive\r\n"
+            "Content-Type: multipart/form-data; "
+            "boundary=--------------------------338874100326900647006157\r\n"
+            "Content-Length: 222\r\n\r\n"
+            "--------------------------338874100326900647006157\r\n"
+            "Content-Disposition: form-data; name=\"file1\"; filename=\"firstpart.txt\"\r\n"
+            "Content-Type: text/plain\r\n\r\n"
+            "First part\n\r\n"
+            "----------------------------338874100326900647006157--\r\n";
+
+        openConnection(c, "127.0.0.1", port);
+
+        auto fut = createFutureResult(c);
+        c.sendMultiPartRequest({request});
+        auto res = fut.get();
+        REQUIRE(res.statusCode_ == 200);  // MockFileHandler::writeFile returns 200
+        REQUIRE(mockFileHandler.getOpenFileForWriteCalls() == 1);
+        REQUIRE(mockFileHandler.getLastData("/firstpart.txt0") == true);
+        std::vector<char> result = mockFileHandler.getMockWriteFile("/firstpart.txt0");
+        std::vector<char> expected = {'F', 'i', 'r', 's', 't', ' ', 'p', 'a', 'r', 't', '\n'};
+        REQUIRE(result == expected);
+    }
+    SECTION("it should handle divided multipart request with request headers only") {
+        const std::string request1 =
+            "POST / HTTP/1.1\r\n"
+            "Host: 127.0.0.1:8081\r\n"
+            "Accept-Encoding: gzip, deflate, br\r\n"
+            "Connection: keep-alive\r\n"
+            "Content-Type: multipart/form-data; "
+            "boundary=--------------------------338874100326900647006157\r\n"
+            "Content-Length: 222\r\n\r\n";
+        const std::string request2 =
+            "--------------------------338874100326900647006157\r\n"
+            "Content-Disposition: form-data; name=\"file1\"; filename=\"firstpart.txt\"\r\n"
+            "Content-Type: text/plain\r\n\r\n"
+            "First part\n\r\n----------------------------338874100326900647006157--\r\n";
+
+        openConnection(c, "127.0.0.1", port);
+
+        std::future<TestClient::TestResult> futs[2] = {createFutureResult(c),
+                                                       createFutureResult(c)};
+        c.sendMultiPartRequest({request1, request2});
+        auto res1 = futs[0].get();
+        auto res2 = futs[1].get();
+
+        REQUIRE(res1.statusCode_ == 200);  // Header response
+        REQUIRE(res2.statusCode_ == 200);  // MockFileHandler::writeFile returns 200
+        REQUIRE(mockFileHandler.getOpenFileForWriteCalls() == 1);
+        REQUIRE(mockFileHandler.getLastData("/firstpart.txt0") == true);
+        std::vector<char> result = mockFileHandler.getMockWriteFile("/firstpart.txt0");
+        std::vector<char> expected = {'F', 'i', 'r', 's', 't', ' ', 'p', 'a', 'r', 't', '\n'};
+        REQUIRE(result == expected);
+    }
+    SECTION("it should handle divided multipart request that includes initial part headers") {
+        const std::string request1 =
+            "POST / HTTP/1.1\r\n"
+            "Host: 127.0.0.1:8081\r\n"
+            "Accept-Encoding: gzip, deflate, br\r\n"
+            "Connection: keep-alive\r\n"
+            "Content-Type: multipart/form-data; "
+            "boundary=--------------------------338874100326900647006157\r\n"
+            "Content-Length: 222\r\n\r\n"
+            "--------------------------338874100326900647006157\r\n"
+            "Content-Disposition: form-data; name=\"file1\"; filename=\"firstpart.txt\"\r\n"
+            "Content-Type: text/plain\r\n\r\n";
+        const std::string request2 =
+            "First part.\n\r\n----------------------------338874100326900647006157--\r\n";
+
+        openConnection(c, "127.0.0.1", port);
+
+        std::future<TestClient::TestResult> futs[2] = {createFutureResult(c),
+                                                       createFutureResult(c)};
+        c.sendMultiPartRequest({request1, request2});
+        auto res1 = futs[0].get();
+        auto res2 = futs[1].get();
+        REQUIRE(res1.statusCode_ == 201);  // MockFileHandler::openFileForWrite
+                                           // returns 201
+
+        REQUIRE(res2.statusCode_ == 200);  // MockFileHandler::writeFile returns 200
+        REQUIRE(mockFileHandler.getOpenFileForWriteCalls() == 1);
+        REQUIRE(mockFileHandler.getLastData("/firstpart.txt0") == true);
+        std::vector<char> result = mockFileHandler.getMockWriteFile("/firstpart.txt0");
+        std::vector<char> expected = {'F', 'i', 'r', 's', 't', ' ', 'p', 'a', 'r', 't', '.', '\n'};
+        REQUIRE(result == expected);
+    }
+    SECTION("it should respond with fileHandlers bad response") {
+        const std::string request1 =
+            "POST / HTTP/1.1\r\n"
+            "Host: 127.0.0.1:8081\r\n"
+            "Accept-Encoding: gzip, deflate, br\r\n"
+            "Connection: keep-alive\r\n"
+            "Content-Type: multipart/form-data; "
+            "boundary=--------------------------338874100326900647006157\r\n"
+            "Content-Length: 222\r\n\r\n"
+            "--------------------------338874100326900647006157\r\n"
+            "Content-Disposition: form-data; name=\"file1\"; filename=\"firstpart.txt\"\r\n"
+            "Content-Type: text/plain\r\n\r\n";
+
+        mockFileHandler.setMockFailToOpenWriteFile();
+
+        openConnection(c, "127.0.0.1", port);
+
+        auto fut = createFutureResult(c);
+        c.sendMultiPartRequest({request1});
+        auto res = fut.get();
+        REQUIRE(res.statusCode_ == 500);  // MockFileHandler::openFileForWrite
+    }
+    SECTION("it should handle multiple parts in a multipart request") {
+        const std::string request1 =
+            "POST / HTTP/1.1\r\n"
+            "Host: 127.0.0.1:8081\r\n"
+            "Accept-Encoding: gzip, deflate, br\r\n"
+            "Connection: keep-alive\r\n"
+            "Content-Type: multipart/form-data; "
+            "boundary=--------------------------383973011316738131928582\r\n"
+            "Content-Length: 394\r\n\r\n"
+            "----------------------------383973011316738131928582\r\n"
+            "Content-Disposition: form-data; name=\"file1\"; filename=\"firstpart.txt\"\r\n"
+            "Content-Type: text/plain\r\n\r\n";
+        const std::string request2 =
+            "First part.\n\r\n"
+            "----------------------------383973011316738131928582\r\n"
+            "Content-Disposition: form-data; name=\"file2\"; filename=\"secondpart.txt\"\r\n"
+            "Content-Type: text/plain\r\n\r\n";
+        const std::string request3 =
+            "Second part,\n\r\n----------------------------383973011316738131928582--\r\n";
+
+        openConnection(c, "127.0.0.1", port);
+
+        std::future<TestClient::TestResult> futs[3] = {
+            createFutureResult(c), createFutureResult(c), createFutureResult(c)};
+        c.sendMultiPartRequest({request1, request2, request3});
+        auto res1 = futs[0].get();
+        auto res2 = futs[1].get();
+        auto res3 = futs[2].get();
+
+        REQUIRE(res1.statusCode_ == 201);  // MockFileHandler::openFileForWrite returns 201
+        REQUIRE(res2.statusCode_ == 201);  // MockFileHandler::openFileForWrite returns 201
+        REQUIRE(res3.statusCode_ == 200);  // MockFileHandler::writeFile returns 200
+        REQUIRE(mockFileHandler.getOpenFileForWriteCalls() == 2);
+        REQUIRE(mockFileHandler.getLastData("/firstpart.txt0") == true);
+        REQUIRE(mockFileHandler.getLastData("/secondpart.txt0") == true);
+        std::vector<char> result = mockFileHandler.getMockWriteFile("/firstpart.txt0");
+        std::vector<char> expected = {'F', 'i', 'r', 's', 't', ' ', 'p', 'a', 'r', 't', '.', '\n'};
+        REQUIRE(result == expected);
+        result = mockFileHandler.getMockWriteFile("/secondpart.txt0");
+        expected = {'S', 'e', 'c', 'o', 'n', 'd', ' ', 'p', 'a', 'r', 't', ',', '\n'};
+        REQUIRE(result == expected);
+    }
+
+    ioc.stop();
+    t.join();
+}

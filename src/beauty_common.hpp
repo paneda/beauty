@@ -11,9 +11,7 @@
 namespace http {
 namespace server {
 
-using requestHandlerCallback = std::function<void(const Request &req, Reply &rep)>;
-using fileNotFoundHandlerCallback = std::function<void(Reply &rep)>;
-using addFileHeaderCallback = std::function<void(std::vector<Header> &headers)>;
+using handlerCallback = std::function<void(const Request &req, Reply &rep)>;
 
 struct HttpPersistence {
     HttpPersistence(std::chrono::seconds keepAliveTimeout,

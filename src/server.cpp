@@ -14,11 +14,17 @@ namespace server {
 Server::Server(asio::io_context &ioContext,
                uint16_t port,
                IFileHandler *fileHandler,
-               HttpPersistence options)
+               HttpPersistence options,
+               size_t maxContentSize)
     : acceptor_(ioContext, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)),
       connectionManager_(options),
       requestHandler_(fileHandler),
-      timer_(ioContext) {
+      timer_(ioContext),
+      maxContentSize_(maxContentSize) {
+    if (maxContentSize < 1024) {
+        std::cout << "maxContentSize must be equal or larger than 1024 bytes" << std::endl;
+        return;
+    }
     doAccept();
     doTick();
 }
@@ -27,11 +33,13 @@ Server::Server(asio::io_context &ioContext,
                const std::string &address,
                const std::string &port,
                IFileHandler *fileHandler,
-               HttpPersistence options)
+               HttpPersistence options,
+               size_t maxContentSize)
     : acceptor_(ioContext),
       connectionManager_(options),
       requestHandler_(fileHandler),
-      timer_(ioContext) {
+      timer_(ioContext),
+      maxContentSize_(maxContentSize) {
     // Register to handle the signals that indicate when the server should exit.
     // It is safe to register for the same signal multiple times in a program,
     // provided all registration for the specified signal is made through Asio.
@@ -42,6 +50,10 @@ Server::Server(asio::io_context &ioContext,
     signals_->add(SIGQUIT);
 #endif  // defined(SIGQUIT)
 
+    if (maxContentSize < 1024) {
+        std::cout << "maxContentSize must be equal or larger than 1024 bytes" << std::endl;
+        return;
+    }
     doAwaitStop();
 
     // Open the acceptor with the option to reuse the address (i.e.
@@ -61,16 +73,12 @@ uint16_t Server::getBindedPort() const {
     return acceptor_.local_endpoint().port();
 }
 
-void Server::addRequestHandler(const requestHandlerCallback &cb) {
+void Server::addRequestHandler(const handlerCallback &cb) {
     requestHandler_.addRequestHandler(cb);
 }
 
-void Server::setFileNotFoundHandler(const fileNotFoundHandlerCallback &cb) {
+void Server::setFileNotFoundHandler(const handlerCallback &cb) {
     requestHandler_.setFileNotFoundHandler(cb);
-}
-
-void Server::addFileHeaderHandler(const addFileHeaderCallback &cb) {
-    requestHandler_.addFileHeaderHandler(cb);
 }
 
 void Server::doAccept() {
@@ -82,8 +90,11 @@ void Server::doAccept() {
         }
 
         if (!ec) {
-            connectionManager_.start(std::make_shared<Connection>(
-                std::move(socket), connectionManager_, requestHandler_, connectionId_++));
+            connectionManager_.start(std::make_shared<Connection>(std::move(socket),
+                                                                  connectionManager_,
+                                                                  requestHandler_,
+                                                                  connectionId_++,
+                                                                  maxContentSize_));
         } else {
             std::cout << "doAccept: " << ec.message() << ':' << ec.value() << std::endl;
         }

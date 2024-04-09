@@ -1,7 +1,5 @@
 #pragma once
-// clang-format off
 #include "environment.hpp"
-// clang-format on
 
 #include <array>
 #include <asio.hpp>
@@ -29,7 +27,8 @@ class Connection : public std::enable_shared_from_this<Connection> {
     explicit Connection(asio::ip::tcp::socket socket,
                         ConnectionManager &manager,
                         RequestHandler &handler,
-                        unsigned connectionId);
+                        unsigned connectionId,
+                        size_t maxContentSize);
 
     // Start the first asynchronous operation for the connection.
     void start(std::chrono::seconds keepAliveTimeout, size_t keepAliveMax);
@@ -43,11 +42,14 @@ class Connection : public std::enable_shared_from_this<Connection> {
    private:
     // Perform an asynchronous read operation.
     void doRead();
+    void doReadBody();
 
     // Perform an asynchronous write operation.
+    void doWritePartAck();
     void doWriteHeaders();
     void doWriteContent();
 
+    void handleKeepAlive();
     void handleWriteCompleted();
 
     void shutdown();
@@ -62,7 +64,7 @@ class Connection : public std::enable_shared_from_this<Connection> {
     RequestHandler &requestHandler_;
 
     // Buffer for incoming data.
-    std::array<char, 8192> buffer_;
+    std::vector<char> buffer_;
 
     // The incoming request.
     Request request_;
@@ -76,6 +78,7 @@ class Connection : public std::enable_shared_from_this<Connection> {
     // The reply to be sent back to the client.
     Reply reply_;
 
+    // The unique id for the connection.
     unsigned connectionId_;
 
     std::chrono::steady_clock::time_point timestamp_;
@@ -83,6 +86,9 @@ class Connection : public std::enable_shared_from_this<Connection> {
     std::chrono::seconds keepAliveTimeout_;
     size_t keepAliveMax_;
     size_t nrOfRequest_ = 0;
+
+    // The max buffer size when reading from socket.
+    size_t maxContentSize_;
 };
 
 typedef std::shared_ptr<Connection> connection_ptr;

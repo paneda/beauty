@@ -25,21 +25,22 @@ class Server {
     explicit Server(asio::io_context &ioContext,
                     uint16_t port,
                     IFileHandler *fileHandler,
-                    HttpPersistence options);
+                    HttpPersistence options,
+                    size_t maxContentSize = 4096);
 
     // advanced constructor use for OS:s supporting signal_set
     explicit Server(asio::io_context &ioContext,
                     const std::string &address,
                     const std::string &port,
                     IFileHandler *fileHandler,
-                    HttpPersistence options);
+                    HttpPersistence options,
+                    size_t maxContentSize = 4096);
 
     uint16_t getBindedPort() const;
 
     // handlers to be optionally implemented
-    void addRequestHandler(const requestHandlerCallback &cb);
-    void setFileNotFoundHandler(const fileNotFoundHandlerCallback &cb);
-    void addFileHeaderHandler(const addFileHeaderCallback &cb);
+    void addRequestHandler(const handlerCallback &cb);
+    void setFileNotFoundHandler(const handlerCallback &cb);
 
    private:
     void doAccept();
@@ -55,6 +56,8 @@ class Server {
 
     // time to handle connection status
     asio::steady_timer timer_;
+
+    const size_t maxContentSize_;
 };
 
 }  // namespace server
