@@ -22,20 +22,23 @@ class Server {
     Server &operator=(const Server &) = delete;
 
     // simple constructor, use for ESP32
-    explicit Server(asio::io_context &ioContext, uint16_t port, IFileHandler *fileHandler);
+    explicit Server(asio::io_context &ioContext,
+                    uint16_t port,
+                    IFileHandler *fileHandler,
+                    size_t maxContentSize = 4096);
 
     // advanced constructor use for OS:s supporting signal_set
     explicit Server(asio::io_context &ioContext,
                     const std::string &address,
                     const std::string &port,
-                    IFileHandler *fileHandler);
+                    IFileHandler *fileHandler,
+                    size_t maxContentSize = 4096);
 
     uint16_t getBindedPort() const;
 
     // handlers to be optionally implemented
-    void addRequestHandler(const requestHandlerCallback &cb);
-    void setFileNotFoundHandler(const fileNotFoundHandlerCallback &cb);
-    void addFileHeaderHandler(const addFileHeaderCallback &cb);
+    void addRequestHandler(const handlerCallback &cb);
+    void setFileNotFoundHandler(const handlerCallback &cb);
 
    private:
     void doAccept();
@@ -47,6 +50,7 @@ class Server {
     RequestHandler requestHandler_;
     // each connection gets a unique internal id
     unsigned connectionId_ = 0;
+    const size_t maxContentSize_;
 };
 
 }  // namespace server

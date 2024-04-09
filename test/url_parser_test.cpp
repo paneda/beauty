@@ -1,6 +1,6 @@
-#include "url_parser.hpp"
-
 #include <catch2/catch_test_macros.hpp>
+
+#include "url_parser.hpp"
 
 using namespace http::server;
 

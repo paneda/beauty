@@ -33,6 +33,19 @@ class TestClient {
             std::bind(&TestClient::handleWriteRequest, this, asio::placeholders::error));
     }
 
+    void sendMultiPartRequest(const std::deque<std::string>& requests) {
+        isMultiPart_ = true;
+        multiPartRequests_ = requests;
+        auto request = multiPartRequests_.front();
+        multiPartRequests_.pop_front();
+        std::ostream requestStream(&request_);
+        requestStream << request;
+        asio::async_write(
+            socket_,
+            request_,
+            std::bind(&TestClient::handleWriteRequest, this, asio::placeholders::error));
+    }
+
     struct TestResult {
         enum Action {
             None,
@@ -101,19 +114,19 @@ class TestClient {
     void handleReadStatusLine(const std::error_code& err) {
         if (!err) {
             // Check that response is OK.
-            std::istream response_stream(&response_);
+            std::istream responseStream(&response_);
             std::string httpVersion;
-            response_stream >> httpVersion;
+            responseStream >> httpVersion;
             unsigned int statusCode;
-            response_stream >> statusCode;
+            responseStream >> statusCode;
             std::string statusMessage;
-            std::getline(response_stream, statusMessage);
+            std::getline(responseStream, statusMessage);
 
             testResult_.action_ = TestResult::ReadRequestStatus;
             gotResult_.notify_one();
             testResult_.statusCode_ = statusCode;
 
-            if (!response_stream) {
+            if (!responseStream) {
                 std::cout << "Invalid response stream\n";
                 return;
             }
@@ -121,15 +134,32 @@ class TestClient {
                 std::cout << "Invalid protocol\n";
                 return;
             }
-            if (statusCode != 200) {
+            if (statusCode != 200 && statusCode != 201) {
                 return;
             }
-            // Read the response headers, which are terminated by a blank line.
-            asio::async_read_until(
-                socket_,
-                response_,
-                "\r\n\r\n",
-                std::bind(&TestClient::handleReadHeaders, this, asio::placeholders::error));
+            if (!isMultiPart_) {
+                // Read the response headers, which are terminated by a blank line.
+                asio::async_read_until(
+                    socket_,
+                    response_,
+                    "\r\n\r\n",
+                    std::bind(&TestClient::handleReadHeaders, this, asio::placeholders::error));
+            } else {
+                if (!multiPartRequests_.empty()) {
+                    response_.consume(response_.size());
+                    auto request = multiPartRequests_.front();
+                    multiPartRequests_.pop_front();
+                    std::ostream requestStream(&request_);
+                    requestStream << request;
+                    asio::async_write(
+                        socket_,
+                        request_,
+                        std::bind(
+                            &TestClient::handleWriteRequest, this, asio::placeholders::error));
+                    return;
+                }
+                return;
+            }
         } else {
             std::cout << "Error4: " << err.message() << ":" << err.value() << "\n";
         }
@@ -138,9 +168,9 @@ class TestClient {
     void handleReadHeaders(const std::error_code& err) {
         if (!err) {
             // Process the response headers.
-            std::istream response_stream(&response_);
+            std::istream responseStream(&response_);
             std::string header;
-            while (std::getline(response_stream, header) && header != "\r") {
+            while (std::getline(responseStream, header) && header != "\r") {
                 testResult_.headers_.push_back(header);
             }
             testResult_.action_ = TestResult::ReadHeaders;
@@ -197,4 +227,6 @@ class TestClient {
     std::mutex mutex_;
     std::condition_variable gotResult_;
     TestResult testResult_;
+    std::deque<std::string> multiPartRequests_;
+    bool isMultiPart_ = false;
 };
