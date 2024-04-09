@@ -13,11 +13,11 @@ int main(int argc, char *argv[]) {
     try {
         // Check command line arguments.
         if (argc != 4) {
-            std::cerr << "Usage: http_server <address> <port> <doc_root>\n";
+            std::cerr << "Usage: beauty_example <address> <port> <doc_root>\n";
             std::cerr << "  For IPv4, try:\n";
-            std::cerr << "    receiver 0.0.0.0 80 .\n";
+            std::cerr << "    beauty_example 0.0.0.0 80 .\n";
             std::cerr << "  For IPv6, try:\n";
-            std::cerr << "    receiver 0::0 80 .\n";
+            std::cerr << "    beauty_example 0::0 80 .\n";
             return 1;
         }
 
@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
         // Initialise the server.
         FileHandler fileHandler(argv[3]);
         FileStorageHandler fileStorageHandler(argv[3]);
-        Server s(ioc, argv[1], argv[2], &fileHandler);
+        Server s(ioc, argv[1], argv[2], &fileHandler, 8192);
         s.addRequestHandler(
             std::bind(&FileStorageHandler::handleRequest, &fileStorageHandler, _1, _2));
 
