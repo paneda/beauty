@@ -24,8 +24,11 @@ Connection::Connection(asio::ip::tcp::socket socket,
       request_(buffer_),
       reply_(maxContentSize) {}
 
-void Connection::start(std::chrono::seconds keepAliveTimeout, size_t keepAliveMax) {
+void Connection::start(bool useKeepAlive,
+                       std::chrono::seconds keepAliveTimeout,
+                       size_t keepAliveMax) {
     lastReceivedTime_ = std::chrono::steady_clock::now();
+    useKeepAlive_ = useKeepAlive;
     keepAliveTimeout_ = keepAliveTimeout;
     keepAliveMax_ = keepAliveMax;
     doRead();
@@ -41,6 +44,10 @@ std::chrono::steady_clock::time_point Connection::getLastReceivedTime() const {
 
 size_t Connection::getNrOfRequests() const {
     return nrOfRequest_;
+}
+
+bool Connection::useKeepAlive() const {
+    return (useKeepAlive_ && request_.keepAlive_);
 }
 
 void Connection::doRead() {
@@ -59,7 +66,6 @@ void Connection::doRead() {
                 if (result == RequestParser::good_complete) {
                     if (requestDecoder_.decodeRequest(request_, buffer_)) {
                         requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
-                        handleKeepAlive();
                         doWriteHeaders();
                     } else {
                         reply_.stockReply(Reply::bad_request);
@@ -127,7 +133,6 @@ void Connection::doReadBody() {
                         doReadBody();
                     }
                 } else {
-                    handleKeepAlive();
                     doWriteHeaders();
                 }
             } else if (ec != asio::error::operation_aborted) {
@@ -138,6 +143,7 @@ void Connection::doReadBody() {
 }
 
 void Connection::doWriteHeaders() {
+    handleKeepAlive();
     auto self(shared_from_this());
     asio::async_write(
         socket_, reply_.headerToBuffers(), [this, self](std::error_code ec, std::size_t) {
@@ -178,7 +184,7 @@ void Connection::doWriteContent() {
 
 void Connection::handleKeepAlive() {
     nrOfRequest_++;
-    if (request_.keepAlive_ && keepAliveTimeout_ != std::chrono::seconds(0)) {
+    if (useKeepAlive_ && request_.keepAlive_) {
         reply_.addHeader("Connection", "keep-alive");
         reply_.addHeader("Keep-Alive",
                          "timeout=" + std::to_string(keepAliveTimeout_.count()) +
@@ -189,7 +195,7 @@ void Connection::handleKeepAlive() {
 }
 
 void Connection::handleWriteCompleted() {
-    if (request_.keepAlive_ && keepAliveTimeout_ != std::chrono::seconds(0)) {
+    if (useKeepAlive_ && request_.keepAlive_) {
         requestParser_.reset();
         request_.reset();
         reply_.reset();

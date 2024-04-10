@@ -58,7 +58,8 @@ const std::string GetApiRequest =
 
 TEST_CASE("server should return binded port", "[server]") {
     asio::io_context ioc;
-    Server s(ioc, "127.0.0.1", "0", nullptr);
+    HttpPersistence persistentOption(0s, 0, 0);
+    Server s(ioc, "127.0.0.1", "0", nullptr, persistentOption);
     uint16_t port = s.getBindedPort();
     REQUIRE(port != 0);
 }
@@ -66,7 +67,8 @@ TEST_CASE("server should return binded port", "[server]") {
 TEST_CASE("contruction", "[server]") {
     SECTION("it should allow connection with simple constructor") {
         asio::io_context ioc;
-        Server s(ioc, 0, nullptr);
+        HttpPersistence persistentOption(0s, 0, 0);
+        Server s(ioc, 0, nullptr, persistentOption);
         uint16_t port = s.getBindedPort();
         REQUIRE(port != 0);
 
@@ -80,7 +82,8 @@ TEST_CASE("contruction", "[server]") {
     }
     SECTION("it should allow connection with advanced constructor", "[server]") {
         asio::io_context ioc;
-        Server s(ioc, "127.0.0.1", "0", nullptr);
+        HttpPersistence persistentOption(0s, 0, 0);
+        Server s(ioc, 0, nullptr, persistentOption);
         uint16_t port = s.getBindedPort();
         REQUIRE(port != 0);
 
@@ -98,7 +101,8 @@ TEST_CASE("server without handlers", "[server]") {
     asio::io_context ioc;
     TestClient c(ioc);
 
-    Server s(ioc, "127.0.0.1", "0", nullptr);
+    HttpPersistence persistentOption(0s, 0, 0);
+    Server s(ioc, 0, nullptr, persistentOption);
     uint16_t port = s.getBindedPort();
     auto t = std::thread(&asio::io_context::run, &ioc);
 
@@ -134,7 +138,8 @@ TEST_CASE("server with file handler", "[server]") {
     TestClient c(ioc);
 
     MockFileHandler mockFileHandler;
-    Server dut(ioc, "127.0.0.1", "0", &mockFileHandler);
+    HttpPersistence persistentOption(0s, 0, 0);
+    Server dut(ioc, "127.0.0.1", "0", &mockFileHandler, persistentOption);
     uint16_t port = dut.getBindedPort();
     auto t = std::thread(&asio::io_context::run, &ioc);
 
@@ -182,9 +187,10 @@ TEST_CASE("server with file handler", "[server]") {
         futs[0].get();             // status
         auto res = futs[1].get();  // headers
         REQUIRE(res.action_ == TestClient::TestResult::ReadHeaders);
-        REQUIRE(res.headers_.size() == 2);
+        REQUIRE(res.headers_.size() == 3);
         REQUIRE(res.headers_[0] == "Content-Length: 100\r");
         REQUIRE(res.headers_[1] == "Content-Type: text/html\r");
+        REQUIRE(res.headers_[2] == "Connection: close\r");
     }
 
     SECTION("it should return correct headers") {
@@ -197,9 +203,10 @@ TEST_CASE("server with file handler", "[server]") {
         futs[0].get();             // status
         auto res = futs[1].get();  // headers
         REQUIRE(res.action_ == TestClient::TestResult::ReadHeaders);
-        REQUIRE(res.headers_.size() == 2);
+        REQUIRE(res.headers_.size() == 3);
         REQUIRE(res.headers_[0] == "Content-Length: 100\r");
         REQUIRE(res.headers_[1] == "Content-Type: text/html\r");
+        REQUIRE(res.headers_[2] == "Connection: close\r");
     }
 
     SECTION("it should return content less than chunk size") {
@@ -240,8 +247,10 @@ TEST_CASE("server with file handler", "[server]") {
         MockNotFoundHandler mockNotFoundHandler;
         mockNotFoundHandler.setMockedContent(mockedContent);
         mockFileHandler.setMockFailToOpenReadFile();
-        dut.setFileNotFoundHandler(std::bind(
-            &MockNotFoundHandler::handleNotFound, &mockNotFoundHandler, std::placeholders::_1, std::placeholders::_2));
+        dut.setFileNotFoundHandler(std::bind(&MockNotFoundHandler::handleNotFound,
+                                             &mockNotFoundHandler,
+                                             std::placeholders::_1,
+                                             std::placeholders::_2));
         openConnection(c, "127.0.0.1", port);
 
         std::future<TestClient::TestResult> futs[3] = {createFutureResult(c),
@@ -256,9 +265,10 @@ TEST_CASE("server with file handler", "[server]") {
         REQUIRE(res.action_ == TestClient::TestResult::ReadContent);
         REQUIRE(mockNotFoundHandler.getNoCalls() == 1);
         REQUIRE(res.statusCode_ == 200);
-        REQUIRE(res.headers_.size() == 2);
+        REQUIRE(res.headers_.size() == 3);
         REQUIRE(res.headers_[0] == "Content-Length: 22\r");
         REQUIRE(res.headers_[1] == "Content-Type: text/plain\r");
+        REQUIRE(res.headers_[2] == "Connection: close\r");
         REQUIRE(res.content_ == convertToCharVec(mockedContent));
     }
 
@@ -272,7 +282,8 @@ TEST_CASE("server with route handler", "[server]") {
 
     std::vector<char> buffer;
     MockRequestHandler mockRequestHandler(buffer);
-    Server dut(ioc, "127.0.0.1", "0", nullptr);
+    HttpPersistence persistentOption(0s, 0, 0);
+    Server dut(ioc, "127.0.0.1", "0", nullptr, persistentOption);
     uint16_t port = dut.getBindedPort();
     dut.addRequestHandler(std::bind(&MockRequestHandler::handleRequest,
                                     &mockRequestHandler,
@@ -343,9 +354,10 @@ TEST_CASE("server with route handler", "[server]") {
         res = futs[1].get();       // headers
         REQUIRE(res.action_ == TestClient::TestResult::ReadHeaders);
         REQUIRE(res.statusCode_ == 200);
-        REQUIRE(res.headers_.size() == 2);
+        REQUIRE(res.headers_.size() == 3);
         REQUIRE(res.headers_[0] == "Content-Length: 12\r");
         REQUIRE(res.headers_[1] == "Content-Type: text/plain\r");
+        REQUIRE(res.headers_[2] == "Connection: close\r");
     }
     SECTION("it should respond with content") {
         std::string content = "this is some content";
@@ -412,7 +424,8 @@ TEST_CASE("server with write filehandler", "[server]") {
     std::vector<char> buffer;  // not used in test
     MockRequestHandler mockRequestHandler(buffer);
     MockFileHandler mockFileHandler;
-    Server dut(ioc, "127.0.0.1", "0", &mockFileHandler);
+    HttpPersistence persistentOption(0s, 0, 0);
+    Server dut(ioc, "127.0.0.1", "0", &mockFileHandler, persistentOption);
     uint16_t port = dut.getBindedPort();
     auto t = std::thread(&asio::io_context::run, &ioc);
 

@@ -27,7 +27,7 @@ struct Request {
     bool keepAlive_ = false;
     std::string requestPath_;
     std::vector<char> &body_;
-    size_t bodySize_;
+    size_t bodySize_ = 0;
 
     // Parsed query params in the request
     std::vector<std::pair<std::string, std::string>> queryParams_;

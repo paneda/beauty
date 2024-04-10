@@ -26,7 +26,7 @@ class Server {
                     uint16_t port,
                     IFileHandler *fileHandler,
                     HttpPersistence options,
-                    size_t maxContentSize = 4096);
+                    size_t maxContentSize = 1024);
 
     // advanced constructor use for OS:s supporting signal_set
     explicit Server(asio::io_context &ioContext,
@@ -34,7 +34,7 @@ class Server {
                     const std::string &port,
                     IFileHandler *fileHandler,
                     HttpPersistence options,
-                    size_t maxContentSize = 4096);
+                    size_t maxContentSize = 1024);
 
     uint16_t getBindedPort() const;
 
