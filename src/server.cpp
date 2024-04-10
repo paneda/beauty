@@ -1,12 +1,9 @@
-#include "server.hpp"
-
 #include <signal.h>
-
 #include <chrono>
 #include <iostream>
 #include <utility>
 
-using namespace std::literals::chrono_literals;
+#include "server.hpp"
 
 namespace http {
 namespace server {
@@ -112,7 +109,7 @@ void Server::doAwaitStop() {
 }
 
 void Server::doTick() {
-    timer_.expires_after(1s);
+    timer_.expires_after(std::chrono::seconds(1));
     timer_.async_wait([this](std::error_code ec) {
         if (!ec) {
             connectionManager_.tick();

@@ -1,8 +1,7 @@
-#include "connection_manager.hpp"
-
+#include <chrono>
 #include <iostream>
 
-using namespace std::literals::chrono_literals;
+#include "connection_manager.hpp"
 
 namespace http {
 namespace server {
@@ -11,7 +10,7 @@ ConnectionManager::ConnectionManager(HttpPersistence options) : httpPersistence_
 
 void ConnectionManager::start(connection_ptr c) {
     connections_.insert(c);
-    std::chrono::seconds keepAliveTimeout = 0s;
+    std::chrono::seconds keepAliveTimeout = std::chrono::seconds(0);
     if (httpPersistence_.connectionLimit_ == 0 ||
         (httpPersistence_.connectionLimit_ > 0 &&
          connections_.size() <= httpPersistence_.connectionLimit_)) {
@@ -39,7 +38,7 @@ void ConnectionManager::setHttpPersistence(HttpPersistence options) {
 void ConnectionManager::tick() {
     auto now = std::chrono::steady_clock::now();
     for (auto it = connections_.begin(); it != connections_.end();) {
-        if (((*it)->getLastRequestTime() + httpPersistence_.keepAliveTimeout_ < now) ||
+        if (((*it)->getLastReceivedTime() + httpPersistence_.keepAliveTimeout_ < now) ||
             ((*it)->getNrOfRequests() >= httpPersistence_.keepAliveMax_)) {
             (*it)->stop();
             connections_.erase(it++);

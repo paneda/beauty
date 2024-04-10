@@ -36,7 +36,7 @@ class Connection : public std::enable_shared_from_this<Connection> {
     // Stop all asynchronous operations associated with the connection.
     void stop();
 
-    std::chrono::steady_clock::time_point getLastRequestTime() const;
+    std::chrono::steady_clock::time_point getLastReceivedTime() const;
     size_t getNrOfRequests() const;
 
    private:
@@ -81,7 +81,8 @@ class Connection : public std::enable_shared_from_this<Connection> {
     // The unique id for the connection.
     unsigned connectionId_;
 
-    std::chrono::steady_clock::time_point timestamp_;
+    // Last received data timestamp.
+    std::chrono::steady_clock::time_point lastReceivedTime_;
 
     std::chrono::seconds keepAliveTimeout_;
     size_t keepAliveMax_;
