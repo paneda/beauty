@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <chrono>
 #include <string>
 #include <utility>
 #include <vector>
@@ -12,6 +13,7 @@ namespace server {
 
 // A request received from a client.
 struct Request {
+    friend class Connection;
     friend class RequestParser;
     friend class RequestHandler;
 
@@ -25,7 +27,7 @@ struct Request {
     bool keepAlive_ = false;
     std::string requestPath_;
     std::vector<char> &body_;
-    size_t bodySize_;
+    size_t bodySize_ = 0;
 
     // Parsed query params in the request
     std::vector<std::pair<std::string, std::string>> queryParams_;
@@ -75,6 +77,14 @@ struct Request {
     }
 
    private:
+    void reset() {
+        method_.clear();
+        uri_.clear();
+        headers_.clear();
+        requestPath_.clear();
+        body_.clear();
+        bodySize_ = 0;
+    }
     Param getParam(const std::vector<std::pair<std::string, std::string>> &params,
                    const std::string &key) const {
         auto it = std::find_if(

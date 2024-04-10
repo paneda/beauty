@@ -1,3 +1,4 @@
+#include <chrono>
 #include <iostream>
 #include <utility>
 #include <vector>
@@ -23,12 +24,30 @@ Connection::Connection(asio::ip::tcp::socket socket,
       request_(buffer_),
       reply_(maxContentSize) {}
 
-void Connection::start() {
+void Connection::start(bool useKeepAlive,
+                       std::chrono::seconds keepAliveTimeout,
+                       size_t keepAliveMax) {
+    lastReceivedTime_ = std::chrono::steady_clock::now();
+    useKeepAlive_ = useKeepAlive;
+    keepAliveTimeout_ = keepAliveTimeout;
+    keepAliveMax_ = keepAliveMax;
     doRead();
 }
 
 void Connection::stop() {
     socket_.close();
+}
+
+std::chrono::steady_clock::time_point Connection::getLastReceivedTime() const {
+    return lastReceivedTime_;
+}
+
+size_t Connection::getNrOfRequests() const {
+    return nrOfRequest_;
+}
+
+bool Connection::useKeepAlive() const {
+    return (useKeepAlive_ && request_.keepAlive_);
 }
 
 void Connection::doRead() {
@@ -40,6 +59,7 @@ void Connection::doRead() {
     socket_.async_read_some(
         asio::buffer(buffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
             if (!ec) {
+                lastReceivedTime_ = std::chrono::steady_clock::now();
                 buffer_.resize(bytesTransferred);
                 RequestParser::result_type result = requestParser_.parse(request_, buffer_);
 
@@ -96,6 +116,7 @@ void Connection::doReadBody() {
     socket_.async_read_some(
         asio::buffer(buffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
             if (!ec) {
+                lastReceivedTime_ = std::chrono::steady_clock::now();
                 buffer_.resize(bytesTransferred);
                 reply_.noBodyBytesReceived_ += bytesTransferred;
 
@@ -122,6 +143,7 @@ void Connection::doReadBody() {
 }
 
 void Connection::doWriteHeaders() {
+    handleKeepAlive();
     auto self(shared_from_this());
     asio::async_write(
         socket_, reply_.headerToBuffers(), [this, self](std::error_code ec, std::size_t) {
@@ -160,12 +182,30 @@ void Connection::doWriteContent() {
         });
 }
 
+void Connection::handleKeepAlive() {
+    nrOfRequest_++;
+    if (useKeepAlive_ && request_.keepAlive_) {
+        reply_.addHeader("Connection", "keep-alive");
+        reply_.addHeader("Keep-Alive",
+                         "timeout=" + std::to_string(keepAliveTimeout_.count()) +
+                             ", max=" + std::to_string(keepAliveMax_));
+    } else {
+        reply_.addHeader("Connection", "close");
+    }
+}
+
 void Connection::handleWriteCompleted() {
-    // TODO: handle keep-alive
-    // initiate graceful connection closure.
-    std::error_code ignored_ec;
-    socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
-    connectionManager_.stop(shared_from_this());
+    if (useKeepAlive_ && request_.keepAlive_) {
+        requestParser_.reset();
+        request_.reset();
+        reply_.reset();
+        doRead();
+    } else {
+        // initiate graceful connection closure.
+        std::error_code ignored_ec;
+        socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
+        connectionManager_.stop(shared_from_this());
+    }
 }
 
 void Connection::shutdown() {

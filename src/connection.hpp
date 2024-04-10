@@ -3,6 +3,7 @@
 
 #include <array>
 #include <asio.hpp>
+#include <chrono>
 #include <memory>
 
 #include "reply.hpp"
@@ -30,10 +31,14 @@ class Connection : public std::enable_shared_from_this<Connection> {
                         size_t maxContentSize);
 
     // Start the first asynchronous operation for the connection.
-    void start();
+    void start(bool useKeepAlive, std::chrono::seconds keepAliveTimeout, size_t keepAliveMax);
 
     // Stop all asynchronous operations associated with the connection.
     void stop();
+
+    std::chrono::steady_clock::time_point getLastReceivedTime() const;
+    size_t getNrOfRequests() const;
+    bool useKeepAlive() const;
 
    private:
     // Perform an asynchronous read operation.
@@ -45,6 +50,7 @@ class Connection : public std::enable_shared_from_this<Connection> {
     void doWriteHeaders();
     void doWriteContent();
 
+    void handleKeepAlive();
     void handleWriteCompleted();
 
     void shutdown();
@@ -75,6 +81,21 @@ class Connection : public std::enable_shared_from_this<Connection> {
 
     // The unique id for the connection.
     unsigned connectionId_;
+
+    // Last received data timestamp.
+    std::chrono::steady_clock::time_point lastReceivedTime_;
+
+    // Number of seconds to keep connection open during inactivity.
+    std::chrono::seconds keepAliveTimeout_;
+
+    // Support keep-alive or not.
+    bool useKeepAlive_ = false;
+
+    // Max requests that can be made on the connection.
+    size_t keepAliveMax_;
+
+    // Request counter
+    size_t nrOfRequest_ = 0;
 
     // The max buffer size when reading from socket.
     size_t maxContentSize_;

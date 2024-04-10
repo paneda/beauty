@@ -6,6 +6,7 @@
 #include "file_storage_handler.hpp"
 #include "server.hpp"
 
+using namespace std::literals::chrono_literals;
 using namespace http::server;
 using namespace std::placeholders;
 
@@ -24,8 +25,9 @@ int main(int argc, char *argv[]) {
         asio::io_context ioc;
         // Initialise the server.
         FileHandler fileHandler(argv[3]);
+        HttpPersistence persistentOption(5s, 1000, 0);
         FileStorageHandler fileStorageHandler(argv[3]);
-        Server s(ioc, argv[1], argv[2], &fileHandler, 8192);
+        Server s(ioc, argv[1], argv[2], &fileHandler, persistentOption, 1024);
         s.addRequestHandler(
             std::bind(&FileStorageHandler::handleRequest, &fileStorageHandler, _1, _2));
 

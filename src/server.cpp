@@ -1,9 +1,9 @@
-#include "server.hpp"
-
 #include <signal.h>
-
+#include <chrono>
 #include <iostream>
 #include <utility>
+
+#include "server.hpp"
 
 namespace http {
 namespace server {
@@ -11,26 +11,31 @@ namespace server {
 Server::Server(asio::io_context &ioContext,
                uint16_t port,
                IFileHandler *fileHandler,
+               HttpPersistence options,
                size_t maxContentSize)
     : acceptor_(ioContext, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)),
-      connectionManager_(),
+      connectionManager_(options),
       requestHandler_(fileHandler),
+      timer_(ioContext),
       maxContentSize_(maxContentSize) {
     if (maxContentSize < 1024) {
         std::cout << "maxContentSize must be equal or larger than 1024 bytes" << std::endl;
         return;
     }
     doAccept();
+    doTick();
 }
 
 Server::Server(asio::io_context &ioContext,
                const std::string &address,
                const std::string &port,
                IFileHandler *fileHandler,
+               HttpPersistence options,
                size_t maxContentSize)
     : acceptor_(ioContext),
-      connectionManager_(),
+      connectionManager_(options),
       requestHandler_(fileHandler),
+      timer_(ioContext),
       maxContentSize_(maxContentSize) {
     // Register to handle the signals that indicate when the server should exit.
     // It is safe to register for the same signal multiple times in a program,
@@ -58,6 +63,7 @@ Server::Server(asio::io_context &ioContext,
     acceptor_.listen();
 
     doAccept();
+    doTick();
 }
 
 uint16_t Server::getBindedPort() const {
@@ -96,11 +102,20 @@ void Server::doAccept() {
 
 void Server::doAwaitStop() {
     signals_->async_wait([this](std::error_code /*ec*/, int /*signo*/) {
-        // The server is stopped by cancelling all outstanding asynchronous
-        // operations. Once all operations have finished the
-        // io_context::run() call will exit.
+        timer_.cancel();
         acceptor_.close();
         connectionManager_.stopAll();
+    });
+}
+
+void Server::doTick() {
+    timer_.expires_after(std::chrono::seconds(1));
+    timer_.async_wait([this](std::error_code ec) {
+        if (!ec) {
+            connectionManager_.tick();
+
+            doTick();
+        }
     });
 }
 

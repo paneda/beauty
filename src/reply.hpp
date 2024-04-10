@@ -62,6 +62,21 @@ class Reply {
     bool hasHeaders() const;
 
    private:
+    void reset() {
+        content_.clear();
+        filePath_.clear();
+        fileExtension_.clear();
+        headers_.clear();
+        returnToClient_ = false;
+        contentPtr_ = nullptr;
+        contentSize_ = 0;
+        replyPartial_ = false;
+        finalPart_ = false;
+        noBodyBytesReceived_ = -1;
+        isMultiPart_ = false;
+        lastOpenFileForWriteId_ = "";
+        multiPartCounter_ = 0;
+    }
     // Headers to be included in the reply.
     status_type status_;
     std::vector<Header> headers_;
@@ -71,7 +86,7 @@ class Reply {
     size_t contentSize_;
 
     // Keep track when replying with successive write buffers.
-    size_t maxContentSize_;
+    const size_t maxContentSize_;
     bool replyPartial_ = false;
     bool finalPart_ = false;
 
