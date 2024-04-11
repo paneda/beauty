@@ -84,6 +84,8 @@ struct Request {
         requestPath_.clear();
         body_.clear();
         bodySize_ = 0;
+		queryParams_.clear();
+		formParams_.clear();
     }
     Param getParam(const std::vector<std::pair<std::string, std::string>> &params,
                    const std::string &key) const {
