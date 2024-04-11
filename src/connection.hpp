@@ -101,7 +101,5 @@ class Connection : public std::enable_shared_from_this<Connection> {
     size_t maxContentSize_;
 };
 
-typedef std::shared_ptr<Connection> connection_ptr;
-
 }  // namespace server
 }  // namespace http

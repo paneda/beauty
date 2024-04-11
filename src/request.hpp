@@ -24,7 +24,7 @@ struct Request {
     int httpVersionMajor_ = 0;
     int httpVersionMinor_ = 0;
     std::vector<Header> headers_;
-    bool keepAlive_ = false;
+    bool keepAlive_ = true;
     std::string requestPath_;
     std::vector<char> &body_;
     size_t bodySize_ = 0;

@@ -19,10 +19,10 @@ class ConnectionManager {
     ConnectionManager(HttpPersistence options);
 
     // Add the specified connection to the manager and start it.
-    void start(connection_ptr c);
+    void start(std::shared_ptr<Connection> c);
 
     // Stop the specified connection.
-    void stop(connection_ptr c);
+    void stop(std::shared_ptr<Connection> c);
 
     // Stop all connections.
     void stopAll();
@@ -41,7 +41,7 @@ class ConnectionManager {
 
    private:
     // The managed connections.
-    std::set<connection_ptr> connections_;
+    std::set<std::shared_ptr<Connection>> connections_;
 
     // Http persistence options.
     HttpPersistence httpPersistence_;
