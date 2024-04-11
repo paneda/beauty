@@ -1,11 +1,10 @@
 #pragma once
 
-#include <deque>
-#include <string>
-
 #include "beauty_common.hpp"
 #include "multipart_parser.hpp"
 #include "i_file_handler.hpp"
+#include "reply.hpp"
+#include "request.hpp"
 
 namespace http {
 namespace server {
@@ -21,8 +20,10 @@ class RequestHandler {
 
     explicit RequestHandler(IFileHandler *fileHandler);
 
+    // Handlers to be optionally implemented.
     void addRequestHandler(const handlerCallback &cb);
     void setFileNotFoundHandler(const handlerCallback &cb);
+
     void handleRequest(unsigned connectionId,
                        const Request &req,
                        std::vector<char> &content,

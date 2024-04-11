@@ -1,9 +1,9 @@
 #pragma once
 #include "environment.hpp"
 
-#include <array>
 #include <asio.hpp>
 #include <chrono>
+#include <vector>
 #include <memory>
 
 #include "reply.hpp"
@@ -97,7 +97,7 @@ class Connection : public std::enable_shared_from_this<Connection> {
     // Request counter
     size_t nrOfRequest_ = 0;
 
-    // The max buffer size when reading from socket.
+    // The max buffer size when reading/writing socket.
     size_t maxContentSize_;
 };
 

@@ -1,11 +1,5 @@
-#include <chrono>
-#include <iostream>
-#include <utility>
-#include <vector>
-
-#include "connection.hpp"
 #include "connection_manager.hpp"
-#include "request_handler.hpp"
+#include "connection.hpp"
 
 namespace http {
 namespace server {
@@ -91,7 +85,8 @@ void Connection::doRead() {
                     doRead();
                 }
             } else if (ec != asio::error::operation_aborted) {
-                std::cout << "doRead: " << ec.message() << ':' << ec.value() << std::endl;
+                connectionManager_.debugMsg("doRead: " + ec.message() + ':' +
+                                            std::to_string(ec.value()));
                 connectionManager_.stop(shared_from_this());
             }
         });
@@ -104,7 +99,8 @@ void Connection::doWritePartAck() {
             if (!ec) {
                 doReadBody();
             } else {
-                std::cout << "doWritePartAck: " << ec.message() << ':' << ec.value() << std::endl;
+                connectionManager_.debugMsg("doWritePartAck: " + ec.message() + ':' +
+                                            std::to_string(ec.value()));
                 shutdown();
             }
         });
@@ -136,7 +132,8 @@ void Connection::doReadBody() {
                     doWriteHeaders();
                 }
             } else if (ec != asio::error::operation_aborted) {
-                std::cout << "doReadBody: " << ec.message() << ':' << ec.value() << std::endl;
+                connectionManager_.debugMsg("doReadBody: " + ec.message() + ':' +
+                                            std::to_string(ec.value()));
                 connectionManager_.stop(shared_from_this());
             }
         });
@@ -154,7 +151,8 @@ void Connection::doWriteHeaders() {
                     handleWriteCompleted();
                 }
             } else {
-                std::cout << "doWriteHeaders: " << ec.message() << ':' << ec.value() << std::endl;
+                connectionManager_.debugMsg("doWriteHeaders: " + ec.message() + ':' +
+                                            std::to_string(ec.value()));
                 shutdown();
             }
         });
@@ -176,7 +174,8 @@ void Connection::doWriteContent() {
                     handleWriteCompleted();
                 }
             } else {
-                std::cout << "doWriteContent: " << ec.message() << ':' << ec.value() << std::endl;
+                connectionManager_.debugMsg("doWriteContent: " + ec.message() + ':' +
+                                            std::to_string(ec.value()));
                 shutdown();
             }
         });

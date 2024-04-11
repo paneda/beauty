@@ -85,8 +85,10 @@ class Reply {
     const char* contentPtr_ = nullptr;
     size_t contentSize_;
 
-    // Keep track when replying with successive write buffers.
+    // The max buffer size when writing socket.
     const size_t maxContentSize_;
+
+    // Keep track when replying with successive write buffers.
     bool replyPartial_ = false;
     bool finalPart_ = false;
 

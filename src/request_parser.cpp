@@ -1,5 +1,5 @@
-#include <string.h>
 #include <algorithm>
+#include <strings.h>
 
 #include "parse_common.hpp"
 #include "request.hpp"

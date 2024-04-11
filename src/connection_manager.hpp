@@ -33,12 +33,21 @@ class ConnectionManager {
     // Handle connections periodically.
     void tick();
 
+    // Handler for debug messages
+    void setDebugMsgHandler(const debugMsgCallback &cb);
+
+    // Connections may use the debug message handler.
+    void debugMsg(const std::string &msg);
+
    private:
     // The managed connections.
     std::set<connection_ptr> connections_;
 
     // Http persistence options.
     HttpPersistence httpPersistence_;
+
+    // Callback to handle debug messages.
+    debugMsgCallback debugMsgCb_;
 };
 
 }  // namespace server

@@ -30,6 +30,7 @@ int main(int argc, char *argv[]) {
         Server s(ioc, argv[1], argv[2], &fileHandler, persistentOption, 1024);
         s.addRequestHandler(
             std::bind(&FileStorageHandler::handleRequest, &fileStorageHandler, _1, _2));
+        s.setDebugMsgHandler([](const std::string &msg) { std::cout << msg << std::endl; });
 
         // Run the server until stopped.
         ioc.run();

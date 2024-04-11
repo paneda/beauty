@@ -1,11 +1,6 @@
-#include <string>
-
-#include "request_handler.hpp"
-#include "beauty_common.hpp"
 #include "header.hpp"
 #include "mime_types.hpp"
-#include "reply.hpp"
-#include "request.hpp"
+#include "request_handler.hpp"
 
 namespace http {
 namespace server {

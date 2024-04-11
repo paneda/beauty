@@ -1,12 +1,10 @@
-#include <chrono>
-#include <iostream>
-
 #include "connection_manager.hpp"
 
 namespace http {
 namespace server {
 
-ConnectionManager::ConnectionManager(HttpPersistence options) : httpPersistence_(options) {}
+ConnectionManager::ConnectionManager(HttpPersistence options)
+    : httpPersistence_(options), debugMsgCb_(defaultDebugMsgHandler) {}
 
 void ConnectionManager::start(connection_ptr c) {
     connections_.insert(c);
@@ -38,25 +36,56 @@ void ConnectionManager::setHttpPersistence(HttpPersistence options) {
 
 void ConnectionManager::tick() {
     auto now = std::chrono::steady_clock::now();
-    for (auto it = connections_.begin(); it != connections_.end();) {
+    // connections_.erase(
+    //     std::remove_if(connections_.begin(), connections_.end(), [&](connection_ptr c) {
+    //         bool erase = false;
+    //         if ((c->getLastReceivedTime() + httpPersistence_.keepAliveTimeout_ < now)) {
+    //             debugMsgCb_("Removing connection due to inactivity");
+    //             erase = true;
+    //         }
+    //         if (c->getNrOfRequests() >= httpPersistence_.keepAliveMax_) {
+    //             debugMsgCb_("Removing connection due max request limit");
+    //             erase = true;
+    //         }
+
+    //         if (erase) {
+    //             c->stop();
+    //         }
+    //         return erase;
+    //     }));
+    debugMsg(std::to_string(connections_.size()));
+    auto it = connections_.begin();
+    while (it != connections_.end()) {
         if ((*it)->useKeepAlive()) {
             bool erase = false;
             if (((*it)->getLastReceivedTime() + httpPersistence_.keepAliveTimeout_ < now)) {
-                std::cout << "Removing connection due to inactivity\n";
+                debugMsgCb_("Removing connection due to inactivity");
                 erase = true;
             }
             if ((*it)->getNrOfRequests() >= httpPersistence_.keepAliveMax_) {
-                std::cout << "Removing connection due max request limit\n";
+                debugMsgCb_("Removing connection due max request limit");
                 erase = true;
             }
 
             if (erase) {
                 (*it)->stop();
-                connections_.erase(it);
+                debugMsgCb_("erasing..");
+                it = connections_.erase(it);
+            } else {
+                it++;
             }
+        } else {
+            it++;
         }
-        ++it;
     }
+}
+
+void ConnectionManager::setDebugMsgHandler(const debugMsgCallback &cb) {
+    debugMsgCb_ = cb;
+}
+
+void ConnectionManager::debugMsg(const std::string &msg) {
+    debugMsgCb_(msg);
 }
 
 }  // namespace server

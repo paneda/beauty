@@ -1,7 +1,6 @@
 #pragma once
-// clang-format off
+// included first
 #include "environment.hpp"
-// clang-format on
 
 #include <asio.hpp>
 #include <memory>
@@ -21,14 +20,14 @@ class Server {
     Server(const Server &) = delete;
     Server &operator=(const Server &) = delete;
 
-    // simple constructor, use for ESP32
+    // Simple constructor, use for ESP32.
     explicit Server(asio::io_context &ioContext,
                     uint16_t port,
                     IFileHandler *fileHandler,
                     HttpPersistence options,
                     size_t maxContentSize = 1024);
 
-    // advanced constructor use for OS:s supporting signal_set
+    // Advanced constructor use for OS:s supporting signal_set.
     explicit Server(asio::io_context &ioContext,
                     const std::string &address,
                     const std::string &port,
@@ -38,9 +37,10 @@ class Server {
 
     uint16_t getBindedPort() const;
 
-    // handlers to be optionally implemented
+    // Handlers to be optionally implemented.
     void addRequestHandler(const handlerCallback &cb);
     void setFileNotFoundHandler(const handlerCallback &cb);
+    void setDebugMsgHandler(const debugMsgCallback &cb);
 
    private:
     void doAccept();
@@ -51,13 +51,21 @@ class Server {
     asio::ip::tcp::acceptor acceptor_;
     ConnectionManager connectionManager_;
     RequestHandler requestHandler_;
-    // each connection gets a unique internal id
+
+    // Unique Id for each connection.
     unsigned connectionId_ = 0;
 
-    // time to handle connection status
+    // Timer to handle connection status.
     asio::steady_timer timer_;
 
+    // The max buffer size when reading/writing socket.
     const size_t maxContentSize_;
+
+    // Callback to handle post file access, e.g. a custom not found handler.
+    handlerCallback fileNotFoundCb_;
+
+    // Callback to handle debug messages.
+    debugMsgCallback debugMsgCb_;
 };
 
 }  // namespace server

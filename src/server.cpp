@@ -1,6 +1,5 @@
 #include <signal.h>
 #include <chrono>
-#include <iostream>
 #include <utility>
 
 #include "server.hpp"
@@ -17,9 +16,10 @@ Server::Server(asio::io_context &ioContext,
       connectionManager_(options),
       requestHandler_(fileHandler),
       timer_(ioContext),
-      maxContentSize_(maxContentSize) {
+      maxContentSize_(maxContentSize),
+      debugMsgCb_(defaultDebugMsgHandler) {
     if (maxContentSize < 1024) {
-        std::cout << "maxContentSize must be equal or larger than 1024 bytes" << std::endl;
+        debugMsgCb_("maxContentSize must be equal or larger than 1024 bytes");
         return;
     }
     doAccept();
@@ -36,7 +36,8 @@ Server::Server(asio::io_context &ioContext,
       connectionManager_(options),
       requestHandler_(fileHandler),
       timer_(ioContext),
-      maxContentSize_(maxContentSize) {
+      maxContentSize_(maxContentSize),
+      debugMsgCb_(defaultDebugMsgHandler) {
     // Register to handle the signals that indicate when the server should exit.
     // It is safe to register for the same signal multiple times in a program,
     // provided all registration for the specified signal is made through Asio.
@@ -48,7 +49,7 @@ Server::Server(asio::io_context &ioContext,
 #endif  // defined(SIGQUIT)
 
     if (maxContentSize < 1024) {
-        std::cout << "maxContentSize must be equal or larger than 1024 bytes" << std::endl;
+        debugMsgCb_("maxContentSize must be equal or larger than 1024 bytes");
         return;
     }
     doAwaitStop();
@@ -78,6 +79,11 @@ void Server::setFileNotFoundHandler(const handlerCallback &cb) {
     requestHandler_.setFileNotFoundHandler(cb);
 }
 
+void Server::setDebugMsgHandler(const debugMsgCallback &cb) {
+    connectionManager_.setDebugMsgHandler(cb);
+    debugMsgCb_ = cb;
+}
+
 void Server::doAccept() {
     acceptor_.async_accept([this](std::error_code ec, asio::ip::tcp::socket socket) {
         // Check whether the server was stopped by a signal before this
@@ -93,7 +99,7 @@ void Server::doAccept() {
                                                                   connectionId_++,
                                                                   maxContentSize_));
         } else {
-            std::cout << "doAccept: " << ec.message() << ':' << ec.value() << std::endl;
+            debugMsgCb_("doAccept: " + ec.message() + ":" + std::to_string(ec.value()));
         }
 
         doAccept();
