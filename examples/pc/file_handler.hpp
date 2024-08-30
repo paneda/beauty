@@ -4,25 +4,27 @@
 
 #include "i_file_handler.hpp"
 
-namespace http {
-namespace server {
-
-class FileHandler : public IFileHandler {
+class FileHandler : public http::server::IFileHandler {
    public:
     FileHandler(const std::string &docRoot);
     virtual ~FileHandler() = default;
 
-    size_t openFileForRead(const std::string &id, const Request &request, Reply &reply) override;
-    int readFile(const std::string &id, const Request &request, char *buf, size_t maxSize) override;
+    size_t openFileForRead(const std::string &id,
+                           const http::server::Request &request,
+                           http::server::Reply &reply) override;
+    int readFile(const std::string &id,
+                 const http::server::Request &request,
+                 char *buf,
+                 size_t maxSize) override;
 
-    Reply::status_type openFileForWrite(const std::string &id,
-                                        const Request &request,
-                                        Reply &reply,
+	http::server::Reply::status_type openFileForWrite(const std::string &id,
+                                        const http::server::Request &request,
+                                        http::server::Reply &reply,
                                         std::string &err) override;
     void closeReadFile(const std::string &id) override;
 
-    Reply::status_type writeFile(const std::string &id,
-                                 const Request &request,
+	http::server::Reply::status_type writeFile(const std::string &id,
+                                 const http::server::Request &request,
                                  const char *buf,
                                  size_t size,
                                  bool lastData,
@@ -30,9 +32,10 @@ class FileHandler : public IFileHandler {
 
    private:
     const std::string docRoot_;
+
+	// As we need to handle multiple connections that reads/writes different
+	// files, we keep maps to handle this.
+	// Key is the id of each file, provided by Beauty.
     std::unordered_map<std::string, std::ifstream> openReadFiles_;
     std::unordered_map<std::string, std::ofstream> openWriteFiles_;
 };
-
-}  // namespace server
-}  // namespace http

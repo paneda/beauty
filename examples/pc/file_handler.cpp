@@ -3,8 +3,7 @@
 #include <iostream>
 #include <limits>
 
-namespace http {
-namespace server {
+using namespace http::server;
 
 FileHandler::FileHandler(const std::string &docRoot) : docRoot_(docRoot) {}
 
@@ -40,7 +39,6 @@ Reply::status_type FileHandler::openFileForWrite(const std::string &id,
                                                  const Request &request,
                                                  Reply &reply,
                                                  std::string &err) {
-    // TODO: error handling
     std::string fullPath = docRoot_ + reply.filePath_;
     std::ofstream &os = openWriteFiles_[id];
     os.open(fullPath.c_str(), std::ios::out | std::ios::binary);
@@ -53,10 +51,10 @@ Reply::status_type FileHandler::writeFile(const std::string &id,
                                           size_t size,
                                           bool lastData,
                                           std::string &err) {
-    // TODO: error handling
     openWriteFiles_[id].write(buf, size);
+    if (lastData) {
+        openWriteFiles_[id].close();
+		openWriteFiles_.erase(id);
+    }
     return Reply::status_type::ok;
 }
-
-}  // namespace server
-}  // namespace http

@@ -3,7 +3,7 @@
 #include <string>
 
 #include "file_handler.hpp"
-#include "file_storage_handler.hpp"
+#include "my_file_api.hpp"
 #include "server.hpp"
 
 using namespace std::literals::chrono_literals;
@@ -26,10 +26,10 @@ int main(int argc, char *argv[]) {
         // Initialise the server.
         FileHandler fileHandler(argv[3]);
         HttpPersistence persistentOption(5s, 1000, 0);
-        FileStorageHandler fileStorageHandler(argv[3]);
+        MyFileApi fileStorageHandler(argv[3]);
         Server s(ioc, argv[1], argv[2], &fileHandler, persistentOption, 1024);
         s.addRequestHandler(
-            std::bind(&FileStorageHandler::handleRequest, &fileStorageHandler, _1, _2));
+            std::bind(&MyFileApi::handleRequest, &fileStorageHandler, _1, _2));
         s.setDebugMsgHandler([](const std::string &msg) { std::cout << msg << std::endl; });
 
         // Run the server until stopped.

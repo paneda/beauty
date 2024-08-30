@@ -272,7 +272,7 @@ void Reply::stockReply(Reply::status_type status) {
     headers_[1].name_ = "Content-Type";
     headers_[1].value_ = "text/html";
 
-    returnToClient_ = true;
+	returnToClient_ = true;
 }
 
 }  // namespace server
