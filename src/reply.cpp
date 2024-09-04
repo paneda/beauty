@@ -87,26 +87,15 @@ bool Reply::hasHeaders() const {
 
 void Reply::send(status_type status) {
     status_ = status;
-    if (headers_.empty()) {
-        headers_.resize(1);
-        headers_[0].name_ = "Content-Length";
-        headers_[0].value_ = "0";
-    }
-    content_.clear();
-    contentPtr_ = nullptr;
+	headers_.push_back({"Content-Length", "0"});
 
     returnToClient_ = true;
 }
 
 void Reply::send(status_type status, const std::string& contentType) {
     status_ = status;
-    if (headers_.empty()) {
-        headers_.resize(2);
-        headers_[0].name_ = "Content-Length";
-        headers_[0].value_ = std::to_string(content_.size());
-        headers_[1].name_ = "Content-Type";
-        headers_[1].value_ = contentType;
-    }
+	headers_.push_back({"Content-Length", std::to_string(content_.size())});
+	headers_.push_back({"Content-Type", contentType});
 
     returnToClient_ = true;
 }
@@ -116,13 +105,9 @@ void Reply::sendPtr(status_type status,
                     const char* data,
                     size_t size) {
     status_ = status;
-    if (headers_.empty()) {
-        headers_.resize(2);
-        headers_[0].name_ = "Content-Length";
-        headers_[0].value_ = std::to_string(size);
-        headers_[1].name_ = "Content-Type";
-        headers_[1].value_ = contentType;
-    }
+	headers_.push_back({"Content-Length", std::to_string(size)});
+	headers_.push_back({"Content-Type", contentType});
+
     contentPtr_ = data;
     contentSize_ = size;
 
@@ -286,6 +271,8 @@ void Reply::stockReply(Reply::status_type status) {
     headers_[0].value_ = std::to_string(content_.size());
     headers_[1].name_ = "Content-Type";
     headers_[1].value_ = "text/html";
+
+    returnToClient_ = true;
 }
 
 }  // namespace server
