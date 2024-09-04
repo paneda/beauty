@@ -231,9 +231,9 @@ RequestParser::result_type RequestParser::consume(Request &req,
                     req.keepAlive_ = false;
                 }
             } else {
-                if (req.httpVersionMajor_ > 1 ||
-                    (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ == 1)) {
-                    req.keepAlive_ = true;
+                if (req.httpVersionMajor_ < 1 ||
+                    (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ == 0)) {
+                    req.keepAlive_ = false;
                 }
             }
 
