@@ -26,7 +26,6 @@ struct Request {
     bool keepAlive_ = true;
     std::string requestPath_;
     std::vector<char> &body_;
-    size_t bodySize_ = 0;
 
     // Parsed query params in the request
     std::vector<std::pair<std::string, std::string>> queryParams_;
@@ -65,11 +64,6 @@ struct Request {
         return requestPath_.rfind(sw, 0) == 0;
     }
 
-    // returns content-length value
-    int getBodySize() const {
-        return bodySize_;
-    }
-
     // returns number of body bytes in initial request buffer
     int getNoInitialBodyBytesReceived() const {
         return noInitialBodyBytesReceived_;
@@ -82,7 +76,7 @@ struct Request {
         headers_.clear();
         requestPath_.clear();
         body_.clear();
-        bodySize_ = 0;
+        contentLength_ = 0;
 		queryParams_.clear();
 		formParams_.clear();
     }
@@ -108,6 +102,7 @@ struct Request {
     }
 
     int noInitialBodyBytesReceived_ = -1;
+    size_t contentLength_ = 0;
 };
 
 }  // namespace server
