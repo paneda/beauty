@@ -324,7 +324,6 @@ TEST_CASE("server with route handler", "[server]") {
         REQUIRE(req.headers_[1].value_ == "*/*");
         REQUIRE(req.headers_[2].name_ == "Connection");
         REQUIRE(req.headers_[2].value_ == "keep-alive");
-        REQUIRE(req.bodySize_ == 0);
         REQUIRE(req.body_.size() == 0);
     }
     SECTION("it should respond with status code") {

@@ -145,6 +145,7 @@ TEST_CASE("parse POST request", "[request_parser]") {
         std::vector<char> expectedContent = convertToCharVec("arg1=test;arg1=%20%21;arg3=test");
         REQUIRE(fixture.content_ == expectedContent);
         REQUIRE(fixture.request.getNoInitialBodyBytesReceived() == expectedContent.size());
+        REQUIRE(fixture.request.body_ == expectedContent);
     }
     SECTION("should return bad for POST HTTP/1.1 with chunked body") {
         const std::string request =
@@ -191,4 +192,5 @@ TEST_CASE("parse POST request partially", "[request_parser]") {
     std::vector<char> expectedContent = convertToCharVec("This request");
     REQUIRE(fixture.content_ == expectedContent);
     REQUIRE(fixture.request.getNoInitialBodyBytesReceived() == expectedContent.size());
+	REQUIRE(fixture.request.body_ == expectedContent);
 }

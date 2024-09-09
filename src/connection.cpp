@@ -122,7 +122,7 @@ void Connection::doReadBody() {
                 unsigned multiPartCounter = reply_.multiPartCounter_;
 
                 requestHandler_.handlePartialWrite(connectionId_, request_, buffer_, reply_);
-                if (reply_.noBodyBytesReceived_ < request_.getBodySize()) {
+                if (reply_.noBodyBytesReceived_ < request_.contentLength_) {
                     if (multiPartCounter != reply_.multiPartCounter_) {
                         doWritePartAck();
                     } else {

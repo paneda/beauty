@@ -16,7 +16,6 @@ void MockRequestHandler::handleRequest(const Request& req, Reply& rep) {
     receivedRequest_.keepAlive_ = req.keepAlive_;
     receivedRequest_.requestPath_ = req.requestPath_;
     receivedRequest_.body_ = req.body_;
-    receivedRequest_.bodySize_ = req.bodySize_;
     receivedRequest_.queryParams_ = req.queryParams_;
     receivedRequest_.formParams_ = req.formParams_;
 

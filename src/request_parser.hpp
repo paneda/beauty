@@ -53,7 +53,7 @@ class RequestParser {
         post,
     } state_;
 
-    std::size_t contentSize_ = 0;
+    std::size_t contentLength_ = 0;
 };
 
 }  // namespace server

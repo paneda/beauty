@@ -195,9 +195,9 @@ RequestParser::result_type RequestParser::consume(Request &req,
                     Header &h = req.headers_.back();
 
                     if (strcasecmp(h.name_.c_str(), "Content-Length") == 0) {
-                        contentSize_ = atoi(h.value_.c_str());
-                        req.bodySize_ = contentSize_;
-                        contentSize_ = std::min(content.capacity(), contentSize_);
+                        contentLength_ = atoi(h.value_.c_str());
+                        req.contentLength_ = contentLength_;
+                        contentLength_ = std::min(content.capacity(), contentLength_);
                     } else if (strcasecmp(h.name_.c_str(), "Transfer-Encoding") == 0) {
                         if (strcasecmp(h.value_.c_str(), "chunked") == 0) {
                             return bad;
@@ -231,15 +231,16 @@ RequestParser::result_type RequestParser::consume(Request &req,
                     req.keepAlive_ = false;
                 }
             } else {
-                if (req.httpVersionMajor_ < 1 ||
-                    (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ == 0)) {
-                    req.keepAlive_ = false;
+				req.keepAlive_ = false;
+                if (req.httpVersionMajor_ > 1 ||
+                    (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ == 1)) {
+                    req.keepAlive_ = true;
                 }
             }
 
             // start filling up body data
             content.clear();
-            if (contentSize_ == 0) {
+            if (contentLength_ == 0) {
                 if (input == '\n') {
                     return good_complete;
                 } else {
@@ -252,10 +253,10 @@ RequestParser::result_type RequestParser::consume(Request &req,
             return indeterminate;
         }
         case post:
-            --contentSize_;
+            --contentLength_;
             req.noInitialBodyBytesReceived_++;
             content.push_back(input);
-            if (contentSize_ == 0) {
+            if (contentLength_ == 0) {
                 return good_complete;
             }
             return indeterminate;
