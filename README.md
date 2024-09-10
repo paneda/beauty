@@ -29,8 +29,7 @@ mkdir build
 cmake --build build ..
 # run with
 build/examples/beauty_example 0.0.0.0 8080 www
-# visit localhost:8080 and test the routes provided by
-examples/pc/my_file_api.cpp
+# visit localhost:8080 and test the routes provided by examples/pc/my_file_api.cpp
 ```
 
 ## ESP32
@@ -101,7 +100,7 @@ void httpServerThread(void*) {
 # Execution order
 For an incomming http request, Beauty first invokes the middleware stack in
 added order. If no middleware respond to the request, Beauty will call the file
-system handler (if defined). If the file system handler fails to open the
+io handler (if defined). If the file io handler fails to open the
 requested file, Beauty will respond with 404. It is possible to
 "addFileNotFoundHandler" to provide custom 404 logic and response.
 
@@ -111,15 +110,15 @@ one for PC and one for ESP32.
 
 |Contructor |Description |
 |--|--|
-|`Server(asio::io_context &ioContext, uint16_t port, IFileSystem *fileSystem, HttpPersistence options, size_t maxContentSize = 1024)`| Use with ESP32|
-|`Server(asio::io_context &ioContext, const std::string &address, const std::string &port, IFileSystem *fileSystem, HttpPersistence options, size_t maxContentSize = 1024)`| Use on PC|
+|`Server(asio::io_context &ioContext, uint16_t port, IFileIO *fileIO, HttpPersistence options, size_t maxContentSize = 1024)`| Use with ESP32|
+|`Server(asio::io_context &ioContext, const std::string &address, const std::string &port, IFileIO *fileIO, HttpPersistence options, size_t maxContentSize = 1024)`| Use on PC|
 
 |Constructor argument |Description |
 |--|--|
 |ioContext |The asio::io_context |
 |address |Address of the network interface to use, PC constructor only |
 |port |The port that the server binds and responds too.<br>**Note.** For the PC constructor this can be set to 0 in which case the operating system will assign a free port.|
-|fileSystem| The implementation class for IFileSystem, see examples. May be set to nullptr of no file access is needed. |
+|fileIO| The implementation class for IFileIO, see examples. May be set to nullptr of no file access is needed. |
 |options| See HTTP persistence options below|
 |maxContentSize| The max size in bytes of request/response buffers. Each connection will allocate one buffer for each direction. The minimum buffer size is 1024.|
 
@@ -132,17 +131,17 @@ one for PC and one for ESP32.
 The definitions of `handlerCallback` and `debugMsgCallback` can be found in src/beauty_common.hpp.
 
 ## HTTP persistence options
-Beauty support HTTP/1.1 using Keep-Alive connections. The advantage of Keep-Alive connections is faster response time and to avoid unnecessary re-allocation of buffers for repeated request/response cycles with the same clients.
-The drawback is of coarse that memory may be used up when serving many clients. 
+Beauty support HTTP/1.1 using Keep-Alive connections. The advantage of Keep-Alive connections is faster response time and avoid unnecessary re-allocation of buffers for repeated request/response cycles with the same clients.
+The drawback is of coarse that memory may be used up more rapidly when serving many clients. The `connectionLimit` may serve as a trade-off to achieve both advantages for constrained environments.
 
-The behaviour is controlled with the HttpPersistence struct, defined in src/beauty_common.hpp.
+The behaviour is controlled with HttpPersistence, defined in src/beauty_common.hpp.
 It is required by both Server constructors and includes the following members:
 
 |Variable |Description |
 |--|--|
 |`std::chrono::seconds keepAliveTimeout_`| Keep-Alive timeout for inactive connections. Sent in Keep-Alive response header.  0s = Keep-Alive disabled.<br>When disabled, Beauty acts as a HTTP/1.0 server, sending Connection=close in all responses. |
 |`size_t keepAliveMax_` |Max number of request that can be processed on the connection before it is closed. Sent in Keep-Alive response header.<br>**Note.** Only relevant if keepAliveTimeout_ > 0s|
-|`size_t connectionLimit_` |Internal limitation of the number of persistent http connections that are allowed. If this limit is exceeded, Connection=close will be sent in the response for new connections.<br>0 = no limit.<br>As each connection will allocate two buffers of `maxContentSize`, it may be useful for constrained environments to set a reasonable limit.<br>**Note.** Only relevant if keepAliveTimeout_ > 0s. |
+|`size_t connectionLimit_` |Internal limitation of the number of persistent http connections that are allowed. If this limit is exceeded, Connection=close will be sent in the response for new connections.<br>0 = no limit.<br>**Note.** Only relevant if keepAliveTimeout_ > 0s. |
 
 # Middleware design
 A middleware is defined by implementing the `handlerCallback` function. E.g. as:
@@ -185,7 +184,7 @@ The following member variables can be modified in the reply.
 |`std::string filePath_`  |Intialized with Request::requestPath_. Can be modified by middleware before filesystem handler reads the file. See examples. |
 |`std::string fileExtension_` |Beauty parses the file extension provided in the `Request::requestPath_` and stores it here for convenient access. |
 
-The following methods methods are provided:
+The following methods are provided:
 |Metod |Description |
 |---|---|
 |`void addHeader(const string &name, const string &value)`|Beauty always adds the `Content-Length` header automatically. So this header must never be added through addHeader().<br>Typically Beauty will also automatically add the `Content-Type` header. However if this method is used, Beauty will not add the `Content-Type` header.<br>So when using this method, all response headers (except for `Content-Length`), must be added.<br>This scheme allows to control the `Content-Type` header from a middleware in special cases.  See examples/pc/my_file_api.cpp. |
