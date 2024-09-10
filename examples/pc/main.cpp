@@ -26,13 +26,12 @@ int main(int argc, char *argv[]) {
         // Initialise the server.
         FileIO fileIO(argv[3]);
         HttpPersistence persistentOption(5s, 1000, 0);
-        MyFileApi fileStorageHandler(argv[3]);
+        MyFileApi fileApi(argv[3]);
         Server s(ioc, argv[1], argv[2], &fileIO, persistentOption, 1024);
-        s.addRequestHandler(
-            std::bind(&MyFileApi::handleRequest, &fileStorageHandler, _1, _2));
+        s.addRequestHandler(std::bind(&MyFileApi::handleRequest, &fileApi, _1, _2));
         s.setDebugMsgHandler([](const std::string &msg) { std::cout << msg << std::endl; });
 
-        // Run the server until stopped.
+        // Run the server until stopped with Ctrl-C.
         ioc.run();
     } catch (std::exception &e) {
         std::cerr << "exception: " << e.what() << "\n";
