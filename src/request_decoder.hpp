@@ -5,8 +5,7 @@
 
 #include "request.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 class RequestDecoder {
    public:
@@ -42,5 +41,4 @@ class RequestDecoder {
     }
 };
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

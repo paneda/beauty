@@ -16,8 +16,8 @@ bool ends_with(std::string const& value, std::string const& ending) {
 }
 
 size_t MockFileIO::openFileForRead(const std::string& id,
-                                        const http::server::Request& request,
-                                        http::server::Reply& reply) {
+                                        const beauty::Request& request,
+                                        beauty::Reply& reply) {
     OpenReadFile& openFile = openReadFiles_[id];
     countOpenFileForReadCalls_++;
     if (openFile.isOpen_) {
@@ -34,7 +34,7 @@ size_t MockFileIO::openFileForRead(const std::string& id,
 }
 
 int MockFileIO::readFile(const std::string& id,
-                              const http::server::Request& request,
+                              const beauty::Request& request,
                               char* buf,
                               size_t maxSize) {
     OpenReadFile& openFile = openReadFiles_[id];
@@ -54,10 +54,10 @@ void MockFileIO::closeReadFile(const std::string& id) {
     openReadFiles_.erase(id);
 }
 
-http::server::Reply::status_type MockFileIO::openFileForWrite(
+beauty::Reply::status_type MockFileIO::openFileForWrite(
     const std::string& id,
-    const http::server::Request& request,
-    http::server::Reply& reply,
+    const beauty::Request& request,
+    beauty::Reply& reply,
     std::string& err) {
     OpenWriteFile& openFile = openWriteFiles_[id];
     if (openFile.isOpen_) {
@@ -66,14 +66,14 @@ http::server::Reply::status_type MockFileIO::openFileForWrite(
     countOpenFileForWriteCalls_++;
     if (mockFailToOpenWriteFile_) {
         openWriteFiles_.erase(id);
-        return http::server::Reply::status_type::internal_server_error;
+        return beauty::Reply::status_type::internal_server_error;
     }
     openFile.isOpen_ = true;
-    return http::server::Reply::status_type::created;
+    return beauty::Reply::status_type::created;
 }
 
-http::server::Reply::status_type MockFileIO::writeFile(const std::string& id,
-                                                            const http::server::Request& request,
+beauty::Reply::status_type MockFileIO::writeFile(const std::string& id,
+                                                            const beauty::Request& request,
                                                             const char* buf,
                                                             size_t size,
                                                             bool lastData,
@@ -84,7 +84,7 @@ http::server::Reply::status_type MockFileIO::writeFile(const std::string& id,
     }
     openFile.file_.insert(openFile.file_.end(), buf, buf + size);
     openFile.lastData_ = lastData;
-    return http::server::Reply::status_type::ok;
+    return beauty::Reply::status_type::ok;
 }
 
 int MockFileIO::getOpenFileForWriteCalls() {

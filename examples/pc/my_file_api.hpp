@@ -10,7 +10,7 @@ class MyFileApi {
     MyFileApi(const std::string &docRoot);
     virtual ~MyFileApi() = default;
 
-    void handleRequest(const http::server::Request &req, http::server::Reply &rep);
+    void handleRequest(const beauty::Request &req, beauty::Reply &rep);
 
    private:
     const std::string docRoot_;

@@ -7,8 +7,7 @@
 #include "reply.hpp"
 #include "request.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 using handlerCallback = std::function<void(const Request &req, Reply &rep)>;
 
@@ -38,5 +37,4 @@ struct HttpPersistence {
     size_t connectionLimit_;
 };
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

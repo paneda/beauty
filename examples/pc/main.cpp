@@ -7,7 +7,7 @@
 #include "server.hpp"
 
 using namespace std::literals::chrono_literals;
-using namespace http::server;
+using namespace beauty;
 using namespace std::placeholders;
 
 int main(int argc, char *argv[]) {

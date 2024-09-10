@@ -8,8 +8,7 @@
 #include "header.hpp"
 #include "multipart_parser.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 class RequestHandler;
 
@@ -112,5 +111,4 @@ class Reply {
     std::vector<asio::const_buffer> contentToBuffers();
 };
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

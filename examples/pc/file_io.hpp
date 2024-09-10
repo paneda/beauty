@@ -4,27 +4,27 @@
 
 #include "i_file_io.hpp"
 
-class FileIO : public http::server::IFileIO {
+class FileIO : public beauty::IFileIO {
    public:
     FileIO(const std::string &docRoot);
     virtual ~FileIO() = default;
 
     size_t openFileForRead(const std::string &id,
-                           const http::server::Request &request,
-                           http::server::Reply &reply) override;
+                           const beauty::Request &request,
+                           beauty::Reply &reply) override;
     int readFile(const std::string &id,
-                 const http::server::Request &request,
+                 const beauty::Request &request,
                  char *buf,
                  size_t maxSize) override;
 
-	http::server::Reply::status_type openFileForWrite(const std::string &id,
-                                        const http::server::Request &request,
-                                        http::server::Reply &reply,
+	beauty::Reply::status_type openFileForWrite(const std::string &id,
+                                        const beauty::Request &request,
+                                        beauty::Reply &reply,
                                         std::string &err) override;
     void closeReadFile(const std::string &id) override;
 
-	http::server::Reply::status_type writeFile(const std::string &id,
-                                 const http::server::Request &request,
+	beauty::Reply::status_type writeFile(const std::string &id,
+                                 const beauty::Request &request,
                                  const char *buf,
                                  size_t size,
                                  bool lastData,

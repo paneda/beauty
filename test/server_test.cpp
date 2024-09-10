@@ -13,7 +13,7 @@
 #include "request_handler.hpp"
 
 using namespace std::literals::chrono_literals;
-using namespace http::server;
+using namespace beauty;
 
 namespace {
 std::future<TestClient::TestResult> createFutureResult(TestClient& client,

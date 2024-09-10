@@ -4,8 +4,7 @@
 #include "parse_common.hpp"
 #include "multipart_parser.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 MultiPartParser::MultiPartParser(std::vector<char> &lastBuffer)
     : state_(expecting_hyphen_1), lastBuffer_(lastBuffer) {}
@@ -296,5 +295,4 @@ MultiPartParser::result_type MultiPartParser::consume(std::vector<char>::iterato
     }
 }
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

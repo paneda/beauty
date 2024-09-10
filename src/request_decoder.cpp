@@ -4,8 +4,7 @@
 
 #include "request_decoder.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 bool RequestDecoder::decodeRequest(Request &req, std::vector<char> &content) {
     // url decode uri
@@ -59,5 +58,4 @@ void RequestDecoder::keyValDecode(const std::string &in,
     }
 }
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

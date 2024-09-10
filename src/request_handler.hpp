@@ -6,8 +6,7 @@
 #include "reply.hpp"
 #include "request.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 class IRouteHandler;
 struct Reply;
@@ -53,5 +52,4 @@ class RequestHandler {
     handlerCallback fileNotFoundCb_;
 };
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

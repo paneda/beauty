@@ -4,7 +4,7 @@
 
 #include "file_io.hpp"
 
-using namespace http::server;
+using namespace beauty;
 
 size_t FileIO::openFileForRead(const std::string& id, const Request& request, Reply& reply) {
 

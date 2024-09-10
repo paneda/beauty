@@ -4,8 +4,7 @@
 
 #include "server.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 Server::Server(asio::io_context &ioContext,
                uint16_t port,
@@ -125,5 +124,4 @@ void Server::doTick() {
     });
 }
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

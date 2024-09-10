@@ -1,7 +1,6 @@
 #include "mime_types.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 namespace mime_types {
 
 struct Mapping {
@@ -27,5 +26,4 @@ std::string extensionToType(const std::string &extension) {
 }
 
 }  // namespace mime_types
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

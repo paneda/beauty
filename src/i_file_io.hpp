@@ -5,8 +5,7 @@
 #include "reply.hpp"
 #include "request.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 class IFileIO {
    public:
@@ -32,5 +31,4 @@ class IFileIO {
                                          std::string& err) = 0;
 };
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

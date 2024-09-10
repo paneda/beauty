@@ -6,8 +6,7 @@
 
 #include <string>
 
-namespace http {
-namespace server {
+namespace beauty {
 
 class UrlParser {
    public:
@@ -276,6 +275,5 @@ class UrlParser {
     } url_;
 };
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty
 

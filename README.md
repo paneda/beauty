@@ -65,23 +65,23 @@ void httpServerThread(void*) {
     MyFileIO fio; // see examples folder for LittleFs
 
     // configurable keep-alive support
-    http::server::HttpPersistence persistentOption(std::chrono::seconds(5), 1000, 20);
+    beauty::HttpPersistence persistentOption(std::chrono::seconds(5), 1000, 20);
 
     // the asio::context
     asio::io_context ioc;
 
     // must use an alternative constructor compared to PC example
-    http::server::Server beauty(ioc, 80, &fio, persistentOption, 1024);
+    beauty::Server server(ioc, 80, &fio, persistentOption, 1024);
 
     // middlewares (just one in this example), see examples folder
     MyFileApi fileApiHandler;
 
     // add middlewares to server in invokation order
     using namespace std::placeholders;
-    beauty.addRequestHandler(std::bind(&MyFileApi::handleRequest, &fileApiHandler, _1, _2));
+    server.addRequestHandler(std::bind(&MyFileApi::handleRequest, &fileApiHandler, _1, _2));
 
     // uncomment to print debug message from server
-    // beauty.setDebugMsgHandler([](const std::string& msg) { Serial.println(msg.c_str()); });
+    // server.setDebugMsgHandler([](const std::string& msg) { Serial.println(msg.c_str()); });
 
     // starts the asio::io_context and hence the server, this is blocking and
     // the reason we're running in a thread.

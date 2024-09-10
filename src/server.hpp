@@ -12,8 +12,7 @@
 #include "i_file_io.hpp"
 #include "request_handler.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 class Server {
    public:
@@ -68,5 +67,4 @@ class Server {
     debugMsgCallback debugMsgCb_;
 };
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

@@ -2,8 +2,7 @@
 #include "mime_types.hpp"
 #include "request_handler.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 namespace {
 
@@ -209,5 +208,4 @@ void RequestHandler::writeFileParts(unsigned connectionId,
     }
 }
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

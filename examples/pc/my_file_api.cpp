@@ -6,7 +6,7 @@
 #include "mime_types.hpp"
 
 namespace fs = std::filesystem;
-using namespace http::server;
+using namespace beauty;
 
 MyFileApi::MyFileApi(const std::string &docRoot) : docRoot_(docRoot) {}
 

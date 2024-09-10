@@ -5,7 +5,7 @@
 #include "file_io.hpp"
 #include "utils/mock_file_io.hpp"
 
-using namespace http::server;
+using namespace beauty;
 
 TEST_CASE("file_io.cpp", "[file_io]") {
     // fixture: create a file (if not exist) with uint32_t values

@@ -2,8 +2,7 @@
 
 #include <string>
 
-namespace http {
-namespace server {
+namespace beauty {
 
 namespace status_strings {
 
@@ -275,5 +274,4 @@ void Reply::stockReply(Reply::status_type status) {
 	returnToClient_ = true;
 }
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

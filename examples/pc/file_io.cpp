@@ -3,7 +3,7 @@
 #include <iostream>
 #include <limits>
 
-using namespace http::server;
+using namespace beauty;
 
 FileIO::FileIO(const std::string &docRoot) : docRoot_(docRoot) {}
 

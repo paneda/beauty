@@ -7,8 +7,7 @@
 #include "header.hpp"
 #include "request.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 struct Request;
 
@@ -81,5 +80,4 @@ class MultiPartParser {
     std::string boundaryStr_;
 };
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty
