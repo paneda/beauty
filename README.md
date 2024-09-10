@@ -52,9 +52,8 @@ be simplified to the "standard" Arduino setup() and loop() concept.
 #include <server.hpp>
 #include <reply.hpp>
 
-// these includes are just examples
-#include "http_result.hpp"
-#include "my_file_system.hpp"
+// these includes needs implementation, see examples
+#include "my_file_io.hpp"
 #include "my_file_api.hpp"
 
 // somewhere in main..
@@ -63,7 +62,7 @@ void httpServerThread(void*) {
     WiFi.onEvent(WiFiEvent);
     WiFi.begin();
 
-    MyFileSystem fs; // see examples folder for LittleFs
+    MyFileIO fio; // see examples folder for LittleFs
 
     // configurable keep-alive support
     http::server::HttpPersistence persistentOption(std::chrono::seconds(5), 1000, 20);
@@ -72,7 +71,7 @@ void httpServerThread(void*) {
     asio::io_context ioc;
 
     // must use an alternative constructor compared to PC example
-    http::server::Server beauty(ioc, 80, &fs, persistentOption, 1024);
+    http::server::Server beauty(ioc, 80, &fio, persistentOption, 1024);
 
     // middlewares (just one in this example), see examples folder
     MyFileApi fileApiHandler;

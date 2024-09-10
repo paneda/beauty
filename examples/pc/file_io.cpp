@@ -1,13 +1,13 @@
-#include "file_handler.hpp"
+#include "file_io.hpp"
 
 #include <iostream>
 #include <limits>
 
 using namespace http::server;
 
-FileHandler::FileHandler(const std::string &docRoot) : docRoot_(docRoot) {}
+FileIO::FileIO(const std::string &docRoot) : docRoot_(docRoot) {}
 
-size_t FileHandler::openFileForRead(const std::string &id, const Request &request, Reply &reply) {
+size_t FileIO::openFileForRead(const std::string &id, const Request &request, Reply &reply) {
     std::string fullPath = docRoot_ + reply.filePath_;
     std::ifstream &is = openReadFiles_[id];
     is.open(fullPath.c_str(), std::ios::in | std::ios::binary);
@@ -22,7 +22,7 @@ size_t FileHandler::openFileForRead(const std::string &id, const Request &reques
     return 0;
 }
 
-int FileHandler::readFile(const std::string &id,
+int FileIO::readFile(const std::string &id,
                           const Request &request,
                           char *buf,
                           size_t maxSize) {
@@ -30,12 +30,12 @@ int FileHandler::readFile(const std::string &id,
     return openReadFiles_[id].gcount();
 }
 
-void FileHandler::closeReadFile(const std::string &id) {
+void FileIO::closeReadFile(const std::string &id) {
     openReadFiles_[id].close();
     openReadFiles_.erase(id);
 }
 
-Reply::status_type FileHandler::openFileForWrite(const std::string &id,
+Reply::status_type FileIO::openFileForWrite(const std::string &id,
                                                  const Request &request,
                                                  Reply &reply,
                                                  std::string &err) {
@@ -45,7 +45,7 @@ Reply::status_type FileHandler::openFileForWrite(const std::string &id,
     return Reply::status_type::ok;
 }
 
-Reply::status_type FileHandler::writeFile(const std::string &id,
+Reply::status_type FileIO::writeFile(const std::string &id,
                                           const Request &request,
                                           const char *buf,
                                           size_t size,

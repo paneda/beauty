@@ -13,8 +13,8 @@ void defaultFileNotFoundHandler(const Request &req, Reply &rep) {
 
 }
 
-RequestHandler::RequestHandler(IFileHandler *fileHandler)
-    : fileHandler_(fileHandler), fileNotFoundCb_(defaultFileNotFoundHandler) {}
+RequestHandler::RequestHandler(IFileIO *fileIO)
+    : fileIO_(fileIO), fileNotFoundCb_(defaultFileNotFoundHandler) {}
 
 void RequestHandler::addRequestHandler(const handlerCallback &cb) {
     requestHandlers_.push_back(cb);
@@ -51,7 +51,7 @@ void RequestHandler::handleRequest(unsigned connectionId,
         }
     }
 
-    if (fileHandler_ != nullptr) {
+    if (fileIO_ != nullptr) {
         if (req.method_ == "POST" && rep.multiPartParser_.parseHeader(req)) {
             rep.status_ = Reply::ok;
             rep.isMultiPart_ = true;
@@ -72,7 +72,7 @@ void RequestHandler::handlePartialRead(unsigned connectionId, const Request &req
 
     if (nrReadBytes < rep.maxContentSize_) {
         rep.finalPart_ = true;
-        fileHandler_->closeReadFile(std::to_string(connectionId));
+        fileIO_->closeReadFile(std::to_string(connectionId));
     }
 }
 
@@ -103,14 +103,14 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
 }
 
 void RequestHandler::closeFile(Reply &rep, unsigned connectionId) {
-    if (fileHandler_ != nullptr) {
-        fileHandler_->closeReadFile(std::to_string(connectionId));
+    if (fileIO_ != nullptr) {
+        fileIO_->closeReadFile(std::to_string(connectionId));
     }
 }
 
 bool RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, Reply &rep) {
     // open the file to send back
-    size_t contentSize = fileHandler_->openFileForRead(std::to_string(connectionId), req, rep);
+    size_t contentSize = fileIO_->openFileForRead(std::to_string(connectionId), req, rep);
     if (contentSize > 0) {
         // fill initial content
         rep.replyPartial_ = contentSize > rep.maxContentSize_;
@@ -118,7 +118,7 @@ bool RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, 
         readFromFile(connectionId, req, rep);
         if (!rep.replyPartial_) {
             // all data fits in initial content
-            fileHandler_->closeReadFile(std::to_string(connectionId));
+            fileIO_->closeReadFile(std::to_string(connectionId));
         }
 
         // Content-Length is always set by server
@@ -138,7 +138,7 @@ bool RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, 
 
 size_t RequestHandler::readFromFile(unsigned connectionId, const Request &req, Reply &rep) {
     rep.content_.resize(rep.maxContentSize_);
-    int nrReadBytes = fileHandler_->readFile(
+    int nrReadBytes = fileIO_->readFile(
         std::to_string(connectionId), req, rep.content_.data(), rep.content_.size());
     rep.content_.resize(nrReadBytes);
     return nrReadBytes;
@@ -159,7 +159,7 @@ void RequestHandler::writeFileParts(unsigned connectionId,
         if (part.headerOnly_ && !part.filename_.empty()) {
             rep.filePath_ = req.requestPath_ + part.filename_;
             std::string err;
-            rep.status_ = fileHandler_->openFileForWrite(
+            rep.status_ = fileIO_->openFileForWrite(
                 rep.filePath_ + std::to_string(connectionId), req, rep, err);
             rep.multiPartCounter_++;
             if (rep.status_ != Reply::status_type::ok &&
@@ -185,7 +185,7 @@ void RequestHandler::writeFileParts(unsigned connectionId,
                 rep.filePath_ = req.requestPath_ + part.filename_;
                 rep.lastOpenFileForWriteId_ = rep.filePath_ + std::to_string(connectionId);
                 rep.status_ =
-                    fileHandler_->openFileForWrite(rep.lastOpenFileForWriteId_, req, rep, err);
+                    fileIO_->openFileForWrite(rep.lastOpenFileForWriteId_, req, rep, err);
                 rep.multiPartCounter_++;
                 if (rep.status_ != Reply::status_type::ok &&
                     rep.status_ != Reply::status_type::created) {
@@ -194,7 +194,7 @@ void RequestHandler::writeFileParts(unsigned connectionId,
                 }
             }
             size_t size = part.end_ - part.start_;
-            rep.status_ = fileHandler_->writeFile(
+            rep.status_ = fileIO_->writeFile(
                 rep.lastOpenFileForWriteId_, req, &(*part.start_), size, part.foundEnd_, err);
             if (rep.status_ != Reply::status_type::ok &&
                 rep.status_ != Reply::status_type::created) {

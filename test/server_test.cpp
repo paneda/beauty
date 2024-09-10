@@ -4,7 +4,7 @@
 #include <numeric>
 #include <thread>
 
-#include "utils/mock_file_handler.hpp"
+#include "utils/mock_file_io.hpp"
 #include "utils/mock_not_found_handler.hpp"
 #include "utils/mock_request_handler.hpp"
 #include "utils/test_client.hpp"
@@ -137,14 +137,14 @@ TEST_CASE("server with file handler", "[server]") {
     asio::io_context ioc;
     TestClient c(ioc);
 
-    MockFileHandler mockFileHandler;
+    MockFileIO mockFileIO;
     HttpPersistence persistentOption(0s, 0, 0);
-    Server dut(ioc, "127.0.0.1", "0", &mockFileHandler, persistentOption);
+    Server dut(ioc, "127.0.0.1", "0", &mockFileIO, persistentOption);
     uint16_t port = dut.getBindedPort();
     auto t = std::thread(&asio::io_context::run, &ioc);
 
     SECTION("it should return 404") {
-        mockFileHandler.setMockFailToOpenReadFile();
+        mockFileIO.setMockFailToOpenReadFile();
         openConnection(c, "127.0.0.1", port);
 
         auto fut = createFutureResult(c);
@@ -154,31 +154,31 @@ TEST_CASE("server with file handler", "[server]") {
         REQUIRE(res.statusCode_ == 404);
     }
 
-    SECTION("it should call fileHandler openFileForRead but not close when no file exists") {
+    SECTION("it should call fileIO openFileForRead but not close when no file exists") {
         openConnection(c, "127.0.0.1", port);
 
         auto fut = createFutureResult(c);
         c.sendRequest(GetIndexRequest);
         fut.get();
-        REQUIRE(mockFileHandler.getOpenFileForReadCalls() == 1);
-        REQUIRE(mockFileHandler.getCloseReadFileCalls() == 0);
+        REQUIRE(mockFileIO.getOpenFileForReadCalls() == 1);
+        REQUIRE(mockFileIO.getCloseReadFileCalls() == 0);
     }
 
-    SECTION("it should call fileHandler openFileForRead and close when file exists") {
+    SECTION("it should call fileIO openFileForRead and close when file exists") {
         openConnection(c, "127.0.0.1", port);
 
-        mockFileHandler.createMockFile(100);
+        mockFileIO.createMockFile(100);
         auto fut = createFutureResult(c);
         c.sendRequest(GetIndexRequest);
         fut.get();
-        REQUIRE(mockFileHandler.getOpenFileForReadCalls() == 1);
-        REQUIRE(mockFileHandler.getCloseReadFileCalls() == 1);
+        REQUIRE(mockFileIO.getOpenFileForReadCalls() == 1);
+        REQUIRE(mockFileIO.getCloseReadFileCalls() == 1);
     }
 
     SECTION("it should assume index.html for directories") {
         openConnection(c, "127.0.0.1", port);
 
-        mockFileHandler.createMockFile(100);
+        mockFileIO.createMockFile(100);
         std::future<TestClient::TestResult> futs[2] = {createFutureResult(c),
                                                        createFutureResult(c)};
         const std::string getDirectoryRequest =
@@ -196,7 +196,7 @@ TEST_CASE("server with file handler", "[server]") {
     SECTION("it should return correct headers") {
         openConnection(c, "127.0.0.1", port);
 
-        mockFileHandler.createMockFile(100);
+        mockFileIO.createMockFile(100);
         std::future<TestClient::TestResult> futs[2] = {createFutureResult(c),
                                                        createFutureResult(c)};
         c.sendRequest(GetIndexRequest);
@@ -213,7 +213,7 @@ TEST_CASE("server with file handler", "[server]") {
         openConnection(c, "127.0.0.1", port);
 
         const size_t fileSizeBytes = 100;
-        mockFileHandler.createMockFile(fileSizeBytes);
+        mockFileIO.createMockFile(fileSizeBytes);
         std::future<TestClient::TestResult> futs[3] = {
             createFutureResult(c), createFutureResult(c), createFutureResult(c, fileSizeBytes)};
         c.sendRequest(GetIndexRequest);
@@ -230,7 +230,7 @@ TEST_CASE("server with file handler", "[server]") {
         openConnection(c, "127.0.0.1", port);
 
         const size_t fileSizeBytes = 10000;
-        mockFileHandler.createMockFile(fileSizeBytes);
+        mockFileIO.createMockFile(fileSizeBytes);
         std::future<TestClient::TestResult> futs[3] = {
             createFutureResult(c), createFutureResult(c), createFutureResult(c, fileSizeBytes)};
         c.sendRequest(GetIndexRequest);
@@ -246,7 +246,7 @@ TEST_CASE("server with file handler", "[server]") {
         std::string mockedContent = "This is mocked content";
         MockNotFoundHandler mockNotFoundHandler;
         mockNotFoundHandler.setMockedContent(mockedContent);
-        mockFileHandler.setMockFailToOpenReadFile();
+        mockFileIO.setMockFailToOpenReadFile();
         dut.setFileNotFoundHandler(std::bind(&MockNotFoundHandler::handleNotFound,
                                              &mockNotFoundHandler,
                                              std::placeholders::_1,
@@ -416,15 +416,15 @@ TEST_CASE("server with route handler", "[server]") {
     t.join();
 }
 
-TEST_CASE("server with write filehandler", "[server]") {
+TEST_CASE("server with write fileIO", "[server]") {
     asio::io_context ioc;
     TestClient c(ioc);
 
     std::vector<char> buffer;  // not used in test
     MockRequestHandler mockRequestHandler(buffer);
-    MockFileHandler mockFileHandler;
+    MockFileIO mockFileIO;
     HttpPersistence persistentOption(0s, 0, 0);
-    Server dut(ioc, "127.0.0.1", "0", &mockFileHandler, persistentOption);
+    Server dut(ioc, "127.0.0.1", "0", &mockFileIO, persistentOption);
     uint16_t port = dut.getBindedPort();
     auto t = std::thread(&asio::io_context::run, &ioc);
 
@@ -452,10 +452,10 @@ TEST_CASE("server with write filehandler", "[server]") {
         auto fut = createFutureResult(c);
         c.sendMultiPartRequest({request});
         auto res = fut.get();
-        REQUIRE(res.statusCode_ == 200);  // MockFileHandler::writeFile returns 200
-        REQUIRE(mockFileHandler.getOpenFileForWriteCalls() == 1);
-        REQUIRE(mockFileHandler.getLastData("/firstpart.txt0") == true);
-        std::vector<char> result = mockFileHandler.getMockWriteFile("/firstpart.txt0");
+        REQUIRE(res.statusCode_ == 200);  // MockFileIO::writeFile returns 200
+        REQUIRE(mockFileIO.getOpenFileForWriteCalls() == 1);
+        REQUIRE(mockFileIO.getLastData("/firstpart.txt0") == true);
+        std::vector<char> result = mockFileIO.getMockWriteFile("/firstpart.txt0");
         std::vector<char> expected = {'F', 'i', 'r', 's', 't', ' ', 'p', 'a', 'r', 't', '\n'};
         REQUIRE(result == expected);
     }
@@ -483,10 +483,10 @@ TEST_CASE("server with write filehandler", "[server]") {
         auto res2 = futs[1].get();
 
         REQUIRE(res1.statusCode_ == 200);  // Header response
-        REQUIRE(res2.statusCode_ == 200);  // MockFileHandler::writeFile returns 200
-        REQUIRE(mockFileHandler.getOpenFileForWriteCalls() == 1);
-        REQUIRE(mockFileHandler.getLastData("/firstpart.txt0") == true);
-        std::vector<char> result = mockFileHandler.getMockWriteFile("/firstpart.txt0");
+        REQUIRE(res2.statusCode_ == 200);  // MockFileIO::writeFile returns 200
+        REQUIRE(mockFileIO.getOpenFileForWriteCalls() == 1);
+        REQUIRE(mockFileIO.getLastData("/firstpart.txt0") == true);
+        std::vector<char> result = mockFileIO.getMockWriteFile("/firstpart.txt0");
         std::vector<char> expected = {'F', 'i', 'r', 's', 't', ' ', 'p', 'a', 'r', 't', '\n'};
         REQUIRE(result == expected);
     }
@@ -512,17 +512,17 @@ TEST_CASE("server with write filehandler", "[server]") {
         c.sendMultiPartRequest({request1, request2});
         auto res1 = futs[0].get();
         auto res2 = futs[1].get();
-        REQUIRE(res1.statusCode_ == 201);  // MockFileHandler::openFileForWrite
+        REQUIRE(res1.statusCode_ == 201);  // MockFileIO::openFileForWrite
                                            // returns 201
 
-        REQUIRE(res2.statusCode_ == 200);  // MockFileHandler::writeFile returns 200
-        REQUIRE(mockFileHandler.getOpenFileForWriteCalls() == 1);
-        REQUIRE(mockFileHandler.getLastData("/firstpart.txt0") == true);
-        std::vector<char> result = mockFileHandler.getMockWriteFile("/firstpart.txt0");
+        REQUIRE(res2.statusCode_ == 200);  // MockFileIO::writeFile returns 200
+        REQUIRE(mockFileIO.getOpenFileForWriteCalls() == 1);
+        REQUIRE(mockFileIO.getLastData("/firstpart.txt0") == true);
+        std::vector<char> result = mockFileIO.getMockWriteFile("/firstpart.txt0");
         std::vector<char> expected = {'F', 'i', 'r', 's', 't', ' ', 'p', 'a', 'r', 't', '.', '\n'};
         REQUIRE(result == expected);
     }
-    SECTION("it should respond with fileHandlers bad response") {
+    SECTION("it should respond with fileIOs bad response") {
         const std::string request1 =
             "POST / HTTP/1.1\r\n"
             "Host: 127.0.0.1:8081\r\n"
@@ -535,14 +535,14 @@ TEST_CASE("server with write filehandler", "[server]") {
             "Content-Disposition: form-data; name=\"file1\"; filename=\"firstpart.txt\"\r\n"
             "Content-Type: text/plain\r\n\r\n";
 
-        mockFileHandler.setMockFailToOpenWriteFile();
+        mockFileIO.setMockFailToOpenWriteFile();
 
         openConnection(c, "127.0.0.1", port);
 
         auto fut = createFutureResult(c);
         c.sendMultiPartRequest({request1});
         auto res = fut.get();
-        REQUIRE(res.statusCode_ == 500);  // MockFileHandler::openFileForWrite
+        REQUIRE(res.statusCode_ == 500);  // MockFileIO::openFileForWrite
     }
     SECTION("it should handle multiple parts in a multipart request") {
         const std::string request1 =
@@ -573,16 +573,16 @@ TEST_CASE("server with write filehandler", "[server]") {
         auto res2 = futs[1].get();
         auto res3 = futs[2].get();
 
-        REQUIRE(res1.statusCode_ == 201);  // MockFileHandler::openFileForWrite returns 201
-        REQUIRE(res2.statusCode_ == 201);  // MockFileHandler::openFileForWrite returns 201
-        REQUIRE(res3.statusCode_ == 200);  // MockFileHandler::writeFile returns 200
-        REQUIRE(mockFileHandler.getOpenFileForWriteCalls() == 2);
-        REQUIRE(mockFileHandler.getLastData("/firstpart.txt0") == true);
-        REQUIRE(mockFileHandler.getLastData("/secondpart.txt0") == true);
-        std::vector<char> result = mockFileHandler.getMockWriteFile("/firstpart.txt0");
+        REQUIRE(res1.statusCode_ == 201);  // MockFileIO::openFileForWrite returns 201
+        REQUIRE(res2.statusCode_ == 201);  // MockFileIO::openFileForWrite returns 201
+        REQUIRE(res3.statusCode_ == 200);  // MockFileIO::writeFile returns 200
+        REQUIRE(mockFileIO.getOpenFileForWriteCalls() == 2);
+        REQUIRE(mockFileIO.getLastData("/firstpart.txt0") == true);
+        REQUIRE(mockFileIO.getLastData("/secondpart.txt0") == true);
+        std::vector<char> result = mockFileIO.getMockWriteFile("/firstpart.txt0");
         std::vector<char> expected = {'F', 'i', 'r', 's', 't', ' ', 'p', 'a', 'r', 't', '.', '\n'};
         REQUIRE(result == expected);
-        result = mockFileHandler.getMockWriteFile("/secondpart.txt0");
+        result = mockFileIO.getMockWriteFile("/secondpart.txt0");
         expected = {'S', 'e', 'c', 'o', 'n', 'd', ' ', 'p', 'a', 'r', 't', ',', '\n'};
         REQUIRE(result == expected);
     }

@@ -1,10 +1,10 @@
-#include "mock_file_handler.hpp"
+#include "mock_file_io.hpp"
 
 #include <cstring>
 #include <limits>
 #include <stdexcept>
 
-#include "file_handler.hpp"
+#include "file_io.hpp"
 
 namespace {
 bool ends_with(std::string const& value, std::string const& ending) {
@@ -15,13 +15,13 @@ bool ends_with(std::string const& value, std::string const& ending) {
 }
 }
 
-size_t MockFileHandler::openFileForRead(const std::string& id,
+size_t MockFileIO::openFileForRead(const std::string& id,
                                         const http::server::Request& request,
                                         http::server::Reply& reply) {
     OpenReadFile& openFile = openReadFiles_[id];
     countOpenFileForReadCalls_++;
     if (openFile.isOpen_) {
-        throw std::runtime_error("MockFileHandler test error: File already opened");
+        throw std::runtime_error("MockFileIO test error: File already opened");
     }
 
     if (mockFailToOpenReadFile_) {
@@ -33,13 +33,13 @@ size_t MockFileHandler::openFileForRead(const std::string& id,
     return mockFileData_.size();
 }
 
-int MockFileHandler::readFile(const std::string& id,
+int MockFileIO::readFile(const std::string& id,
                               const http::server::Request& request,
                               char* buf,
                               size_t maxSize) {
     OpenReadFile& openFile = openReadFiles_[id];
     if (!openFile.isOpen_) {
-        throw std::runtime_error("MockFileHandler test error: readFile() called on closed file");
+        throw std::runtime_error("MockFileIO test error: readFile() called on closed file");
     }
     countReadFileCalls_++;
     size_t leftBytes = std::distance(openFile.readIt_, mockFileData_.end());
@@ -49,19 +49,19 @@ int MockFileHandler::readFile(const std::string& id,
     return bytesToCopy;
 }
 
-void MockFileHandler::closeReadFile(const std::string& id) {
+void MockFileIO::closeReadFile(const std::string& id) {
     countCloseReadFileCalls_++;
     openReadFiles_.erase(id);
 }
 
-http::server::Reply::status_type MockFileHandler::openFileForWrite(
+http::server::Reply::status_type MockFileIO::openFileForWrite(
     const std::string& id,
     const http::server::Request& request,
     http::server::Reply& reply,
     std::string& err) {
     OpenWriteFile& openFile = openWriteFiles_[id];
     if (openFile.isOpen_) {
-        throw std::runtime_error("MockFileHandler test error: File already opened");
+        throw std::runtime_error("MockFileIO test error: File already opened");
     }
     countOpenFileForWriteCalls_++;
     if (mockFailToOpenWriteFile_) {
@@ -72,7 +72,7 @@ http::server::Reply::status_type MockFileHandler::openFileForWrite(
     return http::server::Reply::status_type::created;
 }
 
-http::server::Reply::status_type MockFileHandler::writeFile(const std::string& id,
+http::server::Reply::status_type MockFileIO::writeFile(const std::string& id,
                                                             const http::server::Request& request,
                                                             const char* buf,
                                                             size_t size,
@@ -80,22 +80,22 @@ http::server::Reply::status_type MockFileHandler::writeFile(const std::string& i
                                                             std::string& err) {
     OpenWriteFile& openFile = openWriteFiles_[id];
     if (!openFile.isOpen_) {
-        throw std::runtime_error("MockFileHandler test error: writeFile() called on closed file");
+        throw std::runtime_error("MockFileIO test error: writeFile() called on closed file");
     }
     openFile.file_.insert(openFile.file_.end(), buf, buf + size);
     openFile.lastData_ = lastData;
     return http::server::Reply::status_type::ok;
 }
 
-int MockFileHandler::getOpenFileForWriteCalls() {
+int MockFileIO::getOpenFileForWriteCalls() {
     return countOpenFileForWriteCalls_;
 }
 
 // creates and fills the "file" with counter values
-void MockFileHandler::createMockFile(uint32_t size) {
+void MockFileIO::createMockFile(uint32_t size) {
     int typeSize = sizeof(size);
     if (size % typeSize != 0) {
-        throw std::runtime_error("MockFileHandler setup error: size must be even multiple of " +
+        throw std::runtime_error("MockFileIO setup error: size must be even multiple of " +
                                  std::to_string(typeSize) +
                                  "to accomodate counter "
                                  "values");
@@ -109,30 +109,30 @@ void MockFileHandler::createMockFile(uint32_t size) {
     }
 }
 
-std::vector<char> MockFileHandler::getMockWriteFile(const std::string& id) {
+std::vector<char> MockFileIO::getMockWriteFile(const std::string& id) {
     return openWriteFiles_[id].file_;
 }
 
-void MockFileHandler::setMockFailToOpenReadFile() {
+void MockFileIO::setMockFailToOpenReadFile() {
     mockFailToOpenReadFile_ = true;
 }
 
-void MockFileHandler::setMockFailToOpenWriteFile() {
+void MockFileIO::setMockFailToOpenWriteFile() {
     mockFailToOpenWriteFile_ = true;
 }
 
-int MockFileHandler::getOpenFileForReadCalls() {
+int MockFileIO::getOpenFileForReadCalls() {
     return countOpenFileForReadCalls_;
 }
 
-int MockFileHandler::getReadFileCalls() {
+int MockFileIO::getReadFileCalls() {
     return countReadFileCalls_;
 }
 
-int MockFileHandler::getCloseReadFileCalls() {
+int MockFileIO::getCloseReadFileCalls() {
     return countCloseReadFileCalls_;
 }
 
-bool MockFileHandler::getLastData(const std::string& id) {
+bool MockFileIO::getLastData(const std::string& id) {
     return openWriteFiles_[id].lastData_;
 }

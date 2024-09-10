@@ -2,12 +2,12 @@
 #include <fstream>
 #include <unordered_map>
 
-#include "i_file_handler.hpp"
+#include "i_file_io.hpp"
 
-class FileHandler : public http::server::IFileHandler {
+class FileIO : public http::server::IFileIO {
    public:
-    FileHandler(const std::string &docRoot);
-    virtual ~FileHandler() = default;
+    FileIO(const std::string &docRoot);
+    virtual ~FileIO() = default;
 
     size_t openFileForRead(const std::string &id,
                            const http::server::Request &request,

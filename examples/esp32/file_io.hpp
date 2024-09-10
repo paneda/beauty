@@ -3,15 +3,15 @@
 
 #include <unordered_map>
 
-#include "i_file_handler.hpp"
+#include "i_file_io.hpp"
 
-class FileHandler : public http::server::IFileHandler {
+class FileIO : public http::server::IFileIO {
    public:
-    FileHandler() = default;
-    virtual ~FileHandler() = default;
+    FileIO() = default;
+    virtual ~FileIO() = default;
 
-    FileHandler(const FileHandler&) = delete;
-    FileHandler& operator=(const FileHandler&) = delete;
+    FileIO(const FileIO&) = delete;
+    FileIO& operator=(const FileIO&) = delete;
 
     size_t openFileForRead(const std::string& id,
                            const http::server::Request& request,

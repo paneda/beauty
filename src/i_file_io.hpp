@@ -8,10 +8,10 @@
 namespace http {
 namespace server {
 
-class IFileHandler {
+class IFileIO {
    public:
-    IFileHandler() = default;
-    virtual ~IFileHandler() = default;
+    IFileIO() = default;
+    virtual ~IFileIO() = default;
 
     virtual size_t openFileForRead(const std::string& id, const Request& request, Reply& reply) = 0;
     virtual int readFile(const std::string& id,

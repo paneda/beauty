@@ -2,7 +2,7 @@
 #include <iostream>
 #include <string>
 
-#include "file_handler.hpp"
+#include "file_io.hpp"
 #include "my_file_api.hpp"
 #include "server.hpp"
 
@@ -24,10 +24,10 @@ int main(int argc, char *argv[]) {
 
         asio::io_context ioc;
         // Initialise the server.
-        FileHandler fileHandler(argv[3]);
+        FileIO fileIO(argv[3]);
         HttpPersistence persistentOption(5s, 1000, 0);
         MyFileApi fileStorageHandler(argv[3]);
-        Server s(ioc, argv[1], argv[2], &fileHandler, persistentOption, 1024);
+        Server s(ioc, argv[1], argv[2], &fileIO, persistentOption, 1024);
         s.addRequestHandler(
             std::bind(&MyFileApi::handleRequest, &fileStorageHandler, _1, _2));
         s.setDebugMsgHandler([](const std::string &msg) { std::cout << msg << std::endl; });

@@ -5,13 +5,13 @@
 #include <unordered_map>
 #include <vector>
 
-#include "i_file_handler.hpp"
+#include "i_file_io.hpp"
 #include "reply.hpp"
 
-class MockFileHandler : public http::server::IFileHandler {
+class MockFileIO : public http::server::IFileIO {
    public:
-    MockFileHandler() = default;
-    virtual ~MockFileHandler() = default;
+    MockFileIO() = default;
+    virtual ~MockFileIO() = default;
 
     size_t openFileForRead(const std::string& id,
                            const http::server::Request& request,

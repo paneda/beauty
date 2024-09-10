@@ -2,11 +2,11 @@
 
 #include <LittleFS.h>
 
-#include "file_handler.hpp"
+#include "file_io.hpp"
 
 using namespace http::server;
 
-size_t FileHandler::openFileForRead(const std::string& id, const Request& request, Reply& reply) {
+size_t FileIO::openFileForRead(const std::string& id, const Request& request, Reply& reply) {
 
     openReadFiles_[id] = LittleFS.open(reply.filePath_.c_str(), "r");
     if (!openReadFiles_[id]) {
@@ -17,19 +17,19 @@ size_t FileHandler::openFileForRead(const std::string& id, const Request& reques
     return openReadFiles_[id].size();
 }
 
-int FileHandler::readFile(const std::string& id,
+int FileIO::readFile(const std::string& id,
                           const Request& request,
                           char* buf,
                           size_t maxSize) {
     return openReadFiles_[id].readBytes(buf, maxSize);
 }
 
-void FileHandler::closeReadFile(const std::string& id) {
+void FileIO::closeReadFile(const std::string& id) {
     openReadFiles_[id].close();
     openReadFiles_.erase(id);
 }
 
-Reply::status_type FileHandler::openFileForWrite(const std::string& id,
+Reply::status_type FileIO::openFileForWrite(const std::string& id,
                                                  const Request& request,
                                                  Reply& reply,
                                                  std::string& err) {
@@ -47,7 +47,7 @@ Reply::status_type FileHandler::openFileForWrite(const std::string& id,
     return Reply::status_type::ok;
 }
 
-Reply::status_type FileHandler::writeFile(const std::string& id,
+Reply::status_type FileIO::writeFile(const std::string& id,
                                           const Request& request,
                                           const char* buf,
                                           size_t size,

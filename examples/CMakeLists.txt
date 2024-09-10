@@ -2,7 +2,7 @@ project(beauty_example)
 
 add_executable(beauty_example
 	pc/main.cpp
-	pc/file_handler.cpp
+	pc/file_io.cpp
 	pc/my_file_api.cpp
 	${Beauty_Sources}
 )
