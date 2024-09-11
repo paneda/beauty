@@ -28,8 +28,10 @@ This example can be build and run as:
 mkdir build
 cmake --build build ..
 # run with
-build/examples/beauty_example 0.0.0.0 8080 www
-# visit localhost:8080 and test the routes provided by examples/pc/my_file_api.cpp
+build/examples/beauty_example 127.0.0.1 8080 www
+# visit 127.0.0.1:8080 and test the routes provided by examples/pc/my_file_api.cpp
+# upload this README.md with:
+# curl --location '127.0.0.1:8080' --form 'file1=@"README.md"' 
 ```
 
 ## ESP32
