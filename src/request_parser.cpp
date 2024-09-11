@@ -230,7 +230,7 @@ RequestParser::result_type RequestParser::consume(Request &req,
                     req.keepAlive_ = false;
                 }
             } else {
-				req.keepAlive_ = false;
+                req.keepAlive_ = false;
                 if (req.httpVersionMajor_ > 1 ||
                     (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ == 1)) {
                     req.keepAlive_ = true;

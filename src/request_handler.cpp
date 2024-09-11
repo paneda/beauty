@@ -51,31 +51,31 @@ void RequestHandler::handleRequest(unsigned connectionId,
     }
 
     if (fileIO_ == nullptr) {
-		rep.stockReply(Reply::not_implemented);
-		return;
-	}
+        rep.stockReply(Reply::not_implemented);
+        return;
+    }
 
-	if (req.method_ == "POST") {
+    if (req.method_ == "POST") {
         if (rep.multiPartParser_.parseHeader(req)) {
             rep.status_ = Reply::ok;
             rep.isMultiPart_ = true;
             handlePartialWrite(connectionId, req, content, rep);
             return;
-		} else {
-			rep.stockReply(Reply::bad_request);
-			return;
-		}
+        } else {
+            rep.stockReply(Reply::bad_request);
+            return;
+        }
 
-	} else if (req.method_ == "GET") {
-		if (openAndReadFile(connectionId, req, rep) > 0) {
-			return;
-		} else {
-			fileNotFoundCb_(req, rep);
-			return;
-		}
-	}
+    } else if (req.method_ == "GET") {
+        if (openAndReadFile(connectionId, req, rep) > 0) {
+            return;
+        } else {
+            fileNotFoundCb_(req, rep);
+            return;
+        }
+    }
 
-	rep.stockReply(Reply::not_implemented);
+    rep.stockReply(Reply::not_implemented);
 }
 
 void RequestHandler::handlePartialRead(unsigned connectionId, const Request &req, Reply &rep) {
@@ -195,8 +195,7 @@ void RequestHandler::writeFileParts(unsigned connectionId,
                 // late, the response will be late too.
                 rep.filePath_ = req.requestPath_ + part.filename_;
                 rep.lastOpenFileForWriteId_ = rep.filePath_ + std::to_string(connectionId);
-                rep.status_ =
-                    fileIO_->openFileForWrite(rep.lastOpenFileForWriteId_, req, rep, err);
+                rep.status_ = fileIO_->openFileForWrite(rep.lastOpenFileForWriteId_, req, rep, err);
                 rep.multiPartCounter_++;
                 if (rep.status_ != Reply::status_type::ok &&
                     rep.status_ != Reply::status_type::created) {

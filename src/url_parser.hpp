@@ -276,4 +276,3 @@ class UrlParser {
 };
 
 }  // namespace beauty
-

@@ -23,20 +23,20 @@ class FileIO : public beauty::IFileIO {
     void closeReadFile(const std::string& id) override;
 
     beauty::Reply::status_type openFileForWrite(const std::string& id,
-                                                      const Request& request,
-                                                      Reply& reply,
-                                                      std::string& err) override;
+                                                const Request& request,
+                                                Reply& reply,
+                                                std::string& err) override;
     beauty::Reply::status_type writeFile(const std::string& id,
-                                               const beauty::Request& request,
-                                               const char* buf,
-                                               size_t size,
-                                               bool lastData,
-                                               std::string& err) override;
+                                         const beauty::Request& request,
+                                         const char* buf,
+                                         size_t size,
+                                         bool lastData,
+                                         std::string& err) override;
 
    private:
-	// As we need to handle multiple connections that reads/writes different
-	// files, we keep maps to handle this.
-	// Key is the id of each file, provided by Beauty.
+    // As we need to handle multiple connections that reads/writes different
+    // files, we keep maps to handle this.
+    // Key is the id of each file, provided by Beauty.
     std::unordered_map<std::string, File> openReadFiles_;
     std::unordered_map<std::string, File> openWriteFiles_;
 };

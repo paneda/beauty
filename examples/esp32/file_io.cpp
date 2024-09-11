@@ -16,10 +16,7 @@ size_t FileIO::openFileForRead(const std::string& id, const Request& request, Re
     return openReadFiles_[id].size();
 }
 
-int FileIO::readFile(const std::string& id,
-                          const Request& request,
-                          char* buf,
-                          size_t maxSize) {
+int FileIO::readFile(const std::string& id, const Request& request, char* buf, size_t maxSize) {
     return openReadFiles_[id].readBytes(buf, maxSize);
 }
 
@@ -29,9 +26,9 @@ void FileIO::closeReadFile(const std::string& id) {
 }
 
 Reply::status_type FileIO::openFileForWrite(const std::string& id,
-                                                 const Request& request,
-                                                 Reply& reply,
-                                                 std::string& err) {
+                                            const Request& request,
+                                            Reply& reply,
+                                            std::string& err) {
     // only support files under '/' so '/' + max filename = 32
     if (reply.filePath_.size() > 32) {
         err = "Filename too long max 31 characters are allowed";
@@ -48,15 +45,15 @@ Reply::status_type FileIO::openFileForWrite(const std::string& id,
 }
 
 Reply::status_type FileIO::writeFile(const std::string& id,
-                                          const Request& request,
-                                          const char* buf,
-                                          size_t size,
-                                          bool lastData,
-                                          std::string& err) {
+                                     const Request& request,
+                                     const char* buf,
+                                     size_t size,
+                                     bool lastData,
+                                     std::string& err) {
     openWriteFiles_[id].write((const uint8_t*)buf, size);
     if (lastData) {
         openWriteFiles_[id].close();
-		openWriteFiles_.erase(id);
+        openWriteFiles_.erase(id);
     }
 
     return Reply::ok;

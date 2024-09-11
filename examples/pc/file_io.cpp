@@ -22,10 +22,7 @@ size_t FileIO::openFileForRead(const std::string &id, const Request &request, Re
     return 0;
 }
 
-int FileIO::readFile(const std::string &id,
-                          const Request &request,
-                          char *buf,
-                          size_t maxSize) {
+int FileIO::readFile(const std::string &id, const Request &request, char *buf, size_t maxSize) {
     openReadFiles_[id].read(buf, maxSize);
     return openReadFiles_[id].gcount();
 }
@@ -36,9 +33,9 @@ void FileIO::closeReadFile(const std::string &id) {
 }
 
 Reply::status_type FileIO::openFileForWrite(const std::string &id,
-                                                 const Request &request,
-                                                 Reply &reply,
-                                                 std::string &err) {
+                                            const Request &request,
+                                            Reply &reply,
+                                            std::string &err) {
     std::string fullPath = docRoot_ + reply.filePath_;
     std::ofstream &os = openWriteFiles_[id];
     os.open(fullPath.c_str(), std::ios::out | std::ios::binary);
@@ -46,15 +43,15 @@ Reply::status_type FileIO::openFileForWrite(const std::string &id,
 }
 
 Reply::status_type FileIO::writeFile(const std::string &id,
-                                          const Request &request,
-                                          const char *buf,
-                                          size_t size,
-                                          bool lastData,
-                                          std::string &err) {
+                                     const Request &request,
+                                     const char *buf,
+                                     size_t size,
+                                     bool lastData,
+                                     std::string &err) {
     openWriteFiles_[id].write(buf, size);
     if (lastData) {
         openWriteFiles_[id].close();
-		openWriteFiles_.erase(id);
+        openWriteFiles_.erase(id);
     }
     return Reply::ok;
 }

@@ -86,15 +86,15 @@ bool Reply::hasHeaders() const {
 
 void Reply::send(status_type status) {
     status_ = status;
-	headers_.push_back({"Content-Length", "0"});
+    headers_.push_back({"Content-Length", "0"});
 
     returnToClient_ = true;
 }
 
 void Reply::send(status_type status, const std::string& contentType) {
     status_ = status;
-	headers_.push_back({"Content-Length", std::to_string(content_.size())});
-	headers_.push_back({"Content-Type", contentType});
+    headers_.push_back({"Content-Length", std::to_string(content_.size())});
+    headers_.push_back({"Content-Type", contentType});
 
     returnToClient_ = true;
 }
@@ -104,8 +104,8 @@ void Reply::sendPtr(status_type status,
                     const char* data,
                     size_t size) {
     status_ = status;
-	headers_.push_back({"Content-Length", std::to_string(size)});
-	headers_.push_back({"Content-Type", contentType});
+    headers_.push_back({"Content-Length", std::to_string(size)});
+    headers_.push_back({"Content-Type", contentType});
 
     contentPtr_ = data;
     contentSize_ = size;
@@ -271,7 +271,7 @@ void Reply::stockReply(Reply::status_type status) {
     headers_[1].name_ = "Content-Type";
     headers_[1].value_ = "text/html";
 
-	returnToClient_ = true;
+    returnToClient_ = true;
 }
 
 }  // namespace beauty
