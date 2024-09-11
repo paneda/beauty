@@ -7,7 +7,6 @@
 using namespace beauty;
 
 size_t FileIO::openFileForRead(const std::string& id, const Request& request, Reply& reply) {
-
     openReadFiles_[id] = LittleFS.open(reply.filePath_.c_str(), "r");
     if (!openReadFiles_[id]) {
         openReadFiles_.erase(id);
@@ -36,15 +35,16 @@ Reply::status_type FileIO::openFileForWrite(const std::string& id,
     // only support files under '/' so '/' + max filename = 32
     if (reply.filePath_.size() > 32) {
         err = "Filename too long max 31 characters are allowed";
-        return Reply::status_type::bad_request;
+        return Reply::bad_request;
     }
 
     openWriteFiles_[id] = LittleFS.open(reply.filePath_.c_str(), "w");
     if (!openWriteFiles_[id]) {
         openWriteFiles_.erase(id);
-        return Reply::status_type::internal_server_error;
+        return Reply::internal_server_error;
     }
-    return Reply::status_type::ok;
+
+    return Reply::ok;
 }
 
 Reply::status_type FileIO::writeFile(const std::string& id,
@@ -59,5 +59,5 @@ Reply::status_type FileIO::writeFile(const std::string& id,
 		openWriteFiles_.erase(id);
     }
 
-    return Reply::status_type::ok;
+    return Reply::ok;
 }

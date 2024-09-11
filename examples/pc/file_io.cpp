@@ -42,7 +42,7 @@ Reply::status_type FileIO::openFileForWrite(const std::string &id,
     std::string fullPath = docRoot_ + reply.filePath_;
     std::ofstream &os = openWriteFiles_[id];
     os.open(fullPath.c_str(), std::ios::out | std::ios::binary);
-    return Reply::status_type::ok;
+    return Reply::ok;
 }
 
 Reply::status_type FileIO::writeFile(const std::string &id,
@@ -56,5 +56,5 @@ Reply::status_type FileIO::writeFile(const std::string &id,
         openWriteFiles_[id].close();
 		openWriteFiles_.erase(id);
     }
-    return Reply::status_type::ok;
+    return Reply::ok;
 }
