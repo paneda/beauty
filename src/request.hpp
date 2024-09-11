@@ -7,8 +7,7 @@
 
 #include "header.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 // A request received from a client.
 struct Request {
@@ -105,5 +104,4 @@ struct Request {
     size_t contentLength_ = 0;
 };
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

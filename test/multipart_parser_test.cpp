@@ -3,7 +3,7 @@
 #include "multipart_parser.hpp"
 #include "request.hpp"
 
-using namespace http::server;
+using namespace beauty;
 
 namespace {
 

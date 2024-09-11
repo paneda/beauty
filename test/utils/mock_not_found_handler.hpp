@@ -8,10 +8,10 @@ class MockNotFoundHandler {
     MockNotFoundHandler() = default;
     virtual ~MockNotFoundHandler() = default;
 
-    void handleNotFound(const http::server::Request &req, http::server::Reply &rep) {
+    void handleNotFound(const beauty::Request &req, beauty::Reply &rep) {
         noCalls_++;
         rep.content_.insert(rep.content_.begin(), mockedContent_.begin(), mockedContent_.end());
-        rep.send(http::server::Reply::ok, "text/plain");
+        rep.send(beauty::Reply::ok, "text/plain");
     }
 
     void setMockedContent(const std::string &mockedContent) {

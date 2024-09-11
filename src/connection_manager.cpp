@@ -1,8 +1,7 @@
 #include "connection_manager.hpp"
 #include <chrono>
 
-namespace http {
-namespace server {
+namespace beauty {
 
 ConnectionManager::ConnectionManager(HttpPersistence options)
     : httpPersistence_(options), debugMsgCb_(defaultDebugMsgHandler) {}
@@ -70,5 +69,4 @@ void ConnectionManager::debugMsg(const std::string &msg) {
     debugMsgCb_(msg);
 }
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

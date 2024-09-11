@@ -9,11 +9,10 @@
 #include "beauty_common.hpp"
 #include "connection.hpp"
 #include "connection_manager.hpp"
-#include "i_file_handler.hpp"
+#include "i_file_io.hpp"
 #include "request_handler.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 class Server {
    public:
@@ -23,7 +22,7 @@ class Server {
     // Simple constructor, use for ESP32.
     explicit Server(asio::io_context &ioContext,
                     uint16_t port,
-                    IFileHandler *fileHandler,
+                    IFileIO *fileIO,
                     HttpPersistence options,
                     size_t maxContentSize = 1024);
 
@@ -31,7 +30,7 @@ class Server {
     explicit Server(asio::io_context &ioContext,
                     const std::string &address,
                     const std::string &port,
-                    IFileHandler *fileHandler,
+                    IFileIO *fileIO,
                     HttpPersistence options,
                     size_t maxContentSize = 1024);
 
@@ -68,5 +67,4 @@ class Server {
     debugMsgCallback debugMsgCb_;
 };
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

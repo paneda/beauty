@@ -2,12 +2,11 @@
 
 #include "beauty_common.hpp"
 #include "multipart_parser.hpp"
-#include "i_file_handler.hpp"
+#include "i_file_io.hpp"
 #include "reply.hpp"
 #include "request.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 class IRouteHandler;
 struct Reply;
@@ -18,7 +17,7 @@ class RequestHandler {
     RequestHandler(const RequestHandler &) = delete;
     RequestHandler &operator=(const RequestHandler &) = delete;
 
-    explicit RequestHandler(IFileHandler *fileHandler);
+    explicit RequestHandler(IFileIO *fileIO);
 
     // Handlers to be optionally implemented.
     void addRequestHandler(const handlerCallback &cb);
@@ -43,8 +42,8 @@ class RequestHandler {
                         Reply &rep,
                         std::deque<MultiPartParser::ContentPart> &parts);
 
-    // Provided FileHandler to be implemented by each specific projects.
-    IFileHandler *fileHandler_ = nullptr;
+    // Provided FileIO to be implemented by each specific projects.
+    IFileIO *fileIO_ = nullptr;
 
     // Added request handler callbacks
     std::deque<handlerCallback> requestHandlers_;
@@ -53,5 +52,4 @@ class RequestHandler {
     handlerCallback fileNotFoundCb_;
 };
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

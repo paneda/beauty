@@ -1,7 +1,6 @@
 #include "mock_request_handler.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 MockRequestHandler::MockRequestHandler(std::vector<char>& body)
     : receivedRequest_(body), receivedReply_(1024) {}
@@ -52,5 +51,4 @@ Reply& MockRequestHandler::getReceivedReply() {
     return receivedReply_;
 }
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

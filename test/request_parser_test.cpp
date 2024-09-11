@@ -4,7 +4,7 @@
 #include "request.hpp"
 #include "request_parser.hpp"
 
-using namespace http::server;
+using namespace beauty;
 
 namespace {
 

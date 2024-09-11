@@ -5,8 +5,7 @@
 #include "request.hpp"
 #include "request_parser.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 RequestParser::RequestParser() : state_(method_start) {}
 
@@ -265,5 +264,4 @@ RequestParser::result_type RequestParser::consume(Request &req,
     }
 }
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

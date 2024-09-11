@@ -1,14 +1,13 @@
-#include "file_handler.hpp"
+#include "file_io.hpp"
 
 #include <iostream>
 #include <limits>
 
-namespace http {
-namespace server {
+using namespace beauty;
 
-FileHandler::FileHandler(const std::string &docRoot) : docRoot_(docRoot) {}
+FileIO::FileIO(const std::string &docRoot) : docRoot_(docRoot) {}
 
-size_t FileHandler::openFileForRead(const std::string &id, const Request &request, Reply &reply) {
+size_t FileIO::openFileForRead(const std::string &id, const Request &request, Reply &reply) {
     std::string fullPath = docRoot_ + reply.filePath_;
     std::ifstream &is = openReadFiles_[id];
     is.open(fullPath.c_str(), std::ios::in | std::ios::binary);
@@ -23,7 +22,7 @@ size_t FileHandler::openFileForRead(const std::string &id, const Request &reques
     return 0;
 }
 
-int FileHandler::readFile(const std::string &id,
+int FileIO::readFile(const std::string &id,
                           const Request &request,
                           char *buf,
                           size_t maxSize) {
@@ -31,32 +30,31 @@ int FileHandler::readFile(const std::string &id,
     return openReadFiles_[id].gcount();
 }
 
-void FileHandler::closeReadFile(const std::string &id) {
+void FileIO::closeReadFile(const std::string &id) {
     openReadFiles_[id].close();
     openReadFiles_.erase(id);
 }
 
-Reply::status_type FileHandler::openFileForWrite(const std::string &id,
+Reply::status_type FileIO::openFileForWrite(const std::string &id,
                                                  const Request &request,
                                                  Reply &reply,
                                                  std::string &err) {
-    // TODO: error handling
     std::string fullPath = docRoot_ + reply.filePath_;
     std::ofstream &os = openWriteFiles_[id];
     os.open(fullPath.c_str(), std::ios::out | std::ios::binary);
-    return Reply::status_type::ok;
+    return Reply::ok;
 }
 
-Reply::status_type FileHandler::writeFile(const std::string &id,
+Reply::status_type FileIO::writeFile(const std::string &id,
                                           const Request &request,
                                           const char *buf,
                                           size_t size,
                                           bool lastData,
                                           std::string &err) {
-    // TODO: error handling
     openWriteFiles_[id].write(buf, size);
-    return Reply::status_type::ok;
+    if (lastData) {
+        openWriteFiles_[id].close();
+		openWriteFiles_.erase(id);
+    }
+    return Reply::ok;
 }
-
-}  // namespace server
-}  // namespace http

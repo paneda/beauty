@@ -1,8 +1,7 @@
 #include "connection_manager.hpp"
 #include "connection.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 Connection::Connection(asio::ip::tcp::socket socket,
                        ConnectionManager &manager,
@@ -215,5 +214,4 @@ void Connection::shutdown() {
     requestHandler_.closeFile(reply_, connectionId_);
 }
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

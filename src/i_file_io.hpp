@@ -5,13 +5,12 @@
 #include "reply.hpp"
 #include "request.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
-class IFileHandler {
+class IFileIO {
    public:
-    IFileHandler() = default;
-    virtual ~IFileHandler() = default;
+    IFileIO() = default;
+    virtual ~IFileIO() = default;
 
     virtual size_t openFileForRead(const std::string& id, const Request& request, Reply& reply) = 0;
     virtual int readFile(const std::string& id,
@@ -32,5 +31,4 @@ class IFileHandler {
                                          std::string& err) = 0;
 };
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

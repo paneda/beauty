@@ -5,8 +5,7 @@
 
 #include "connection.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 // Manages open connections so that they may be cleanly stopped when the server
 // needs to shut down.
@@ -50,5 +49,4 @@ class ConnectionManager {
     debugMsgCallback debugMsgCb_;
 };
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

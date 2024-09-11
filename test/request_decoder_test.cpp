@@ -3,7 +3,7 @@
 #include "request.hpp"
 #include "request_decoder.hpp"
 
-using namespace http::server;
+using namespace beauty;
 
 TEST_CASE("error handling", "[request_parser]") {
     RequestDecoder reqDecoder;

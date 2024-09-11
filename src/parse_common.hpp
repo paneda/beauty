@@ -1,7 +1,6 @@
 #pragma once
 
-namespace http {
-namespace server {
+namespace beauty {
 
 // Check if a byte is an HTTP character.
 inline bool isChar(int c) {
@@ -46,5 +45,4 @@ inline bool isDigit(int c) {
     return c >= '0' && c <= '9';
 }
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

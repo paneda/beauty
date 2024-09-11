@@ -1,7 +1,6 @@
 build
 compile_commands.json
-testfile.bin
-webroot
+testfiles/
 
 #vim
 .tags

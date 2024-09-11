@@ -6,8 +6,7 @@
 #include "reply.hpp"
 #include "request.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 class MockRequestHandler {
    public:
@@ -31,5 +30,4 @@ class MockRequestHandler {
     Reply receivedReply_;
 };
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

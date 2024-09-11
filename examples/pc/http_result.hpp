@@ -17,7 +17,7 @@ const std::string EndJson = "\"}";
 struct HttpResult {
     HttpResult(std::vector<char>& body) : body_(body) {}
     void setError(int statusCode, const std::string& errMsg) {
-        statusCode_ = static_cast<http::server::Reply::status_type>(statusCode);
+        statusCode_ = static_cast<beauty::Reply::status_type>(statusCode);
         body_.reserve(StartJson.size() + errMsg.size() + EndJson.size());
         *this << StartJson << errMsg << EndJson;
     }
@@ -27,6 +27,6 @@ struct HttpResult {
         return *this;
     }
 
-    http::server::Reply::status_type statusCode_ = http::server::Reply::status_type::ok;
+    beauty::Reply::status_type statusCode_ = beauty::Reply::status_type::ok;
     std::vector<char>& body_;
 };

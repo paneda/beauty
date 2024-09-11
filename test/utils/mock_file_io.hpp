@@ -5,29 +5,29 @@
 #include <unordered_map>
 #include <vector>
 
-#include "i_file_handler.hpp"
+#include "i_file_io.hpp"
 #include "reply.hpp"
 
-class MockFileHandler : public http::server::IFileHandler {
+class MockFileIO : public beauty::IFileIO {
    public:
-    MockFileHandler() = default;
-    virtual ~MockFileHandler() = default;
+    MockFileIO() = default;
+    virtual ~MockFileIO() = default;
 
     size_t openFileForRead(const std::string& id,
-                           const http::server::Request& request,
-                           http::server::Reply& reply) override;
+                           const beauty::Request& request,
+                           beauty::Reply& reply) override;
     int readFile(const std::string& id,
-                 const http::server::Request& request,
+                 const beauty::Request& request,
                  char* buf,
                  size_t maxSize) override;
     void closeReadFile(const std::string& id) override;
 
-    http::server::Reply::status_type openFileForWrite(const std::string& id,
-                                                      const http::server::Request& request,
-                                                      http::server::Reply& reply,
+    beauty::Reply::status_type openFileForWrite(const std::string& id,
+                                                      const beauty::Request& request,
+                                                      beauty::Reply& reply,
                                                       std::string& err) override;
-    http::server::Reply::status_type writeFile(const std::string& id,
-                                               const http::server::Request& request,
+    beauty::Reply::status_type writeFile(const std::string& id,
+                                               const beauty::Request& request,
                                                const char* buf,
                                                size_t size,
                                                bool lastData,

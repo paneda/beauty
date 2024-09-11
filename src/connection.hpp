@@ -12,8 +12,7 @@
 #include "request_handler.hpp"
 #include "request_parser.hpp"
 
-namespace http {
-namespace server {
+namespace beauty {
 
 class ConnectionManager;
 
@@ -101,5 +100,4 @@ class Connection : public std::enable_shared_from_this<Connection> {
     size_t maxContentSize_;
 };
 
-}  // namespace server
-}  // namespace http
+}  // namespace beauty

@@ -2,7 +2,7 @@
 
 #include "url_parser.hpp"
 
-using namespace http::server;
+using namespace beauty;
 
 TEST_CASE("http", "[url_parser]") {
     SECTION("it should parse the url") {
