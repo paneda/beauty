@@ -102,9 +102,11 @@ void httpServerThread(void*) {
 # Execution order
 For an incomming http request, Beauty first invokes the middleware stack in
 added order. If no middleware respond to the request, Beauty will call the file
-io handler (if defined). If the file io handler fails to open the
-requested file, Beauty will respond with 404. It is possible to
-"addFileNotFoundHandler" to provide custom 404 logic and response.
+io handler (if defined).
+
+If the file io handler fails to open the requested file, Beauty will respond
+with 404. It is possible to "addFileNotFoundHandler" to provide custom 404
+logic and response.
 
 # Server
 The Server is what runs on top of the Asio::io_context. It has two constructors,
@@ -133,8 +135,13 @@ one for PC and one for ESP32.
 The definitions of `handlerCallback` and `debugMsgCallback` can be found in src/beauty_common.hpp.
 
 ## HTTP persistence options
-Beauty support HTTP/1.1 using Keep-Alive connections. The advantage of Keep-Alive connections is faster response time and avoid unnecessary re-allocation of buffers for repeated request/response cycles with the same clients.
-The drawback is of coarse that memory may be used up more rapidly when serving many clients. The `connectionLimit` may serve as a trade-off to achieve both advantages for constrained environments.
+Beauty support HTTP/1.1 using Keep-Alive connections.
+The advantage of Keep-Alive connections is faster response time and avoid
+unnecessary re-allocation of buffers for repeated request/response cycles with
+the same clients.
+The drawback is of coarse that memory may be used up more rapidly when serving
+many clients. The `connectionLimit` may serve as a trade-off to achieve both
+advantages for constrained environments.
 
 The behaviour is controlled with HttpPersistence, defined in src/beauty_common.hpp.
 It is required by both Server constructors and includes the following members:
@@ -183,7 +190,7 @@ The following member variables can be modified in the reply.
 |Variable | Description |
 |---|---|
 |`std::vector<char> content_`| The content data of the response (i.e. typically the response body). Only used with selected `send` method, see below. |
-|`std::string filePath_`  |Intialized with Request::requestPath_. Can be modified by middleware before filesystem handler reads the file. See examples. |
+|`std::string filePath_`  |Intialized with Request::requestPath_. Can be modified by middleware before files io handler reads the file. See examples. |
 |`std::string fileExtension_` |Beauty parses the file extension provided in the `Request::requestPath_` and stores it here for convenient access. |
 
 The following methods are provided:
@@ -194,5 +201,4 @@ The following methods are provided:
 |`void send(status_type, string contentType)` |Use with `Reply::content_`. `Reply::content_` must be loaded with the response body data before the send method is called.<br>**Note.** If combined with `addHeader()`, the contentType argument do add the `Content-Type` header.|
 |`void send(status_type, string contentType, char* data, size_t size)`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  |Use when pointing to memory holding the response body data.<br>**Note.** If combined with `addHeader()`, the contentType argument do add the `Content-Type` header. |
 |`void stockReply(status_code)`|Replies with a stock body for the status_code. |
-
 
