@@ -50,20 +50,32 @@ void RequestHandler::handleRequest(unsigned connectionId,
         }
     }
 
-    if (fileIO_ != nullptr) {
-        if (req.method_ == "POST" && rep.multiPartParser_.parseHeader(req)) {
+    if (fileIO_ == nullptr) {
+		rep.stockReply(Reply::not_implemented);
+		return;
+	}
+
+	if (req.method_ == "POST") {
+        if (rep.multiPartParser_.parseHeader(req)) {
             rep.status_ = Reply::ok;
             rep.isMultiPart_ = true;
             handlePartialWrite(connectionId, req, content, rep);
             return;
-        } else if (req.method_ == "GET") {
-            if (openAndReadFile(connectionId, req, rep)) {
-                return;
-            }
-        }
-    }
+		} else {
+			rep.stockReply(Reply::bad_request);
+			return;
+		}
 
-    fileNotFoundCb_(req, rep);
+	} else if (req.method_ == "GET") {
+		if (openAndReadFile(connectionId, req, rep) > 0) {
+			return;
+		} else {
+			fileNotFoundCb_(req, rep);
+			return;
+		}
+	}
+
+	rep.stockReply(Reply::not_implemented);
 }
 
 void RequestHandler::handlePartialRead(unsigned connectionId, const Request &req, Reply &rep) {

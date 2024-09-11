@@ -120,14 +120,14 @@ TEST_CASE("server without handlers", "[server]") {
         REQUIRE(res.action_ == TestClient::TestResult::ReadRequestStatus);
         REQUIRE(res.statusCode_ == 400);
     }
-    SECTION("it should return 404 for all valid requests") {
+    SECTION("it should return 501 - not implemented for all valid requests") {
         openConnection(c, "127.0.0.1", port);
 
         auto fut = createFutureResult(c);
         c.sendRequest(GetIndexRequest);
         auto res = fut.get();
         REQUIRE(res.action_ == TestClient::TestResult::ReadRequestStatus);
-        REQUIRE(res.statusCode_ == 404);
+        REQUIRE(res.statusCode_ == 501);
     }
     ioc.stop();
     t.join();
