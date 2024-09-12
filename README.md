@@ -13,7 +13,7 @@ Its main properties:
 * Fast, asynchronous and lock-free implementation
 * Low heap memory requirement (configurable support of buffer sizes)
 * No ESP-IDF/Arduino dependencies, i.e. the web application can be mocked and
-  and tested on PC during development
+  tested on PC during development
 
 # Dependencies
 * asio (non-boost)
