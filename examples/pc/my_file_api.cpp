@@ -26,7 +26,7 @@ void MyFileApi::handleRequest(const Request &req, Reply &rep) {
             rep.content_[rep.content_.size() - 1] = ']';
 
             // As send() is invoked, no further calls to other middleware
-            // or FileSystem will be done.
+            // or FileIO will be done.
             rep.send(res.statusCode_, "application/json");
             return;
         }
@@ -37,7 +37,7 @@ void MyFileApi::handleRequest(const Request &req, Reply &rep) {
                 res.setError(Reply::status_type::bad_request, "File does not exist");
 
                 // As send() is invoked, no further calls to other middleware
-                // or FileSystem will be done.
+                // or FileIO will be done.
                 rep.send(res.statusCode_, "application/json");
                 return;
             }
@@ -45,24 +45,24 @@ void MyFileApi::handleRequest(const Request &req, Reply &rep) {
             // By using addHeader(), we control Content-Type and other headers.
             rep.addHeader("Content-Type", "application/octet-stream");
             rep.addHeader("Content-Disposition", "attachment; filename=" + filename);
-            // Set rep.filePath_ to filename so the FileSystem finds it later
+            // Set rep.filePath_ to filename so the FileIO finds it later
             rep.filePath_ = "/" + filename;
-            // Just return and let FileSystem read and return the file data
+            // Just return and let FileIO read and return the file data
             // from disk.
             return;
         } else {
             // Here we can apply behaviour when file are served as part of
             // our web application.
             // In this example, all docRoot_ files are gzipped, add .gz to path
-            // so the FileSystem finds them.
+            // so the FileIO finds them.
             rep.filePath_ += ".gz";
             // By using addHeader(), we control Content-Type and other headers.
             // Note: As we are adding special response headers for file access,
             // this middleware should be placed last among other middlewares in
-            // our project so it runs just before the FileSystem is called.
+            // our project so it runs just before the FileIO is called.
             rep.addHeader("Content-Type", mime_types::extensionToType(rep.fileExtension_));
             rep.addHeader("Content-Encoding", "gzip");
-            // Just return and let FileSystem read and return the file
+            // Just return and let FileIO read and return the file
             // data from disk.
             return;
         }
