@@ -11,6 +11,9 @@
 #include "request_decoder.hpp"
 #include "request_handler.hpp"
 #include "request_parser.hpp"
+#include "ws_sec_accept.hpp"
+#include "ws_receiver.hpp"
+#include "ws_parser.hpp"
 
 namespace beauty {
 
@@ -48,9 +51,11 @@ class Connection : public std::enable_shared_from_this<Connection> {
     void doWritePartAck();
     void doWriteHeaders();
     void doWriteContent();
+    void doAckWsUpgrade();
 
     void handleKeepAlive();
     void handleWriteCompleted();
+	bool handleUpgradeRequest();
 
     void shutdown();
 
@@ -98,6 +103,12 @@ class Connection : public std::enable_shared_from_this<Connection> {
 
     // The max buffer size when reading/writing socket.
     size_t maxContentSize_;
+
+	// Websocket members.
+	bool isWebSocket_ = false;
+	WsSecAccept secAccept_;
+	WsReceiver wsRecv_;
+	WsParser wsParser_;
 };
 
 }  // namespace beauty

@@ -1,5 +1,6 @@
 #include "connection_manager.hpp"
 #include "connection.hpp"
+#include <iostream>
 
 namespace beauty {
 
@@ -15,7 +16,9 @@ Connection::Connection(asio::ip::tcp::socket socket,
       maxContentSize_(maxContentSize),
       buffer_(maxContentSize),
       request_(buffer_),
-      reply_(maxContentSize) {}
+      reply_(maxContentSize),
+      wsRecv_(buffer_),
+      wsParser_(wsRecv_)	{}
 
 void Connection::start(bool useKeepAlive,
                        std::chrono::seconds keepAliveTimeout,
@@ -40,7 +43,7 @@ size_t Connection::getNrOfRequests() const {
 }
 
 bool Connection::useKeepAlive() const {
-    return (useKeepAlive_ && request_.keepAlive_);
+    return ((useKeepAlive_ && request_.keepAlive_) || isWebSocket_);
 }
 
 void Connection::doRead() {
@@ -54,34 +57,57 @@ void Connection::doRead() {
             if (!ec) {
                 lastReceivedTime_ = std::chrono::steady_clock::now();
                 buffer_.resize(bytesTransferred);
-                RequestParser::result_type result = requestParser_.parse(request_, buffer_);
-
-                if (result == RequestParser::good_complete) {
-                    if (requestDecoder_.decodeRequest(request_, buffer_)) {
-                        requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
-                        doWriteHeaders();
-                    } else {
-                        reply_.stockReply(Reply::bad_request);
-                        doWriteHeaders();
-                    }
-                } else if (result == RequestParser::good_part) {
-                    if (requestDecoder_.decodeRequest(request_, buffer_)) {
-                        reply_.noBodyBytesReceived_ = request_.getNoInitialBodyBytesReceived();
-                        requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
-                        if (reply_.isMultiPart_) {
-                            doWritePartAck();
-                        } else {
-                            doReadBody();
-                        }
-                    } else {
-                        reply_.stockReply(Reply::bad_request);
-                        doWriteHeaders();
-                    }
-                } else if (result == RequestParser::bad) {
-                    reply_.stockReply(Reply::bad_request);
-                    doWriteHeaders();
+                if (isWebSocket_) {
+					printf("bytesTr: %d\n", bytesTransferred);
+					for (int i = 0; i < bytesTransferred; ++i) {
+						printf("%.2x ", (uint8_t) buffer_[i]);
+					}
+					puts("");
+					doRead();
                 } else {
-                    doRead();
+                    RequestParser::result_type result = requestParser_.parse(request_, buffer_);
+                    if (result == RequestParser::result_type::bad) {
+                        puts("bad request");
+                    }
+                    for (const auto &header : request_.headers_) {
+                        std::cout << header.name_ << ": " << header.value_ << "\n";
+                    }
+
+                    if (result == RequestParser::good_complete) {
+                        std::string hVal = request_.getHeaderValue("connection");
+                        if (strcasecmp(hVal.c_str(), "upgrade") == 0) {
+							if (handleUpgradeRequest()) {
+                                doAckWsUpgrade();
+                            } else {
+                                reply_.stockReply(Reply::ok);
+                                doWriteHeaders();
+                            }
+                        } else if (requestDecoder_.decodeRequest(request_, buffer_)) {
+                            requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
+                            doWriteHeaders();
+                        } else {
+                            reply_.stockReply(Reply::bad_request);
+                            doWriteHeaders();
+                        }
+                    } else if (result == RequestParser::good_part) {
+                        if (requestDecoder_.decodeRequest(request_, buffer_)) {
+                            reply_.noBodyBytesReceived_ = request_.getNoInitialBodyBytesReceived();
+                            requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
+                            if (reply_.isMultiPart_) {
+                                doWritePartAck();
+                            } else {
+                                doReadBody();
+                            }
+                        } else {
+                            reply_.stockReply(Reply::bad_request);
+                            doWriteHeaders();
+                        }
+                    } else if (result == RequestParser::bad) {
+                        reply_.stockReply(Reply::bad_request);
+                        doWriteHeaders();
+                    } else {
+                        doRead();
+                    }
                 }
             } else if (ec != asio::error::operation_aborted) {
                 connectionManager_.debugMsg("doRead: " + ec.message() + ':' +
@@ -157,6 +183,24 @@ void Connection::doWriteHeaders() {
         });
 }
 
+void Connection::doAckWsUpgrade() {
+    auto self(shared_from_this());
+    asio::async_write(
+        socket_, reply_.headerToBuffers(), [this, self](std::error_code ec, std::size_t) {
+            if (!ec) {
+                requestParser_.reset();
+                request_.reset();
+                reply_.reset();
+                isWebSocket_ = true;
+                doRead();
+            } else {
+                connectionManager_.debugMsg("doAckWsUpgrade: " + ec.message() + ':' +
+                                            std::to_string(ec.value()));
+                shutdown();
+            }
+        });
+}
+
 void Connection::doWriteContent() {
     auto self(shared_from_this());
     asio::async_write(
@@ -204,6 +248,25 @@ void Connection::handleWriteCompleted() {
         socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
         connectionManager_.stop(shared_from_this());
     }
+}
+
+bool Connection::handleUpgradeRequest() {
+	std::string hVal = request_.getHeaderValue("Upgrade");
+	if (strcasecmp(hVal.c_str(), "websocket") == 0) {
+		reply_.addHeader("Connection", "Upgrade");
+		reply_.addHeader("Upgrade", "websocket");
+		std::string key = request_.getHeaderValue("Sec-WebSocket-Key");
+		reply_.addHeader("Sec-Websocket-Accept",
+						 secAccept_.compute(key.data()));
+		// At the moment no extensions are supported.
+		// reply_.addHeader("Sec-WebSocket-Extensions", "permessage-deflate");
+		reply_.send(Reply::switching_protocol);
+		return true;
+	}
+
+	reply_.stockReply(Reply::ok);
+	doWriteHeaders();
+	return false;
 }
 
 void Connection::shutdown() {
