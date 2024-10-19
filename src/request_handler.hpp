@@ -8,7 +8,6 @@
 
 namespace beauty {
 
-class IRouteHandler;
 struct Reply;
 struct Request;
 

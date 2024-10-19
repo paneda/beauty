@@ -6,19 +6,21 @@ namespace beauty {
 
 Connection::Connection(asio::ip::tcp::socket socket,
                        ConnectionManager &manager,
-                       RequestHandler &handler,
+                       RequestHandler &requestHandler,
+					   WsHandler &wsHandler,
                        unsigned connectionId,
                        size_t maxContentSize)
     : socket_(std::move(socket)),
       connectionManager_(manager),
-      requestHandler_(handler),
+      requestHandler_(requestHandler),
+	  wsHandler_(wsHandler),
       connectionId_(connectionId),
       maxContentSize_(maxContentSize),
       buffer_(maxContentSize),
       request_(buffer_),
       reply_(maxContentSize),
       wsRecv_(buffer_),
-      wsParser_(wsRecv_)	{}
+      wsParser_(wsRecv_) {}
 
 void Connection::start(bool useKeepAlive,
                        std::chrono::seconds keepAliveTimeout,
@@ -58,25 +60,25 @@ void Connection::doRead() {
                 lastReceivedTime_ = std::chrono::steady_clock::now();
                 buffer_.resize(bytesTransferred);
                 if (isWebSocket_) {
-					printf("bytesTr: %d\n", bytesTransferred);
-					for (int i = 0; i < bytesTransferred; ++i) {
-						printf("%.2x ", (uint8_t) buffer_[i]);
-					}
-					puts("");
-					doRead();
+                    // printf("bytesTr: %d\n", bytesTransferred);
+                    // for (int i = 0; i < bytesTransferred; ++i) {
+                    //     printf("{%.2x, ", (uint8_t)buffer_[i]);
+                    // }
+                    // puts("}");
+                    doRead();
                 } else {
                     RequestParser::result_type result = requestParser_.parse(request_, buffer_);
                     if (result == RequestParser::result_type::bad) {
                         puts("bad request");
                     }
-                    for (const auto &header : request_.headers_) {
-                        std::cout << header.name_ << ": " << header.value_ << "\n";
-                    }
+                    // for (const auto &header : request_.headers_) {
+                    //     std::cout << header.name_ << ": " << header.value_ << "\n";
+                    // }
 
                     if (result == RequestParser::good_complete) {
                         std::string hVal = request_.getHeaderValue("connection");
                         if (strcasecmp(hVal.c_str(), "upgrade") == 0) {
-							if (handleUpgradeRequest()) {
+                            if (handleUpgradeRequest()) {
                                 doAckWsUpgrade();
                             } else {
                                 reply_.stockReply(Reply::ok);
@@ -192,6 +194,7 @@ void Connection::doAckWsUpgrade() {
                 request_.reset();
                 reply_.reset();
                 isWebSocket_ = true;
+				wsHandler_.handleOnOpen(connectionId_, wsRecv_);
                 doRead();
             } else {
                 connectionManager_.debugMsg("doAckWsUpgrade: " + ec.message() + ':' +
@@ -251,22 +254,21 @@ void Connection::handleWriteCompleted() {
 }
 
 bool Connection::handleUpgradeRequest() {
-	std::string hVal = request_.getHeaderValue("Upgrade");
-	if (strcasecmp(hVal.c_str(), "websocket") == 0) {
-		reply_.addHeader("Connection", "Upgrade");
-		reply_.addHeader("Upgrade", "websocket");
-		std::string key = request_.getHeaderValue("Sec-WebSocket-Key");
-		reply_.addHeader("Sec-Websocket-Accept",
-						 secAccept_.compute(key.data()));
-		// At the moment no extensions are supported.
-		// reply_.addHeader("Sec-WebSocket-Extensions", "permessage-deflate");
-		reply_.send(Reply::switching_protocol);
-		return true;
-	}
+    std::string hVal = request_.getHeaderValue("Upgrade");
+    if (strcasecmp(hVal.c_str(), "websocket") == 0) {
+        reply_.addHeader("Connection", "Upgrade");
+        reply_.addHeader("Upgrade", "websocket");
+        std::string key = request_.getHeaderValue("Sec-WebSocket-Key");
+        reply_.addHeader("Sec-Websocket-Accept", secAccept_.compute(key.data()));
+        // At the moment no extensions are supported.
+        // reply_.addHeader("Sec-WebSocket-Extensions", "permessage-deflate");
+        reply_.send(Reply::switching_protocol);
+        return true;
+    }
 
-	reply_.stockReply(Reply::ok);
-	doWriteHeaders();
-	return false;
+    reply_.stockReply(Reply::ok);
+    doWriteHeaders();
+    return false;
 }
 
 void Connection::shutdown() {

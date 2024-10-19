@@ -12,7 +12,8 @@
 #include "request_handler.hpp"
 #include "request_parser.hpp"
 #include "ws_sec_accept.hpp"
-#include "ws_receiver.hpp"
+#include "ws_handler.hpp"
+#include "ws_receive.hpp"
 #include "ws_parser.hpp"
 
 namespace beauty {
@@ -28,7 +29,8 @@ class Connection : public std::enable_shared_from_this<Connection> {
     // Construct a connection with the given socket.
     explicit Connection(asio::ip::tcp::socket socket,
                         ConnectionManager &manager,
-                        RequestHandler &handler,
+                        RequestHandler &requestHandler,
+						WsHandler &wsHandler,
                         unsigned connectionId,
                         size_t maxContentSize);
 
@@ -55,7 +57,7 @@ class Connection : public std::enable_shared_from_this<Connection> {
 
     void handleKeepAlive();
     void handleWriteCompleted();
-	bool handleUpgradeRequest();
+    bool handleUpgradeRequest();
 
     void shutdown();
 
@@ -104,11 +106,12 @@ class Connection : public std::enable_shared_from_this<Connection> {
     // The max buffer size when reading/writing socket.
     size_t maxContentSize_;
 
-	// Websocket members.
-	bool isWebSocket_ = false;
-	WsSecAccept secAccept_;
-	WsReceiver wsRecv_;
-	WsParser wsParser_;
+    // Websocket members.
+    bool isWebSocket_ = false;
+    WsSecAccept secAccept_;
+    WsReceive wsRecv_;
+    WsParser wsParser_;
+	WsHandler &wsHandler_;
 };
 
 }  // namespace beauty

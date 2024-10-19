@@ -78,6 +78,10 @@ void Server::setFileNotFoundHandler(const handlerCallback &cb) {
     requestHandler_.setFileNotFoundHandler(cb);
 }
 
+void Server::setWsClientHandler(const wsClientCallback &cb) {
+	wsHandler_.setWsClientHandler(cb);
+}
+
 void Server::setDebugMsgHandler(const debugMsgCallback &cb) {
     connectionManager_.setDebugMsgHandler(cb);
     debugMsgCb_ = cb;
@@ -95,6 +99,7 @@ void Server::doAccept() {
             connectionManager_.start(std::make_shared<Connection>(std::move(socket),
                                                                   connectionManager_,
                                                                   requestHandler_,
+																  wsHandler_,
                                                                   connectionId_++,
                                                                   maxContentSize_));
         } else {

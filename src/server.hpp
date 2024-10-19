@@ -39,6 +39,7 @@ class Server {
     // Handlers to be optionally implemented.
     void addRequestHandler(const handlerCallback &cb);
     void setFileNotFoundHandler(const handlerCallback &cb);
+    void setWsClientHandler(const wsClientCallback &cb);
     void setDebugMsgHandler(const debugMsgCallback &cb);
 
    private:
@@ -50,6 +51,7 @@ class Server {
     asio::ip::tcp::acceptor acceptor_;
     ConnectionManager connectionManager_;
     RequestHandler requestHandler_;
+	WsHandler wsHandler_;
 
     // Unique Id for each connection.
     unsigned connectionId_ = 0;

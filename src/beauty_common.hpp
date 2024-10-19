@@ -6,10 +6,14 @@
 
 #include "reply.hpp"
 #include "request.hpp"
+#include "ws_receive.hpp"
 
 namespace beauty {
 
 using handlerCallback = std::function<void(const Request &req, Reply &rep)>;
+
+enum class WsClientEvent {onOpen, onClose, onMessage};
+using wsClientCallback = std::function<void(const WsClientEvent event, const WsReceive &recv)>;
 
 using debugMsgCallback = std::function<void(const std::string &msg)>;
 static void defaultDebugMsgHandler(const std::string &msg) {}
