@@ -7,7 +7,7 @@
 #include "reply.hpp"
 
 namespace {
-const std::string StartJson = "{\"Error:\" \"";
+const std::string StartJson = "{\"error\": \"";
 const std::string EndJson = "\"}";
 }
 
