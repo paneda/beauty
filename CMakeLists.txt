@@ -1,5 +1,3 @@
-file (GLOB Beauty_Sources CONFIGURE_DEPENDS "src/*.cpp")
-
 if(NOT IDF_PATH)
 	cmake_minimum_required(VERSION 3.24)
 	project(beauty
@@ -8,6 +6,8 @@ if(NOT IDF_PATH)
 	)
 
 	enable_testing()
+
+	file (GLOB Beauty_Sources CONFIGURE_DEPENDS "src/*.cpp")
 
 	add_subdirectory(import)
 	add_subdirectory(examples)
@@ -24,6 +24,7 @@ endif()
 
 # --- ESP-IDF component support: only active when included as a component ---
 if(IDF_PATH)
+	file (GLOB Beauty_Sources "src/*.cpp")
 	# Register as ESP-IDF component
 	idf_component_register(
 		SRCS ${Beauty_Sources}
