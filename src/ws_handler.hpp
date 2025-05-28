@@ -16,15 +16,20 @@ class WsHandler {
 
     WsHandler();
 
-    // Handlers to be optionally implemented.
-    void setWsClientHandler(const wsClientCallback &cb);
+    void setWsOnOpenHandler(const wsOnOpenCallback &cb);
+    void setWsOnCloseHandler(const wsOnCloseCallback &cb);
+    void setWsOnMessageHandler(const wsOnMessageCallback &cb);
+    void setWsOnErrorHandler(const wsOnErrorCallback &cb);
 
-    void handleOnOpen(unsigned connectionId, const WsReceive &recv);
-    void handleOnClose(unsigned connectionId, const WsReceive &recv);
+    void handleOnOpen(unsigned connectionId);
+    void handleOnClose(unsigned connectionId);
     void handleOnMessage(unsigned connectionId, const WsReceive &recv);
 
    private:
-    wsClientCallback wsClientCallback_;
+    wsOnOpenCallback wsOnOpenCallback_;
+    wsOnCloseCallback wsOnCloseCallback_;
+    wsOnMessageCallback wsOnMessageCallback_;
+    wsOnErrorCallback wsOnErrorCallback_;
 };
 
 }  // namespace beauty

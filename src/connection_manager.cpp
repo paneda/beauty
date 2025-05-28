@@ -19,8 +19,8 @@ void ConnectionManager::start(std::shared_ptr<Connection> c) {
 }
 
 void ConnectionManager::stop(std::shared_ptr<Connection> c) {
-    connections_.erase(c);
     c->stop();
+    connections_.erase(c);
 }
 
 void ConnectionManager::stopAll() {
@@ -36,10 +36,17 @@ void ConnectionManager::setHttpPersistence(HttpPersistence options) {
 
 void ConnectionManager::tick() {
     auto now = std::chrono::steady_clock::now();
-    auto it = connections_.begin();
+	auto it = connections_.begin();
     while (it != connections_.end()) {
-        if ((*it)->useKeepAlive()) {
-            bool erase = false;
+		bool erase = false;
+		if ((*it)->isWebSocket()) {
+			if (httpPersistence_.wsReceiveTimeout_ != std::chrono::seconds(0)) {
+				if (((*it)->getLastReceivedTime() + httpPersistence_.wsReceiveTimeout_ < now)) {
+					debugMsgCb_("Removing ws connection due to receive inactivity");
+					erase = true;
+				}
+			}
+		} else if ((*it)->useKeepAlive()) {
             if (((*it)->getLastReceivedTime() + httpPersistence_.keepAliveTimeout_ < now)) {
                 debugMsgCb_("Removing connection due to inactivity");
                 erase = true;
@@ -48,17 +55,15 @@ void ConnectionManager::tick() {
                 debugMsgCb_("Removing connection due max request limit");
                 erase = true;
             }
+        } 
 
-            if (erase) {
-                (*it)->stop();
-                it = connections_.erase(it);
-            } else {
-                it++;
-            }
-        } else {
-            it++;
-        }
-    }
+		if (erase) {
+			(*it)->stop();
+			it = connections_.erase(it);
+		} else {
+			it++;
+		}
+	}
 }
 
 void ConnectionManager::setDebugMsgHandler(const debugMsgCallback &cb) {

@@ -2,6 +2,7 @@
 
 #include <array>
 #include <vector>
+#include <stdint.h>
 
 #include "ws_receive.hpp"
 
@@ -12,9 +13,8 @@ class WsParser {
     WsParser(WsReceive &wsRecv);
     WsParser(const WsParser &) = delete;
     WsParser &operator=(const WsParser &) = delete;
-    WsParser() = default;
 
-    enum result_type { done, bad, indeterminate };
+    enum result_type { done, indeterminate };
 
     result_type parse();
 
@@ -28,27 +28,30 @@ class WsParser {
         s_mask_3,
         s_mask_4,
         s_payload,
+        s_close,
+        s_ping,
+        s_pong,
     } state_ = s_start;
+
+    State getOpCodeState();
 
     result_type consume(std::vector<char>::iterator inPtr);
     bool isFin_;
 
-    enum OpCodeDataFrame {
+    enum OpCode {
         Continuation = 0,
         TextData = 1,
         BinData = 2,
-    } opCodeDF_;
-
-    enum OpCodeControlFrame {
         Close = 8,
         Ping = 9,
         Pong = 10,
-    } opCodeCF_;
+    } opCode_;
 
     size_t payloadLen_;
     bool hasMask_;
     int extLenBytes_;
     std::array<uint8_t, 4> mask_;
+    size_t maskCounter_;
     WsReceive &wsRecv_;
 };
 

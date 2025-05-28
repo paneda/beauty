@@ -6,11 +6,6 @@
 #include "ws_parser.hpp"
 
 namespace beauty {
-// #ifdef assert
-// # define assertFalse(msg) assert(0 && msg)
-// #else
-// # define assertFalse(msg)
-// #endif
 
 namespace {
 const uint8_t FinMask = 0x80;
@@ -22,24 +17,23 @@ const uint8_t LengthMask = 0x7f;
 WsParser::WsParser(WsReceive &wsRecv) : wsRecv_(wsRecv) {}
 
 WsParser::result_type WsParser::parse() {
-    result_type result;
+    result_type result = indeterminate;
 
     if (wsRecv_.content_.empty()) {
-        return indeterminate;
+        return result;
     }
 
     auto begin = wsRecv_.content_.begin();
     auto end = wsRecv_.content_.end();
     while (begin != end) {
         result = consume(begin++);
-        if (result != indeterminate) {
-            wsRecv_.content_.resize(payloadLen_);
-            return result;
+        if (result == done) {
+            break;
         }
     }
 
-    wsRecv_.content_.resize(payloadLen_);
-    return indeterminate;
+    wsRecv_.content_.resize(wsRecv_.outCounter_);
+    return result;
 }
 
 WsParser::result_type WsParser::consume(std::vector<char>::iterator inPtr) {
@@ -47,8 +41,10 @@ WsParser::result_type WsParser::consume(std::vector<char>::iterator inPtr) {
     switch (state_) {
         case s_start:
             isFin_ = input & FinMask;
-            opCodeDF_ = (OpCodeDataFrame)(input & OpMask);
-            payloadLen_ = 0;
+            opCode_ = (OpCode)(input & OpMask);
+            maskCounter_ = 0;
+            wsRecv_.payLoadCounter_ = 0;
+            wsRecv_.isFinal_ = false;
             state_ = s_mask_and_len;
             return indeterminate;
         case s_mask_and_len:
@@ -56,9 +52,11 @@ WsParser::result_type WsParser::consume(std::vector<char>::iterator inPtr) {
             payloadLen_ = input & LengthMask;
             if (payloadLen_ == 126) {
                 extLenBytes_ = 2;
+                payloadLen_ = 0;
                 state_ = s_ext_length;
             } else if (payloadLen_ == 127) {
                 extLenBytes_ = 8;
+                payloadLen_ = 0;
                 state_ = s_ext_length;
             } else if (hasMask_) {
                 state_ = s_mask_1;
@@ -67,7 +65,7 @@ WsParser::result_type WsParser::consume(std::vector<char>::iterator inPtr) {
                 mask_[1] = 0xff;
                 mask_[2] = 0xff;
                 mask_[3] = 0xff;
-                state_ = s_payload;
+                state_ = getOpCodeState();
             }
             return indeterminate;
         case s_ext_length:
@@ -78,7 +76,7 @@ WsParser::result_type WsParser::consume(std::vector<char>::iterator inPtr) {
                 if (hasMask_) {
                     state_ = s_mask_1;
                 } else {
-                    state_ = s_payload;
+                    state_ = getOpCodeState();
                 }
             }
             return indeterminate;
@@ -96,16 +94,51 @@ WsParser::result_type WsParser::consume(std::vector<char>::iterator inPtr) {
             return indeterminate;
         case s_mask_4:
             mask_[3] = input;
-            state_ = s_payload;
+            state_ = getOpCodeState();
             return indeterminate;
         case s_payload:
-            wsRecv_.content_[wsRecv_.outCounter_] = input ^ mask_[wsRecv_.outCounter_ % 4];
-            if (++wsRecv_.outCounter_ >= payloadLen_) {
+            wsRecv_.content_[wsRecv_.outCounter_++] = input ^ mask_[maskCounter_++ % 4];
+            if (++wsRecv_.payLoadCounter_ >= payloadLen_) {
+                state_ = s_start;
+                wsRecv_.isFinal_ = true;
+                wsRecv_.payLoadCounter_ = 0;
+                return done;
+            }
+            return indeterminate;
+        case s_close:
+            wsRecv_.content_[wsRecv_.outCounter_++] = input ^ mask_[maskCounter_++ % 4];
+            if (++wsRecv_.payLoadCounter_ >= payloadLen_) {
+                state_ = s_start;
+                wsRecv_.isFinal_ = true;
+                wsRecv_.payLoadCounter_ = 0;
                 return done;
             }
             return indeterminate;
         default:
-            return bad;
+            // should never get here
+            assert(false);
+            return indeterminate;
+    }
+}
+
+WsParser::State WsParser::getOpCodeState() {
+    switch (opCode_) {
+        case Continuation:
+            // not yet implemented
+            assert(false);
+            return s_start;
+        case TextData:
+        case BinData:
+            return s_payload;
+        case Close:
+            return s_close;
+        case Ping:
+            return s_ping;
+        case Pong:
+            return s_pong;
+        default:
+            assert(false);
+            return s_start;
     }
 }
 

@@ -55,13 +55,13 @@ void MyFileApi::handleRequest(const Request &req, Reply &rep) {
             // our web application.
             // In this example, all docRoot_ files are gzipped, add .gz to path
             // so the FileIO finds them.
-            rep.filePath_ += ".gz";
+            // rep.filePath_ += ".gz";
             // By using addHeader(), we control Content-Type and other headers.
             // Note: As we are adding special response headers for file access,
             // this middleware should be placed last among other middlewares in
             // our project so it runs just before the FileIO is called.
-            rep.addHeader("Content-Type", mime_types::extensionToType(rep.fileExtension_));
-            rep.addHeader("Content-Encoding", "gzip");
+            // rep.addHeader("Content-Type", mime_types::extensionToType(rep.fileExtension_));
+            // rep.addHeader("Content-Encoding", "gzip");
             // Just return and let FileIO read and return the file
             // data from disk.
             return;

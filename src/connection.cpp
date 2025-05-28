@@ -7,13 +7,13 @@ namespace beauty {
 Connection::Connection(asio::ip::tcp::socket socket,
                        ConnectionManager &manager,
                        RequestHandler &requestHandler,
-					   WsHandler &wsHandler,
+                       WsHandler &wsHandler,
                        unsigned connectionId,
                        size_t maxContentSize)
     : socket_(std::move(socket)),
       connectionManager_(manager),
       requestHandler_(requestHandler),
-	  wsHandler_(wsHandler),
+      wsHandler_(wsHandler),
       connectionId_(connectionId),
       maxContentSize_(maxContentSize),
       buffer_(maxContentSize),
@@ -33,6 +33,9 @@ void Connection::start(bool useKeepAlive,
 }
 
 void Connection::stop() {
+    if (isWebSocket_) {
+        wsHandler_.handleOnClose(connectionId_);
+    }
     socket_.close();
 }
 
@@ -48,6 +51,10 @@ bool Connection::useKeepAlive() const {
     return ((useKeepAlive_ && request_.keepAlive_) || isWebSocket_);
 }
 
+bool Connection::isWebSocket() const {
+	return isWebSocket_;
+}
+
 void Connection::doRead() {
     auto self(shared_from_this());
     // asio uses buffer_.size() to limit amount of read data so must restore
@@ -60,21 +67,17 @@ void Connection::doRead() {
                 lastReceivedTime_ = std::chrono::steady_clock::now();
                 buffer_.resize(bytesTransferred);
                 if (isWebSocket_) {
-                    // printf("bytesTr: %d\n", bytesTransferred);
-                    // for (int i = 0; i < bytesTransferred; ++i) {
-                    //     printf("{%.2x, ", (uint8_t)buffer_[i]);
-                    // }
-                    // puts("}");
+                    printf("bytesTr: %d\n", bytesTransferred);
+                    for (int i = 0; i < bytesTransferred; ++i) {
+                        printf("0x%.2x, ", (uint8_t)buffer_[i]);
+                    }
+                    puts("}");
+                    wsRecv_.reset();
+                    WsParser::result_type result = wsParser_.parse();
+					wsHandler_.handleOnMessage(connectionId_, wsRecv_);
                     doRead();
                 } else {
                     RequestParser::result_type result = requestParser_.parse(request_, buffer_);
-                    if (result == RequestParser::result_type::bad) {
-                        puts("bad request");
-                    }
-                    // for (const auto &header : request_.headers_) {
-                    //     std::cout << header.name_ << ": " << header.value_ << "\n";
-                    // }
-
                     if (result == RequestParser::good_complete) {
                         std::string hVal = request_.getHeaderValue("connection");
                         if (strcasecmp(hVal.c_str(), "upgrade") == 0) {
@@ -194,7 +197,7 @@ void Connection::doAckWsUpgrade() {
                 request_.reset();
                 reply_.reset();
                 isWebSocket_ = true;
-				wsHandler_.handleOnOpen(connectionId_, wsRecv_);
+                wsHandler_.handleOnOpen(connectionId_);
                 doRead();
             } else {
                 connectionManager_.debugMsg("doAckWsUpgrade: " + ec.message() + ':' +

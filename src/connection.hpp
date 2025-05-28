@@ -43,6 +43,7 @@ class Connection : public std::enable_shared_from_this<Connection> {
     std::chrono::steady_clock::time_point getLastReceivedTime() const;
     size_t getNrOfRequests() const;
     bool useKeepAlive() const;
+	bool isWebSocket() const;
 
    private:
     // Perform an asynchronous read operation.

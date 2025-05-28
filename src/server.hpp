@@ -39,7 +39,12 @@ class Server {
     // Handlers to be optionally implemented.
     void addRequestHandler(const handlerCallback &cb);
     void setFileNotFoundHandler(const handlerCallback &cb);
-    void setWsClientHandler(const wsClientCallback &cb);
+
+    void setWsOnOpenHandler(const wsOnOpenCallback &cb);
+    void setWsOnCloseHandler(const wsOnCloseCallback &cb);
+    void setWsOnMessageHandler(const wsOnMessageCallback &cb);
+    void setWsOnErrorHandler(const wsOnErrorCallback &cb);
+
     void setDebugMsgHandler(const debugMsgCallback &cb);
 
    private:

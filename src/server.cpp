@@ -78,8 +78,20 @@ void Server::setFileNotFoundHandler(const handlerCallback &cb) {
     requestHandler_.setFileNotFoundHandler(cb);
 }
 
-void Server::setWsClientHandler(const wsClientCallback &cb) {
-	wsHandler_.setWsClientHandler(cb);
+void Server::setWsOnOpenHandler(const wsOnOpenCallback &cb) {
+	wsHandler_.setWsOnOpenHandler(cb);
+}
+
+void Server::setWsOnCloseHandler(const wsOnCloseCallback &cb) {
+	wsHandler_.setWsOnCloseHandler(cb);
+}
+
+void Server::setWsOnMessageHandler(const wsOnMessageCallback &cb) {
+	wsHandler_.setWsOnMessageHandler(cb);
+}
+
+void Server::setWsOnErrorHandler(const wsOnErrorCallback &cb) {
+	wsHandler_.setWsOnErrorHandler(cb);
 }
 
 void Server::setDebugMsgHandler(const debugMsgCallback &cb) {

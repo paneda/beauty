@@ -12,8 +12,10 @@ namespace beauty {
 
 using handlerCallback = std::function<void(const Request &req, Reply &rep)>;
 
-enum class WsClientEvent {onOpen, onClose, onMessage};
-using wsClientCallback = std::function<void(const WsClientEvent event, const WsReceive &recv)>;
+using wsOnOpenCallback = std::function<void(const std::string& connectionId)>;
+using wsOnCloseCallback = std::function<void(const std::string& connectionId)>;
+using wsOnMessageCallback = std::function<void(const std::string& connectionId, const WsReceive &recv)>;
+using wsOnErrorCallback = std::function<void(const std::string& connectionId, const std::string &error)>;
 
 using debugMsgCallback = std::function<void(const std::string &msg)>;
 static void defaultDebugMsgHandler(const std::string &msg) {}
@@ -39,6 +41,11 @@ struct HttpPersistence {
     // sent in the response for new connections.
     // 0 = no limit.
     size_t connectionLimit_;
+
+	// Timeout for websocket connections. If a client did not send any data on
+	// the connection within this timeout, the connection will be closed.
+	// 0 = no limit.
+	std::chrono::seconds  wsReceiveTimeout_ = std::chrono::seconds(0);
 };
 
 }  // namespace beauty
