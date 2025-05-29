@@ -63,6 +63,12 @@ class Connection : public std::enable_shared_from_this<Connection> {
     // The handler used to process the incoming request.
     RequestHandler &requestHandler_;
 
+    // The unique id for the connection.
+    unsigned connectionId_;
+
+    // The max buffer size when reading/writing socket.
+    size_t maxContentSize_;
+
     // Buffer for incoming data.
     std::vector<char> buffer_;
 
@@ -78,9 +84,6 @@ class Connection : public std::enable_shared_from_this<Connection> {
     // The reply to be sent back to the client.
     Reply reply_;
 
-    // The unique id for the connection.
-    unsigned connectionId_;
-
     // Last received data timestamp.
     std::chrono::steady_clock::time_point lastReceivedTime_;
 
@@ -95,9 +98,6 @@ class Connection : public std::enable_shared_from_this<Connection> {
 
     // Request counter
     size_t nrOfRequest_ = 0;
-
-    // The max buffer size when reading/writing socket.
-    size_t maxContentSize_;
 };
 
 }  // namespace beauty

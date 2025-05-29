@@ -64,7 +64,7 @@ struct Request {
     }
 
     // returns number of body bytes in initial request buffer
-    int getNoInitialBodyBytesReceived() const {
+    size_t getNoInitialBodyBytesReceived() const {
         return noInitialBodyBytesReceived_;
     }
 
@@ -100,7 +100,7 @@ struct Request {
         return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), ichar_equals);
     }
 
-    int noInitialBodyBytesReceived_ = -1;
+    size_t noInitialBodyBytesReceived_ = 0;
     size_t contentLength_ = 0;
 };
 

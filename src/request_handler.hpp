@@ -9,7 +9,7 @@
 namespace beauty {
 
 class IRouteHandler;
-struct Reply;
+class Reply;
 struct Request;
 
 class RequestHandler {
@@ -32,7 +32,7 @@ class RequestHandler {
                             const Request &req,
                             std::vector<char> &content,
                             Reply &rep);
-    void closeFile(Reply &rep, unsigned connectionId);
+    void closeFile(unsigned connectionId);
 
    private:
     bool openAndReadFile(unsigned connectionId, const Request &req, Reply &rep);

@@ -4,6 +4,10 @@
 
 #include "server.hpp"
 
+namespace {
+	void defaultDebugMsgHandler(const std::string&) {}
+}
+
 namespace beauty {
 
 Server::Server(asio::io_context &ioContext,

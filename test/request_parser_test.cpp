@@ -183,8 +183,7 @@ TEST_CASE("parse POST request partially", "[request_parser]") {
         "\r\n";
     const std::string body =
         "This request includes headers and some body data (this text) that does not fit the input "
-        "content buffer of 320 bytes.";
-    "\r\n";
+        "content buffer of 320 bytes.\r\n";
 
     auto result = fixture.parse(headers + body);
 

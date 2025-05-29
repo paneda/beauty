@@ -13,6 +13,8 @@ if(NOT IDF_PATH)
 	add_subdirectory(examples)
 	add_subdirectory(test)
 
+	target_compile_options(beauty_example PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
 	# Note: Beauty_Sources requires C++11 only however examples/test
 	# requires c++17
 	set_target_properties(beauty_example beauty_test PROPERTIES

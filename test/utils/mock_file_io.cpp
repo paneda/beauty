@@ -6,18 +6,9 @@
 
 #include "file_io.hpp"
 
-namespace {
-bool ends_with(std::string const& value, std::string const& ending) {
-    if (ending.size() > value.size()) {
-        return false;
-    };
-    return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
-}
-}
-
 size_t MockFileIO::openFileForRead(const std::string& id,
-                                        const beauty::Request& request,
-                                        beauty::Reply& reply) {
+                                        const beauty::Request&,
+                                        beauty::Reply&) {
     OpenReadFile& openFile = openReadFiles_[id];
     countOpenFileForReadCalls_++;
     if (openFile.isOpen_) {
@@ -34,7 +25,7 @@ size_t MockFileIO::openFileForRead(const std::string& id,
 }
 
 int MockFileIO::readFile(const std::string& id,
-                              const beauty::Request& request,
+                              const beauty::Request&,
                               char* buf,
                               size_t maxSize) {
     OpenReadFile& openFile = openReadFiles_[id];
@@ -56,9 +47,9 @@ void MockFileIO::closeReadFile(const std::string& id) {
 
 beauty::Reply::status_type MockFileIO::openFileForWrite(
     const std::string& id,
-    const beauty::Request& request,
-    beauty::Reply& reply,
-    std::string& err) {
+    const beauty::Request&,
+    beauty::Reply&,
+    std::string&) {
     OpenWriteFile& openFile = openWriteFiles_[id];
     if (openFile.isOpen_) {
         throw std::runtime_error("MockFileIO test error: File already opened");
@@ -73,11 +64,11 @@ beauty::Reply::status_type MockFileIO::openFileForWrite(
 }
 
 beauty::Reply::status_type MockFileIO::writeFile(const std::string& id,
-                                                            const beauty::Request& request,
+                                                            const beauty::Request&,
                                                             const char* buf,
                                                             size_t size,
                                                             bool lastData,
-                                                            std::string& err) {
+                                                            std::string&) {
     OpenWriteFile& openFile = openWriteFiles_[id];
     if (!openFile.isOpen_) {
         throw std::runtime_error("MockFileIO test error: writeFile() called on closed file");

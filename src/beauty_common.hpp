@@ -12,7 +12,6 @@ namespace beauty {
 using handlerCallback = std::function<void(const Request &req, Reply &rep)>;
 
 using debugMsgCallback = std::function<void(const std::string &msg)>;
-static void defaultDebugMsgHandler(const std::string &msg) {}
 
 struct HttpPersistence {
     HttpPersistence(std::chrono::seconds keepAliveTimeout,

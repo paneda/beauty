@@ -71,7 +71,7 @@ class Reply {
         contentSize_ = 0;
         replyPartial_ = false;
         finalPart_ = false;
-        noBodyBytesReceived_ = -1;
+        noBodyBytesReceived_ = 0;
         isMultiPart_ = false;
         lastOpenFileForWriteId_ = "";
         multiPartCounter_ = 0;
@@ -92,7 +92,7 @@ class Reply {
     bool finalPart_ = false;
 
     // Keep track of the number of body bytes received in request body.
-    int noBodyBytesReceived_ = -1;
+    size_t noBodyBytesReceived_ = 0;
 
     // Keep track if the body is a multi-part upload.
     bool isMultiPart_ = false;

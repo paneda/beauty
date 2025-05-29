@@ -39,10 +39,9 @@ bool MultiPartParser::parseHeader(const Request &req) {
     return true;
 }
 
-MultiPartParser::result_type MultiPartParser::parse(const Request &req,
-                                                    std::vector<char> &content,
+MultiPartParser::result_type MultiPartParser::parse(std::vector<char> &content,
                                                     std::deque<ContentPart> &parts) {
-    result_type result;
+    result_type result = result_type::indeterminate;
 
     if (content.empty()) {
         return indeterminate;

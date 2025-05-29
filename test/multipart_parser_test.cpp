@@ -19,10 +19,9 @@ struct Fixture {
     bool parseHeader(const Request &req) {
         return parser_.parseHeader(req);
     }
-    MultiPartParser::result_type parse(const Request &req,
-                                       std::vector<char> &content,
+    MultiPartParser::result_type parse(std::vector<char> &content,
                                        std::deque<MultiPartParser::ContentPart> &parts) {
-        return parser_.parse(req, content, parts);
+        return parser_.parse(content, parts);
     }
 
     void flush(std::vector<char> &content, std::deque<MultiPartParser::ContentPart> &parts) {
@@ -85,7 +84,7 @@ TEST_CASE("parse single part content", "[multipart_parser]") {
     SECTION("should return done for single parts") {
         // getting back the initial empty parts
         std::deque<MultiPartParser::ContentPart> parts;
-        REQUIRE(fixture.parse(request, content, parts) == MultiPartParser::result_type::done);
+        REQUIRE(fixture.parse(content, parts) == MultiPartParser::result_type::done);
         REQUIRE(parts.size() == 0);
 
         // result==done so call flush
@@ -127,7 +126,7 @@ TEST_CASE("parse multi-part content", "[multipart_parser]") {
     SECTION("should return done for multiple parts") {
         std::deque<MultiPartParser::ContentPart> parts;
         // getting back the initial empty parts
-        REQUIRE(fixture.parse(request, content, parts) == MultiPartParser::result_type::done);
+        REQUIRE(fixture.parse(content, parts) == MultiPartParser::result_type::done);
         REQUIRE(parts.size() == 0);
 
         // result==done so call flush
@@ -169,12 +168,12 @@ TEST_CASE("parse until start of content", "[multipart_parser]") {
         std::deque<MultiPartParser::ContentPart> parts;
         // getting back the initial empty parts
         std::vector<char> content = convertToCharVec(contentStr1);
-        REQUIRE(fixture.parse(request, content, parts) ==
+        REQUIRE(fixture.parse(content, parts) ==
                 MultiPartParser::result_type::indeterminate);
         REQUIRE(parts.size() == 0);
 
         content = convertToCharVec(contentStr2);
-        REQUIRE(fixture.parse(request, content, parts) == MultiPartParser::result_type::done);
+        REQUIRE(fixture.parse(content, parts) == MultiPartParser::result_type::done);
         REQUIRE(parts.size() == 1);
         REQUIRE(parts[0].filename_ == "firstpart.txt");
         REQUIRE(!parts[0].foundStart_);
@@ -208,7 +207,7 @@ TEST_CASE("parse empty content", "[multipart_parser]") {
     SECTION("should return indeterminate") {
         std::deque<MultiPartParser::ContentPart> parts;
         // getting back the initial empty parts
-        REQUIRE(fixture.parse(request, content, parts) ==
+        REQUIRE(fixture.parse(content, parts) ==
                 MultiPartParser::result_type::indeterminate);
         REQUIRE(parts.size() == 0);
 
@@ -240,7 +239,7 @@ TEST_CASE("parse empty part content", "[multipart_parser]") {
     SECTION("should return size = 0") {
         std::deque<MultiPartParser::ContentPart> parts;
         // getting back the initial empty parts
-        REQUIRE(fixture.parse(request, content, parts) == MultiPartParser::result_type::done);
+        REQUIRE(fixture.parse(content, parts) == MultiPartParser::result_type::done);
         REQUIRE(parts.size() == 0);
 
         // result==done so call flush
@@ -273,7 +272,7 @@ TEST_CASE("content start and end in consecutive buffers", "[multipart_parser]") 
 
     // getting back the initial empty parts
     std::vector<char> content = convertToCharVec(contentStr1);
-    REQUIRE(fixture.parse(request, content, parts) == MultiPartParser::result_type::indeterminate);
+    REQUIRE(fixture.parse(content, parts) == MultiPartParser::result_type::indeterminate);
     REQUIRE(parts.size() == 0);
 
     // peaking the last part..
@@ -287,7 +286,7 @@ TEST_CASE("content start and end in consecutive buffers", "[multipart_parser]") 
 
     // ..that is actually delivered in the next parse call
     content = convertToCharVec(contentStr2);
-    REQUIRE(fixture.parse(request, content, parts) == MultiPartParser::result_type::done);
+    REQUIRE(fixture.parse(content, parts) == MultiPartParser::result_type::done);
     REQUIRE(parts.size() == 1);
     REQUIRE(parts[0].filename_ == "testfile01.txt");
     REQUIRE(parts[0].foundStart_);
@@ -328,7 +327,7 @@ TEST_CASE("content end in next to last body part", "[multipart_parser]") {
 
     // getting back the initial empty parts
     std::vector<char> content = convertToCharVec(contentStr1);
-    REQUIRE(fixture.parse(request, content, parts) == MultiPartParser::result_type::indeterminate);
+    REQUIRE(fixture.parse(content, parts) == MultiPartParser::result_type::indeterminate);
     REQUIRE(parts.size() == 0);
 
     // Note: Whenever no start or end is found, the multipart parser assumes
@@ -342,11 +341,11 @@ TEST_CASE("content end in next to last body part", "[multipart_parser]") {
     // should be 0. But to get '0', the code would need more logic that in
     // practise doesn't make much sense.
     content = convertToCharVec(contentStr2);
-    REQUIRE(fixture.parse(request, content, parts) == MultiPartParser::result_type::indeterminate);
+    REQUIRE(fixture.parse(content, parts) == MultiPartParser::result_type::indeterminate);
     REQUIRE(parts.size() == 1);
 
     content = convertToCharVec(contentStr3);
-    REQUIRE(fixture.parse(request, content, parts) == MultiPartParser::result_type::indeterminate);
+    REQUIRE(fixture.parse(content, parts) == MultiPartParser::result_type::indeterminate);
     REQUIRE(parts.size() == 1);
     REQUIRE(parts[0].filename_ == "testfile01.txt");
     REQUIRE(parts[0].foundStart_);
@@ -355,7 +354,7 @@ TEST_CASE("content end in next to last body part", "[multipart_parser]") {
     REQUIRE(*(parts[0].end_ - 1) == 'o');
 
     content = convertToCharVec(contentStr4);
-    REQUIRE(fixture.parse(request, content, parts) == MultiPartParser::result_type::indeterminate);
+    REQUIRE(fixture.parse(content, parts) == MultiPartParser::result_type::indeterminate);
     REQUIRE(parts.size() == 1);
     REQUIRE(parts[0].filename_ == "");
     REQUIRE(!parts[0].foundStart_);
@@ -364,7 +363,7 @@ TEST_CASE("content end in next to last body part", "[multipart_parser]") {
     REQUIRE(*(parts[0].end_ - 1) == ' ');
 
     content = convertToCharVec(contentStr5);
-    REQUIRE(fixture.parse(request, content, parts) == MultiPartParser::result_type::done);
+    REQUIRE(fixture.parse(content, parts) == MultiPartParser::result_type::done);
     REQUIRE(parts.size() == 1);
     REQUIRE(parts[0].filename_ == "");
     REQUIRE(!parts[0].foundStart_);
@@ -404,11 +403,11 @@ TEST_CASE("content end in previous body part and last part contain content", "[m
 
     // getting back the initial empty parts
     std::vector<char> content = convertToCharVec(contentStr1);
-    REQUIRE(fixture.parse(request, content, parts) == MultiPartParser::result_type::indeterminate);
+    REQUIRE(fixture.parse(content, parts) == MultiPartParser::result_type::indeterminate);
     REQUIRE(parts.size() == 0);
 
     content = convertToCharVec(contentStr2);
-    REQUIRE(fixture.parse(request, content, parts) == MultiPartParser::result_type::done);
+    REQUIRE(fixture.parse(content, parts) == MultiPartParser::result_type::done);
     REQUIRE(parts.size() == 2);
     REQUIRE(parts[0].filename_ == "testfile01.txt");
     REQUIRE(parts[0].foundStart_);
