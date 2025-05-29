@@ -29,6 +29,6 @@ if(IDF_PATH)
 	idf_component_register(
 		SRCS ${Beauty_Sources}
 		INCLUDE_DIRS "src"
-		REQUIRES
+		REQUIRES asio espressif__sock_utils 
 	)
 endif()
