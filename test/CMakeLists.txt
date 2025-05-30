@@ -1,6 +1,6 @@
 project(beauty_test)
 
-add_executable(beauty_test
+add_executable(${PROJECT_NAME}
 	server_test.cpp
 	file_io_test.cpp
 	request_parser_test.cpp
@@ -10,10 +10,11 @@ add_executable(beauty_test
 	${CMAKE_SOURCE_DIR}/examples/pc/file_io.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/utils/mock_file_io.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/utils/mock_request_handler.cpp
-	${Beauty_Sources}
 )
 
-target_link_libraries(beauty_test PRIVATE Catch2::Catch2WithMain asio::asio)
+target_link_libraries(${PROJECT_NAME} PRIVATE Catch2::Catch2WithMain asio::asio ${CMAKE_PROJECT_NAME})
+
+target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 include_directories(
     ${CMAKE_SOURCE_DIR}/src
@@ -22,6 +23,6 @@ include_directories(
 
 # define tests
 add_test(
-	NAME beauty_test
-	COMMAND $<TARGET_FILE:beauty_test> --success
+	NAME ${PROJECT_NAME} 
+	COMMAND $<TARGET_FILE:${PROJECT_NAME}> --success
 )

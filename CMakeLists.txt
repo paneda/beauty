@@ -1,24 +1,26 @@
 if(NOT IDF_PATH)
 	cmake_minimum_required(VERSION 3.24)
-	project(beauty
+	project(beauty_library
 		LANGUAGES CXX
 		VERSION 1.0
 	)
 
 	enable_testing()
 
-	file (GLOB Beauty_Sources CONFIGURE_DEPENDS "src/*.cpp")
+	file (GLOB beauty_sources CONFIGURE_DEPENDS "src/*.cpp")
 
 	add_subdirectory(import)
 	add_subdirectory(examples)
 	add_subdirectory(test)
 
-	target_compile_options(beauty_example PRIVATE -Wall -Wextra -Wpedantic -Werror)
+	add_library(${CMAKE_PROJECT_NAME} STATIC ${beauty_sources})
 
-	# Note: Beauty_Sources requires C++11 only however examples/test
-	# requires c++17
-	set_target_properties(beauty_example beauty_test PROPERTIES
-		CXX_STANDARD 17
+	target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE asio::asio)
+
+	target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+	set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES
+		CXX_STANDARD 11
 		CXX_STANDARD_REQUIRED YES
 		CXX_EXTENSIONS NO
 	)
@@ -26,10 +28,10 @@ endif()
 
 # --- ESP-IDF component support: only active when included as a component ---
 if(IDF_PATH)
-	file (GLOB Beauty_Sources "src/*.cpp")
+	file (GLOB beauty_sources "src/*.cpp")
 	# Register as ESP-IDF component
 	idf_component_register(
-		SRCS ${Beauty_Sources}
+		SRCS ${beauty_sources}
 		INCLUDE_DIRS "src"
 		REQUIRES asio espressif__sock_utils 
 	)
