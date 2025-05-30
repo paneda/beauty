@@ -1,6 +1,10 @@
 #include "connection_manager.hpp"
 #include <chrono>
 
+namespace {
+	void defaultDebugMsgHandler(const std::string&) {}
+}
+
 namespace beauty {
 
 ConnectionManager::ConnectionManager(HttpPersistence options)

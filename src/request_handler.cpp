@@ -6,7 +6,7 @@ namespace beauty {
 
 namespace {
 
-void defaultFileNotFoundHandler(const Request &req, Reply &rep) {
+void defaultFileNotFoundHandler(const Request&, Reply& rep) {
     rep.stockReply(Reply::not_found);
 }
 
@@ -92,7 +92,7 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
                                         std::vector<char> &content,
                                         Reply &rep) {
     std::deque<MultiPartParser::ContentPart> parts;
-    MultiPartParser::result_type result = rep.multiPartParser_.parse(req, content, parts);
+    MultiPartParser::result_type result = rep.multiPartParser_.parse(content, parts);
 
     if (result == MultiPartParser::result_type::bad) {
         rep.stockReply(Reply::status_type::bad_request);
@@ -113,7 +113,7 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
     }
 }
 
-void RequestHandler::closeFile(Reply &rep, unsigned connectionId) {
+void RequestHandler::closeFile(unsigned connectionId) {
     if (fileIO_ != nullptr) {
         fileIO_->closeReadFile(std::to_string(connectionId));
     }

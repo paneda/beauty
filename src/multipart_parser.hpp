@@ -39,8 +39,7 @@ class MultiPartParser {
     // data is required.
     // The caller must inspect readyParts to see if any parts has been
     // completed.
-    result_type parse(const Request &req,
-                      std::vector<char> &content,
+    result_type parse(std::vector<char> &content,
                       std::deque<ContentPart> &parts);
 
     void flush(std::vector<char> &content, std::deque<ContentPart> &parts);
@@ -75,7 +74,6 @@ class MultiPartParser {
     std::vector<char> &lastBuffer_;
     std::deque<ContentPart> lastParts_;
 
-    size_t contentCount_;
     size_t boundaryCount_;
     std::string boundaryStr_;
 };
