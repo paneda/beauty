@@ -5,13 +5,21 @@ if(NOT IDF_PATH)
 		VERSION 1.0
 	)
 
-	enable_testing()
 
-	file (GLOB beauty_sources CONFIGURE_DEPENDS "src/*.cpp")
+	option(BUILD_EXAMPLES "Build the examples." OFF)
+	option(BUILD_TESTING "Build the testing tree." OFF)
 
+	file(GLOB beauty_sources CONFIGURE_DEPENDS "src/*.cpp")
 	add_subdirectory(import)
-	add_subdirectory(examples)
-	add_subdirectory(test)
+
+	if(BUILD_EXAMPLES)
+		add_subdirectory(examples)
+	endif()
+
+	if(BUILD_TESTING)
+		enable_testing()
+		add_subdirectory(test)
+	endif()
 
 	add_library(${CMAKE_PROJECT_NAME} STATIC ${beauty_sources})
 
@@ -33,6 +41,6 @@ if(IDF_PATH)
 	idf_component_register(
 		SRCS ${beauty_sources}
 		INCLUDE_DIRS "src"
-		REQUIRES asio espressif__sock_utils 
+		REQUIRES asio espressif__sock_utils
 	)
 endif()
