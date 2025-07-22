@@ -5,9 +5,7 @@ if(NOT IDF_PATH)
 		VERSION 1.0
 	)
 
-
 	option(BUILD_EXAMPLES "Build the examples." OFF)
-	option(BUILD_TESTING "Build the testing tree." OFF)
 
 	file(GLOB beauty_sources CONFIGURE_DEPENDS "src/*.cpp")
 	add_subdirectory(import)
@@ -16,8 +14,8 @@ if(NOT IDF_PATH)
 		add_subdirectory(examples)
 	endif()
 
+	include(CTest)
 	if(BUILD_TESTING)
-		enable_testing()
 		add_subdirectory(test)
 	endif()
 
