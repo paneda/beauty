@@ -11,6 +11,6 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/src
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE asio::asio ${CMAKE_PROJECT_NAME})
+target_link_libraries(${PROJECT_NAME} PRIVATE asio::asio cjson ${CMAKE_PROJECT_NAME})
 
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
