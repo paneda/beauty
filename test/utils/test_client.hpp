@@ -67,11 +67,11 @@ class TestClient {
         std::unique_lock<std::mutex> lock(mutex_);
         auto test = gotResult_.wait_for(lock, std::chrono::seconds(2));
         if (test == std::cv_status::timeout) {
-			TestResult ret;
-			ret.action_ = TestResult::TimedOut;
-			ret.statusCode_ = 0;
-			ret.headers_.clear();
-			ret.content_.clear();
+            TestResult ret;
+            ret.action_ = TestResult::TimedOut;
+            ret.statusCode_ = 0;
+            ret.headers_.clear();
+            ret.content_.clear();
             return ret;
         }
         return testResult_;

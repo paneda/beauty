@@ -168,8 +168,7 @@ TEST_CASE("parse until start of content", "[multipart_parser]") {
         std::deque<MultiPartParser::ContentPart> parts;
         // getting back the initial empty parts
         std::vector<char> content = convertToCharVec(contentStr1);
-        REQUIRE(fixture.parse(content, parts) ==
-                MultiPartParser::result_type::indeterminate);
+        REQUIRE(fixture.parse(content, parts) == MultiPartParser::result_type::indeterminate);
         REQUIRE(parts.size() == 0);
 
         content = convertToCharVec(contentStr2);
@@ -207,8 +206,7 @@ TEST_CASE("parse empty content", "[multipart_parser]") {
     SECTION("should return indeterminate") {
         std::deque<MultiPartParser::ContentPart> parts;
         // getting back the initial empty parts
-        REQUIRE(fixture.parse(content, parts) ==
-                MultiPartParser::result_type::indeterminate);
+        REQUIRE(fixture.parse(content, parts) == MultiPartParser::result_type::indeterminate);
         REQUIRE(parts.size() == 0);
 
         // result==done so call flush

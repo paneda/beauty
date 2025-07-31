@@ -8,7 +8,7 @@ class MockNotFoundHandler {
     MockNotFoundHandler() = default;
     virtual ~MockNotFoundHandler() = default;
 
-    void handleNotFound(const beauty::Request&, beauty::Reply &rep) {
+    void handleNotFound(const beauty::Request &, beauty::Reply &rep) {
         noCalls_++;
         rep.content_.insert(rep.content_.begin(), mockedContent_.begin(), mockedContent_.end());
         rep.send(beauty::Reply::ok, "text/plain");
