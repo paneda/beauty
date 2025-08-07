@@ -192,12 +192,7 @@ class HttpResult {
     template <typename T>
     void singleJsonKeyValue(const std::string& key, T value) {
         cJSON* root = startJson();
-        if (std::is_same<T, int>::value || std::is_same<T, long>::value ||
-            std::is_same<T, long long>::value) {
-            cJSON_AddNumberToObject(root, key.c_str(), static_cast<double>(value));
-        } else {
-            cJSON_AddNumberToObject(root, key.c_str(), static_cast<double>(value));
-        }
+		cJSON_AddNumberToObject(root, key.c_str(), static_cast<double>(value));
         serializeResponse();
     }
 
