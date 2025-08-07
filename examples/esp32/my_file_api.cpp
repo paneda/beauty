@@ -1,4 +1,5 @@
 #include <string>
+#include <functional>
 #include <FS.h>
 #include <LittleFS.h>
 
@@ -20,6 +21,7 @@ void MyFileApi::handleRequest(const Request &req, Reply &rep) {
                 File root = LittleFS.open("/");
                 File foundFile = root.openNextFile();
                 while (foundFile) {
+                    cJSON *fileObj = cJSON_CreateObject();
                     cJSON_AddStringToObject(fileObj, "name", foundFile.name());
                     cJSON_AddNumberToObject(fileObj, "size", foundFile.size());
                     cJSON_AddItemToArray(fileArray, fileObj);
