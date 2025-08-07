@@ -6,7 +6,7 @@ namespace beauty {
 
 namespace {
 
-void defaultFileNotFoundHandler(const Request&, Reply& rep) {
+void defaultFileNotFoundHandler(const Request &, Reply &rep) {
     rep.stockReply(Reply::not_found);
 }
 

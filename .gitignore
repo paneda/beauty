@@ -1,6 +1,9 @@
 build
 compile_commands.json
 testfiles/
+*.idea
+*.vscode
+*.bin
 
 #vim
 .tags

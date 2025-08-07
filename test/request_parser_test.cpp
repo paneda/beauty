@@ -191,5 +191,5 @@ TEST_CASE("parse POST request partially", "[request_parser]") {
     std::vector<char> expectedContent = convertToCharVec("This request");
     REQUIRE(fixture.content_ == expectedContent);
     REQUIRE(fixture.request.getNoInitialBodyBytesReceived() == expectedContent.size());
-	REQUIRE(fixture.request.body_ == expectedContent);
+    REQUIRE(fixture.request.body_ == expectedContent);
 }

@@ -7,12 +7,13 @@ add_executable(${PROJECT_NAME}
 	multipart_parser_test.cpp
 	request_decoder_test.cpp
 	url_parser_test.cpp
+	http_result_test.cpp
 	${CMAKE_SOURCE_DIR}/examples/pc/file_io.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/utils/mock_file_io.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/utils/mock_request_handler.cpp
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE Catch2::Catch2WithMain asio::asio ${CMAKE_PROJECT_NAME})
+target_link_libraries(${PROJECT_NAME} PRIVATE Catch2::Catch2WithMain asio::asio cjson ${CMAKE_PROJECT_NAME})
 
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
 

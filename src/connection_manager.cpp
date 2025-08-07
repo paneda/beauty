@@ -2,7 +2,7 @@
 #include <chrono>
 
 namespace {
-	void defaultDebugMsgHandler(const std::string&) {}
+void defaultDebugMsgHandler(const std::string &) {}
 }
 
 namespace beauty {

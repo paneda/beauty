@@ -7,7 +7,7 @@ using namespace beauty;
 
 FileIO::FileIO(const std::string &docRoot) : docRoot_(docRoot) {}
 
-size_t FileIO::openFileForRead(const std::string &id, const Request&, Reply &reply) {
+size_t FileIO::openFileForRead(const std::string &id, const Request &, Reply &reply) {
     std::string fullPath = docRoot_ + reply.filePath_;
     std::ifstream &is = openReadFiles_[id];
     is.open(fullPath.c_str(), std::ios::in | std::ios::binary);
@@ -22,7 +22,7 @@ size_t FileIO::openFileForRead(const std::string &id, const Request&, Reply &rep
     return 0;
 }
 
-int FileIO::readFile(const std::string &id, const Request&, char *buf, size_t maxSize) {
+int FileIO::readFile(const std::string &id, const Request &, char *buf, size_t maxSize) {
     openReadFiles_[id].read(buf, maxSize);
     return openReadFiles_[id].gcount();
 }
@@ -33,9 +33,9 @@ void FileIO::closeReadFile(const std::string &id) {
 }
 
 Reply::status_type FileIO::openFileForWrite(const std::string &id,
-                                            const Request&,
+                                            const Request &,
                                             Reply &reply,
-                                            std::string&) {
+                                            std::string &) {
     std::string fullPath = docRoot_ + reply.filePath_;
     std::ofstream &os = openWriteFiles_[id];
     os.open(fullPath.c_str(), std::ios::out | std::ios::binary);
@@ -43,11 +43,11 @@ Reply::status_type FileIO::openFileForWrite(const std::string &id,
 }
 
 Reply::status_type FileIO::writeFile(const std::string &id,
-                                     const Request&,
+                                     const Request &,
                                      const char *buf,
                                      size_t size,
                                      bool lastData,
-                                     std::string&) {
+                                     std::string &) {
     openWriteFiles_[id].write(buf, size);
     if (lastData) {
         openWriteFiles_[id].close();

@@ -124,4 +124,3 @@ TEST_CASE("http", "[url_parser]") {
         REQUIRE(parser.path() == "/path/to/file");
     }
 }
-

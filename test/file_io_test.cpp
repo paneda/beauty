@@ -99,8 +99,9 @@ TEST_CASE("Reading from MockFileIO", "[file_handler]") {
     }
     SECTION("should throw if call read() before opened") {
         std::vector<uint32_t> readData(10);
-        REQUIRE_THROWS_AS(fio.readFile("0", req, (char*)readData.data(), readData.size() * typeSize),
-                          std::runtime_error);
+        REQUIRE_THROWS_AS(
+            fio.readFile("0", req, (char*)readData.data(), readData.size() * typeSize),
+            std::runtime_error);
     }
     SECTION("should read chunks") {
         fio.openFileForRead("0", req, rep);

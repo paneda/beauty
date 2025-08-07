@@ -35,8 +35,8 @@ build/examples/beauty_example 127.0.0.1 8080 www
 ```
 
 ## ESP32
-The below code assumes running Beauty in an platform.io/Arduino context However
-there's no reason it shouldn't run using ESP-IDF.
+Beauty can be used in both PlatformIO/Arduino and ESP-IDF development frameworks.
+Check documentation in respective framework how to add external libraries.
 
 As asio::io_context::run() is blocking, the code below uses a RTOS thread as
 its probably the best fit for most applications. However if nothing else
@@ -202,3 +202,122 @@ The following methods are provided:
 |`void send(status_type, string contentType, char* data, size_t size)`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  |Use when pointing to memory holding the response body data.<br>**Note.** If combined with `addHeader()`, the contentType argument do add the `Content-Type` header. |
 |`void stockReply(status_code)`|Replies with a stock body for the status_code. |
 
+## HttpResult (optional)
+As the request and reply classes store data in `std::vector<char>` it becomes a bit hard to manipulate their data as e.g. JSON documents. Therefore, the HttpResult class provides a convenient way to do so.
+
+For high portability, HttpResult uses cJSON, so cJSON needs to be imported to your project. If you have a different preferred JSON library, you may use HttpResult as inspiration.
+
+### Constructor
+HttpResult takes a reference to the `Reply::content_` buffer:
+```cpp
+HttpResult res(rep.content_);
+```
+
+### Parsing JSON requests
+```cpp
+// Parse JSON from request body
+if (res.parseJsonRequest(req.body_)) {
+    // Access parsed values with type safety
+    std::string name = res.getString("name", "default");
+    int age = res.getInt("age", 0);
+    bool active = res.getBool("active", false);
+    double score = res.getDouble("score", 0.0);
+    
+    // Check if key exists
+    if (res.containsKey("email")) {
+        std::string email = res.getString("email");
+    }
+}
+```
+
+### Building JSON responses
+Simple key-value responses:
+```cpp
+// Single string value
+res.singleJsonKeyValue("message", "Hello World");
+
+// Single numeric value  
+res.singleJsonKeyValue("count", 42);
+
+// Single boolean value
+res.singleJsonKeyValue("success", true);
+```
+
+Complex JSON structures:
+```cpp
+// Build custom JSON response
+res.buildJsonResponse([&]() -> cJSON* {
+    cJSON* root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "status", "ok");
+    cJSON_AddNumberToObject(root, "timestamp", time(nullptr));
+    
+    cJSON* users = cJSON_CreateArray();
+    for (const auto& user : userList) {
+        cJSON* userObj = cJSON_CreateObject();
+        cJSON_AddStringToObject(userObj, "name", user.name.c_str());
+        cJSON_AddNumberToObject(userObj, "id", user.id);
+        cJSON_AddItemToArray(users, userObj);
+    }
+    cJSON_AddItemToObject(root, "users", users);
+    
+    return root;
+});
+```
+
+Direct array responses:
+```cpp
+// Return JSON array as root element
+res.buildJsonResponse([&]() -> cJSON* {
+    cJSON* filesArray = cJSON_CreateArray();
+    for (const auto& file : files) {
+        cJSON* fileObj = cJSON_CreateObject();
+        cJSON_AddStringToObject(fileObj, "name", file.name.c_str());
+        cJSON_AddNumberToObject(fileObj, "size", file.size);
+        cJSON_AddItemToArray(filesArray, fileObj);
+    }
+    return filesArray;
+});
+```
+
+Error responses:
+```cpp
+// Generate error response with status code
+res.jsonError(Reply::status_type::bad_request, "Invalid input data");
+```
+
+### Sending JSON responses
+After building the JSON response, send it:
+```cpp
+rep.send(res.statusCode_, "application/json");
+```
+### Building non-JSON responses
+For HTML, plain text, or other non-JSON responses, use the streaming operator:
+```cpp
+// HTML response
+res << "<!DOCTYPE html>"
+    << "<html><head><title>My Page</title></head>"
+    << "<body>"
+    << "<h1>Welcome to Beauty Server</h1>"
+    << "<p>Current time: " << getCurrentTime() << "</p>"
+    << "</body></html>";
+
+rep.send(res.statusCode_, "text/html");
+```
+
+```cpp
+// Plain text response
+res << "Server status: OK\n"
+    << "Uptime: " << getUptime() << " seconds\n"
+    << "Active connections: " << getConnectionCount();
+
+rep.send(res.statusCode_, "text/plain");
+```
+
+```cpp
+// CSV response
+res << "Name,Age,City\n"
+    << "John,25,New York\n"
+    << "Jane,30,London\n";
+
+rep.send(res.statusCode_, "text/csv");
+```
