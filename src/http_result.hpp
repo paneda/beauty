@@ -96,7 +96,7 @@ class HttpResult {
         if (requestRoot_ == nullptr) {
             const char* errorPtr = cJSON_GetErrorPtr();
 
-			std::ostringstream oss;
+            std::ostringstream oss;
             oss << "JSON parsing failed";
 
             if (errorPtr != nullptr) {
@@ -192,7 +192,7 @@ class HttpResult {
     template <typename T>
     void singleJsonKeyValue(const std::string& key, T value) {
         cJSON* root = startJson();
-		cJSON_AddNumberToObject(root, key.c_str(), static_cast<double>(value));
+        cJSON_AddNumberToObject(root, key.c_str(), static_cast<double>(value));
         serializeResponse();
     }
 

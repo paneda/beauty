@@ -84,8 +84,9 @@ TEST_CASE("HttpResult parse JSON request", "[http_result]") {
         requestBuf = {'{', 'i', 'n', 'v', 'a', 'l', 'i', 'd', '}'};
         REQUIRE_FALSE(result.parseJsonRequest(requestBuf));
         REQUIRE(result.requestBody_.isEmpty());
-		REQUIRE(result.statusCode_ == beauty::Reply::status_type::bad_request);
-		REQUIRE(std::string(replyBuf.begin(), replyBuf.end()) == "{\"error\":\"JSON parsing failed at position 1\"}");
+        REQUIRE(result.statusCode_ == beauty::Reply::status_type::bad_request);
+        REQUIRE(std::string(replyBuf.begin(), replyBuf.end()) ==
+                "{\"error\":\"JSON parsing failed at position 1\"}");
     }
     SECTION("should handle invalid empty body") {
         requestBuf.clear();
