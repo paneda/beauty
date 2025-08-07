@@ -2,6 +2,7 @@
 
 #include <istream>
 #include <string>
+#include <sstream>
 #include <vector>
 #include "cjson/cJSON.h"
 #include "reply.hpp"
@@ -94,14 +95,16 @@ class HttpResult {
         requestRoot_ = cJSON_Parse(jsonStr.c_str());
         if (requestRoot_ == nullptr) {
             const char* errorPtr = cJSON_GetErrorPtr();
-            std::string errorMsg = "JSON parsing failed";
+
+			std::ostringstream oss;
+            oss << "JSON parsing failed";
 
             if (errorPtr != nullptr) {
-                errorMsg += ": ";
-                errorMsg += errorPtr;
+                ptrdiff_t pos = errorPtr - jsonStr.c_str() - 1;
+                oss << " at position " << (pos >= 0 ? static_cast<size_t>(pos) : 0);
             }
 
-            jsonError(400, errorMsg);
+            jsonError(400, oss.str());
             return false;
         }
 
