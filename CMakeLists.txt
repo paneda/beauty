@@ -47,5 +47,5 @@ if(IDF_PATH)
 		REQUIRES asio espressif__sock_utils
 	)
 	# Define preprocessor macro for conditional includes
-	target_compile_definitions(${COMPONENT_LIB} PRIVATE BEAUTY_ESP_IDF_BUILD=1)
+	target_compile_definitions(${COMPONENT_LIB} PUBLIC BEAUTY_ESP_IDF_BUILD=1)
 endif()
