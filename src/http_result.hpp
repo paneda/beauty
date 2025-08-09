@@ -1,10 +1,11 @@
 #pragma once
 
+#include <functional>
 #include <istream>
 #include <string>
 #include <sstream>
 #include <vector>
-#include "cjson/cJSON.h"
+#include "beauty_common.hpp"
 #include "reply.hpp"
 
 namespace beauty {
