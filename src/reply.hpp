@@ -60,6 +60,40 @@ class Reply {
     void addHeader(const std::string& name, const std::string& val);
     bool hasHeaders() const;
 
+// Test-only interface - enable to access private members for e.g. unit test of middlewares.
+#ifdef BEAUTY_ENABLE_TESTING
+    status_type getStatus() const {
+        return status_;
+    }
+
+    const std::vector<Header>& getHeaders() const {
+        return headers_;
+    }
+
+    static bool iequals(const std::string& a, const std::string& b) {
+        if (a.size() != b.size()) {
+            return false;
+        }
+
+        for (size_t i = 0; i < a.size(); ++i) {
+            if (std::tolower(static_cast<unsigned char>(a[i])) !=
+                std::tolower(static_cast<unsigned char>(b[i]))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    std::string getHeaderValue(const std::string& headerName) const {
+        for (const auto& header : headers_) {
+            if (iequals(header.name_, headerName)) {
+                return header.value_;
+            }
+        }
+        return "";
+    }
+#endif
+
    private:
     void reset() {
         content_.clear();
