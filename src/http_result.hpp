@@ -5,6 +5,8 @@
 #include <string>
 #include <sstream>
 #include <vector>
+
+#include "cJSON.h"
 #include "beauty_common.hpp"
 #include "reply.hpp"
 
