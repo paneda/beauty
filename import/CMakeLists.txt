@@ -19,3 +19,12 @@ CPMAddPackage(
 	"ENABLE_CJSON_TEST OFF"
 	"BUILD_SHARED_LIBS OFF"
 )
+
+# cJSON doesn't set include directories automatically, so we need to add them
+# https://github.com/DaveGamble/cJSON/issues/816
+if(json_ADDED)
+  target_include_directories(cjson INTERFACE 
+    $<BUILD_INTERFACE:${json_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+  )
+endif()

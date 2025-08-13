@@ -21,7 +21,7 @@ if(NOT IDF_PATH)
 
 	add_library(${CMAKE_PROJECT_NAME} STATIC ${beauty_sources})
 
-	target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE asio::asio)
+	target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE asio::asio cjson)
 
 	target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC 
 	    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
@@ -46,6 +46,4 @@ if(IDF_PATH)
 		INCLUDE_DIRS "src"
 		REQUIRES asio espressif__sock_utils
 	)
-	# Define preprocessor macro for conditional includes
-	target_compile_definitions(${COMPONENT_LIB} PUBLIC BEAUTY_ESP_IDF_BUILD=1)
 endif()

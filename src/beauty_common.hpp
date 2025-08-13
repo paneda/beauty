@@ -7,13 +7,6 @@
 #include "reply.hpp"
 #include "request.hpp"
 
-// Conditional cJSON include for different environments
-#ifdef BEAUTY_ESP_IDF_BUILD
-#include "cJSON.h"
-#else
-#include "cjson/cJSON.h"
-#endif
-
 namespace beauty {
 
 using handlerCallback = std::function<void(const Request &req, Reply &rep)>;
