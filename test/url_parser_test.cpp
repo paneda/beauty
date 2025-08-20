@@ -1,6 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "url_parser.hpp"
+#include "beauty/url_parser.hpp"
 
 using namespace beauty;
 

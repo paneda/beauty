@@ -1,8 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "request.hpp"
-#include "reply.hpp"
-#include "http_result.hpp"
+#include "beauty/request.hpp"
+#include "beauty/reply.hpp"
+#include "beauty/http_result.hpp"
 
 using namespace beauty;
 

@@ -2,7 +2,7 @@
 #include <chrono>
 #include <utility>
 
-#include "server.hpp"
+#include "beauty/server.hpp"
 
 namespace {
 void defaultDebugMsgHandler(const std::string &) {}

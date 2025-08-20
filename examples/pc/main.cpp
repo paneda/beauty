@@ -1,10 +1,10 @@
-#include <asio.hpp>
 #include <iostream>
 #include <string>
+#include <asio.hpp>
+#include <beauty/server.hpp>
 
 #include "file_io.hpp"
 #include "my_file_api.hpp"
-#include "server.hpp"
 
 using namespace std::literals::chrono_literals;
 using namespace beauty;

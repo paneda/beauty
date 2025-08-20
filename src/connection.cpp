@@ -1,5 +1,5 @@
-#include "connection_manager.hpp"
-#include "connection.hpp"
+#include "beauty/connection_manager.hpp"
+#include "beauty/connection.hpp"
 
 namespace beauty {
 

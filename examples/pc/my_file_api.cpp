@@ -1,9 +1,9 @@
 #include <filesystem>
 #include <string>
+#include <beauty/http_result.hpp>
+#include <beauty/mime_types.hpp>
 
 #include "my_file_api.hpp"
-#include "http_result.hpp"
-#include "mime_types.hpp"
 
 namespace fs = std::filesystem;
 using namespace beauty;

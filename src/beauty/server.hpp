@@ -1,16 +1,16 @@
 #pragma once
 // included first
-#include "environment.hpp"
+#include "beauty/environment.hpp"
 
 #include <asio.hpp>
 #include <memory>
 #include <string>
 
-#include "beauty_common.hpp"
-#include "connection.hpp"
-#include "connection_manager.hpp"
-#include "i_file_io.hpp"
-#include "request_handler.hpp"
+#include "beauty/beauty_common.hpp"
+#include "beauty/connection.hpp"
+#include "beauty/connection_manager.hpp"
+#include "beauty/i_file_io.hpp"
+#include "beauty/request_handler.hpp"
 
 namespace beauty {
 

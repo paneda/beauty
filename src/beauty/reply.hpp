@@ -1,12 +1,12 @@
 #pragma once
-#include "environment.hpp"
+#include "beauty/environment.hpp"
 
 #include <asio.hpp>
 #include <string>
 #include <vector>
 
-#include "header.hpp"
-#include "multipart_parser.hpp"
+#include "beauty/header.hpp"
+#include "beauty/multipart_parser.hpp"
 
 namespace beauty {
 

@@ -1,8 +1,8 @@
 #include <string.h>
 #include <algorithm>
 
-#include "parse_common.hpp"
-#include "multipart_parser.hpp"
+#include "beauty/parse_common.hpp"
+#include "beauty/multipart_parser.hpp"
 
 namespace beauty {
 

@@ -5,8 +5,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "i_file_io.hpp"
-#include "reply.hpp"
+#include "beauty/i_file_io.hpp"
+#include "beauty/reply.hpp"
 
 class MockFileIO : public beauty::IFileIO {
    public:

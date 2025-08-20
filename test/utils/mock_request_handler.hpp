@@ -3,8 +3,8 @@
 #include <string>
 #include <vector>
 
-#include "reply.hpp"
-#include "request.hpp"
+#include "beauty/reply.hpp"
+#include "beauty/request.hpp"
 
 namespace beauty {
 

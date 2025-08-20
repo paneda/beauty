@@ -35,6 +35,21 @@ if(NOT IDF_PATH)
 		CXX_STANDARD_REQUIRED YES
 		CXX_EXTENSIONS NO
 	)
+
+	# Install headers to include/beauty/
+	install(DIRECTORY src/beauty/
+		DESTINATION include/beauty
+		FILES_MATCHING PATTERN "*.hpp"
+	)
+
+	# Install the library
+	install(TARGETS ${CMAKE_PROJECT_NAME}
+		EXPORT beauty_library-targets
+		LIBRARY DESTINATION lib
+		ARCHIVE DESTINATION lib
+		RUNTIME DESTINATION bin
+		INCLUDES DESTINATION include
+	)
 endif()
 
 # --- ESP-IDF component support: only active when included as a component ---

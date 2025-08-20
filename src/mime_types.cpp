@@ -1,4 +1,4 @@
-#include "mime_types.hpp"
+#include "beauty/mime_types.hpp"
 
 namespace beauty {
 namespace mime_types {
