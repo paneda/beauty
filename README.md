@@ -230,6 +230,44 @@ if (res.parseJsonRequest(req.body_)) {
 }
 ```
 
+### Advanced JSON parsing with cJSON
+For complex nested JSON structures, arrays, or when you need to use advanced cJSON functions directly, use the `getRoot()` method:
+```cpp
+// Parse complex nested JSON
+if (res.parseJsonRequest(req.body_)) {
+    // Get direct access to cJSON root for advanced operations
+    cJSON* root = res.requestBody_.getRoot();
+    
+    // Navigate nested objects
+    cJSON* user = cJSON_GetObjectItem(root, "user");
+    if (user && cJSON_IsObject(user)) {
+        cJSON* address = cJSON_GetObjectItem(user, "address");
+        if (address && cJSON_IsObject(address)) {
+            cJSON* street = cJSON_GetObjectItem(address, "street");
+            if (street && cJSON_IsString(street)) {
+                std::string streetName = street->valuestring;
+            }
+        }
+    }
+    
+    // Process arrays
+    cJSON* items = cJSON_GetObjectItem(root, "items");
+    if (items && cJSON_IsArray(items)) {
+        int arraySize = cJSON_GetArraySize(items);
+        for (int i = 0; i < arraySize; i++) {
+            cJSON* item = cJSON_GetArrayItem(items, i);
+            if (item && cJSON_IsObject(item)) {
+                cJSON* id = cJSON_GetObjectItem(item, "id");
+                if (id && cJSON_IsNumber(id)) {
+                    int itemId = id->valueint;
+                    // Process item...
+                }
+            }
+        }
+    }
+}
+```
+
 ### Building JSON responses
 Simple key-value responses:
 ```cpp

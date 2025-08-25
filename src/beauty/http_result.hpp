@@ -60,6 +60,11 @@ class HttpResult {
             jsonRoot_ = root;
         }
 
+        // Get direct access to the cJSON root for advanced operations
+        cJSON* getRoot() const {
+            return jsonRoot_;
+        }
+
        private:
         cJSON* jsonRoot_;
     };

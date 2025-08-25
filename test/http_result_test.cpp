@@ -100,6 +100,72 @@ TEST_CASE("HttpResult parse JSON request", "[http_result]") {
     }
 }
 
+TEST_CASE("HttpResult JsonDocument getRoot for complex JSON operations", "[http_result]") {
+    std::vector<char> replyBuf;
+    HttpResult result(replyBuf);
+
+    // Create a complex nested JSON structure
+    const std::string jsonStr = R"({
+        "user": {
+            "name": "John Doe",
+            "age": 30,
+            "address": {
+                "street": "123 Main St",
+                "city": "Anytown"
+            }
+        },
+        "items": [
+            {"id": 1, "name": "item1"},
+            {"id": 2, "name": "item2"}
+        ]
+    })";
+
+    std::vector<char> requestBuf(jsonStr.begin(), jsonStr.end());
+
+    SECTION("should provide direct access to cJSON root for complex operations") {
+        REQUIRE(result.parseJsonRequest(requestBuf));
+
+        // Get the root cJSON object
+        cJSON* root = result.requestBody_.getRoot();
+        REQUIRE(root != nullptr);
+
+        // Access nested object using cJSON functions
+        cJSON* user = cJSON_GetObjectItem(root, "user");
+        REQUIRE(user != nullptr);
+        REQUIRE(cJSON_IsObject(user));
+
+        cJSON* address = cJSON_GetObjectItem(user, "address");
+        REQUIRE(address != nullptr);
+        REQUIRE(cJSON_IsObject(address));
+
+        cJSON* street = cJSON_GetObjectItem(address, "street");
+        REQUIRE(street != nullptr);
+        REQUIRE(cJSON_IsString(street));
+        REQUIRE(std::string(street->valuestring) == "123 Main St");
+
+        // Access array using cJSON functions
+        cJSON* items = cJSON_GetObjectItem(root, "items");
+        REQUIRE(items != nullptr);
+        REQUIRE(cJSON_IsArray(items));
+        REQUIRE(cJSON_GetArraySize(items) == 2);
+
+        cJSON* firstItem = cJSON_GetArrayItem(items, 0);
+        REQUIRE(firstItem != nullptr);
+        REQUIRE(cJSON_IsObject(firstItem));
+
+        cJSON* itemId = cJSON_GetObjectItem(firstItem, "id");
+        REQUIRE(itemId != nullptr);
+        REQUIRE(cJSON_IsNumber(itemId));
+        REQUIRE(itemId->valueint == 1);
+    }
+
+    SECTION("should return nullptr when no JSON has been parsed") {
+        // Don't parse any JSON
+        cJSON* root = result.requestBody_.getRoot();
+        REQUIRE(root == nullptr);
+    }
+}
+
 TEST_CASE("HttpResult streaming operator", "[http_result]") {
     std::vector<char> replyBuf;
     HttpResult result(replyBuf);
