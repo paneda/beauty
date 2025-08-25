@@ -2,7 +2,7 @@
 #include <cctype>
 #include <sstream>
 
-#include "request_decoder.hpp"
+#include "beauty/request_decoder.hpp"
 
 namespace beauty {
 

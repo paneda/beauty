@@ -3,7 +3,7 @@
 #include <chrono>
 #include <set>
 
-#include "connection.hpp"
+#include "beauty/connection.hpp"
 
 namespace beauty {
 

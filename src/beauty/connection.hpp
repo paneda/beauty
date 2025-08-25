@@ -1,16 +1,16 @@
 #pragma once
-#include "environment.hpp"
+#include "beauty/environment.hpp"
 
 #include <asio.hpp>
 #include <chrono>
 #include <vector>
 #include <memory>
 
-#include "reply.hpp"
-#include "request.hpp"
-#include "request_decoder.hpp"
-#include "request_handler.hpp"
-#include "request_parser.hpp"
+#include "beauty/reply.hpp"
+#include "beauty/request.hpp"
+#include "beauty/request_decoder.hpp"
+#include "beauty/request_handler.hpp"
+#include "beauty/request_parser.hpp"
 
 namespace beauty {
 

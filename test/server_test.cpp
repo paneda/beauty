@@ -9,8 +9,8 @@
 #include "utils/mock_request_handler.hpp"
 #include "utils/test_client.hpp"
 
-#include "server.hpp"
-#include "request_handler.hpp"
+#include "beauty/server.hpp"
+#include "beauty/request_handler.hpp"
 
 using namespace std::literals::chrono_literals;
 using namespace beauty;

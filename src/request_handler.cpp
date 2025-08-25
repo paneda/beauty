@@ -1,6 +1,6 @@
-#include "header.hpp"
-#include "mime_types.hpp"
-#include "request_handler.hpp"
+#include "beauty/header.hpp"
+#include "beauty/mime_types.hpp"
+#include "beauty/request_handler.hpp"
 
 namespace beauty {
 

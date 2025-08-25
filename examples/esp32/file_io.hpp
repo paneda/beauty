@@ -1,9 +1,7 @@
 #pragma once
 #include <FS.h>
-
 #include <unordered_map>
-
-#include "i_file_io.hpp"
+#include <beauty/i_file_io.hpp>
 
 class FileIO : public beauty::IFileIO {
    public:

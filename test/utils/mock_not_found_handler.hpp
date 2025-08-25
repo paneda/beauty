@@ -1,7 +1,7 @@
 #pragma once
 
-#include "reply.hpp"
-#include "request.hpp"
+#include "beauty/reply.hpp"
+#include "beauty/request.hpp"
 
 class MockNotFoundHandler {
    public:

@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <string>
 
-#include "request.hpp"
+#include "beauty/request.hpp"
 
 namespace beauty {
 

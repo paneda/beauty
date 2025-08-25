@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "header.hpp"
-#include "request.hpp"
+#include "beauty/header.hpp"
+#include "beauty/request.hpp"
 
 namespace beauty {
 

@@ -1,7 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "request.hpp"
-#include "request_decoder.hpp"
+#include "beauty/request.hpp"
+#include "beauty/request_decoder.hpp"
 
 using namespace beauty;
 

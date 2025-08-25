@@ -1,10 +1,10 @@
 #pragma once
 
-#include "beauty_common.hpp"
-#include "multipart_parser.hpp"
-#include "i_file_io.hpp"
-#include "reply.hpp"
-#include "request.hpp"
+#include "beauty/beauty_common.hpp"
+#include "beauty/multipart_parser.hpp"
+#include "beauty/i_file_io.hpp"
+#include "beauty/reply.hpp"
+#include "beauty/request.hpp"
 
 namespace beauty {
 

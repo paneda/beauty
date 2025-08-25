@@ -1,5 +1,4 @@
 #include <cstdint>
-
 #include <LittleFS.h>
 
 #include "file_io.hpp"

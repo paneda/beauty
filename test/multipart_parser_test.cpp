@@ -1,7 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "multipart_parser.hpp"
-#include "request.hpp"
+#include "beauty/multipart_parser.hpp"
+#include "beauty/request.hpp"
 
 using namespace beauty;
 

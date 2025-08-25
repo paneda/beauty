@@ -1,9 +1,9 @@
 #include <algorithm>
 #include <strings.h>
 
-#include "parse_common.hpp"
-#include "request.hpp"
-#include "request_parser.hpp"
+#include "beauty/parse_common.hpp"
+#include "beauty/request.hpp"
+#include "beauty/request_parser.hpp"
 
 namespace beauty {
 

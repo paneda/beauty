@@ -50,8 +50,8 @@ be simplified to the "standard" Arduino setup() and loop() concept.
 #include <Arduino.h>
 #include <WiFi.h>
 #include <asio.hpp>
-#include <server.hpp>
-#include <reply.hpp>
+#include <beauty/server.hpp>
+#include <beauty/reply.hpp>
 
 // these includes needs implementation, see examples
 #include "my_file_io.hpp"
@@ -132,7 +132,7 @@ one for PC and one for ESP32.
 |`void setFileNotFoundHandler(const handlerCallback &cb)` | Adds a custom file not find handler. If not set, Beauty will provide a stock reply. |
 |`void setDebugMsgHandler(const debugMsgCallback &cb)` | Adds a custom "printf" handler to get debug messages from Beauty. |
 
-The definitions of `handlerCallback` and `debugMsgCallback` can be found in src/beauty_common.hpp.
+The definitions of `handlerCallback` and `debugMsgCallback` can be found in src/beauty/beauty_common.hpp.
 
 ## HTTP persistence options
 Beauty support HTTP/1.1 using Keep-Alive connections.
@@ -143,7 +143,7 @@ The drawback is of coarse that memory may be used up more rapidly when serving
 many clients. The `connectionLimit` may serve as a trade-off to achieve both
 advantages for constrained environments.
 
-The behaviour is controlled with HttpPersistence, defined in src/beauty_common.hpp.
+The behaviour is controlled with HttpPersistence, defined in src/beauty/beauty_common.hpp.
 It is required by both Server constructors and includes the following members:
 
 |Variable |Description |

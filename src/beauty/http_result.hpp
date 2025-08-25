@@ -7,8 +7,8 @@
 #include <vector>
 
 #include "cJSON.h"
-#include "beauty_common.hpp"
-#include "reply.hpp"
+#include "beauty/beauty_common.hpp"
+#include "beauty/reply.hpp"
 
 namespace beauty {
 
