@@ -14,3 +14,12 @@ include_directories(
 target_link_libraries(${PROJECT_NAME} PRIVATE asio::asio cjson ${CMAKE_PROJECT_NAME})
 
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+# Router test executable
+add_executable(router_test
+	pc/router_test.cpp
+	pc/lightweight_router.cpp
+)
+
+target_link_libraries(router_test PRIVATE asio::asio cjson ${CMAKE_PROJECT_NAME})
+target_compile_options(router_test PRIVATE -Wall -Wextra -Wpedantic -Werror)

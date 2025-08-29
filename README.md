@@ -359,3 +359,134 @@ res << "Name,Age,City\n"
 
 rep.send(res.statusCode_, "text/csv");
 ```
+## Router (optional) for Beauty Web Server
+
+This is a lightweight, embedded-friendly router implementation for the Beauty web server framework. It avoids heavy dependencies like `std::regex` and uses simple string operations for path matching.
+
+### Features
+
+- **Lightweight**: No regex dependencies, uses simple string operations
+- **Embedded-friendly**: Minimal memory footprint and predictable performance
+- **Path Parameters**: Supports parameterized paths like `/users/{userId}`
+- **Multiple HTTP Methods**: Support for GET, POST, PUT, DELETE, etc.
+- **Easy Integration**: Designed to work seamlessly with Beauty's request handling
+
+### File Structure
+
+- `lightweight_router.hpp` - Header file with class definition
+- `lightweight_router.cpp` - Implementation file
+- `router_example.cpp` - Complete example showing how to use the router
+- `router_test.cpp` - Simple test program to verify functionality
+
+### Basic Usage
+
+#### 1. Include the Router
+
+```cpp
+#include "lightweight_router.hpp"
+```
+
+#### 2. Create and Configure Router
+
+```cpp
+beauty::LightweightRouter router;
+
+// Add routes
+router.addRoute("GET", "/users", 
+    [](const beauty::Request& req, beauty::Reply& rep, const std::map<std::string, std::string>& params) {
+        // Handle GET /users
+    });
+
+router.addRoute("GET", "/users/{userId}", 
+    [](const beauty::Request& req, beauty::Reply& rep, const std::map<std::string, std::string>& params) {
+        std::string userId = params.at("userId");
+        // Handle GET /users/{userId}
+    });
+```
+
+#### 3. Handle Requests
+
+```cpp
+// In your Beauty request handler
+void handleRequest(const beauty::Request& req, beauty::Reply& rep) {
+    if (router.handle(req, rep)) {
+        return; // Request was handled by router
+    }
+    
+    // Handle 404 or other logic
+    beauty::HttpResult result(rep.content_);
+    result.jsonError(beauty::Reply::status_type::not_found, "Route not found");
+    rep.send(result.statusCode_, "application/json");
+}
+```
+
+### Path Patterns
+
+The router supports simple path patterns with parameters:
+
+- `/users` - Exact match
+- `/users/{userId}` - Match with parameter
+- `/users/{userId}/posts/{postId}` - Multiple parameters
+- `/api/v1/users/{userId}` - Mixed literal and parameter segments
+
+#### Parameter Extraction
+
+Parameters are automatically extracted and passed to handlers:
+
+```cpp
+router.addRoute("GET", "/users/{userId}/posts/{postId}", 
+    [](const beauty::Request& req, beauty::Reply& rep, const std::map<std::string, std::string>& params) {
+        std::string userId = params.at("userId");
+        std::string postId = params.at("postId");
+        // Use the parameters...
+    });
+```
+
+### Complete Example
+
+See `router_example.cpp` for a complete working example that demonstrates:
+
+- Setting up multiple routes with different HTTP methods
+- Handling path parameters
+- Returning JSON responses
+- Integration with Beauty's HttpResult
+
+### Performance Characteristics
+
+- **Memory**: Minimal overhead, stores only parsed route segments
+- **CPU**: Simple string comparisons, no regex compilation or matching
+- **Predictable**: Linear time complexity O(n) where n is the number of route segments
+- **Embedded-friendly**: No dynamic regex compilation, fixed memory usage per route
+
+### Building and Testing
+
+The router is included in the Beauty examples CMake configuration. To build:
+
+```bash
+mkdir build && cd build
+cmake ..
+make
+```
+
+To run the router test:
+
+```bash
+./router_test
+```
+
+### Integration with Beauty
+
+The router is designed to work as a middleware layer within Beauty's request handling pipeline. You can:
+
+1. Use it as the primary request router
+2. Combine it with other handlers (file serving, API endpoints, etc.)
+3. Fall back to other handlers when no route matches
+
+### Limitations
+
+- Path parameters are always strings (no automatic type conversion)
+- No support for wildcard routes (*, **)
+- No regex support (by design for embedded use)
+- No route priorities (first matching route wins)
+
+These limitations are intentional to keep the implementation simple and lightweight for embedded systems.
