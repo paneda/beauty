@@ -359,3 +359,105 @@ res << "Name,Age,City\n"
 
 rep.send(res.statusCode_, "text/csv");
 ```
+## Router (optional)
+
+Beauty provides a lightweight, router implementation. It avoids heavy dependencies like `std::regex` and uses string operations for path matching.
+
+### Features
+
+- **Lightweight**: No regex dependencies, uses simple string operations
+- **Embedded-friendly**: Minimal memory footprint and predictable performance
+- **Path Parameters**: Supports parameterized paths like `/users/{userId}`
+- **Multiple HTTP Methods**: Support for GET, POST, PUT, DELETE, etc.
+- **Easy Integration**: Designed to work seamlessly with Beauty's request handling
+
+### Basic Usage
+
+#### 1. Include the Router
+
+```cpp
+#include "beauty/router.hpp"
+```
+
+#### 2. Create and Configure Router
+
+```cpp
+beauty::Router router;
+
+// Add routes
+router.addRoute("GET", "/users", 
+    [](const beauty::Request& req, beauty::Reply& rep, const std::unordered_map<std::string, std::string>& params) {
+        // Handle GET /users
+    });
+
+router.addRoute("GET", "/users/{userId}", 
+    [](const beauty::Request& req, beauty::Reply& rep, const std::unordered_map<std::string, std::string>& params) {
+        std::string userId = params.at("userId");
+        // Handle GET /users/{userId}
+    });
+```
+
+#### 3. Handle Requests
+
+```cpp
+// Using the Router, a request handler is essentially implemented like this:
+void handleRequest(const beauty::Request& req, beauty::Reply& rep) {
+    if (router.handle(req, rep)) {
+        return; // Request was handled by router
+    }
+}
+```
+
+### Path Patterns
+
+The router supports simple path patterns with parameters:
+
+- `/users` - Exact match
+- `/users/{userId}` - Match with parameter
+- `/users/{userId}/posts/{postId}` - Multiple parameters
+- `/api/v1/users/{userId}` - Mixed literal and parameter segments
+
+#### Parameter Extraction
+
+Parameters are automatically extracted and passed to handlers:
+
+```cpp
+router.addRoute("GET", "/users/{userId}/posts/{postId}", 
+    [](const beauty::Request& req, beauty::Reply& rep, const std::map<std::string, std::string>& params) {
+        std::string userId = params.at("userId");
+        std::string postId = params.at("postId");
+        // Use the parameters...
+    });
+```
+
+### Complete Example
+
+See `my_router_api.cpp` for a complete working example that demonstrates:
+
+- Setting up multiple routes with different HTTP methods
+- Handling path parameters
+- Returning JSON responses
+- Integration with Beauty's HttpResult
+
+### Performance Characteristics
+
+- **Memory**: Minimal overhead, stores only parsed route segments
+- **CPU**: Simple string comparisons, no regex compilation or matching
+- **Predictable**: Linear time complexity O(n) where n is the number of route segments
+- **Embedded-friendly**: No dynamic regex compilation, fixed memory usage per route
+
+### Building and Testing
+
+The router is included in the Beauty examples CMake configuration. To build:
+
+```bash
+mkdir build && cd build
+cmake -DBUILD_EXAMPLES=On ..
+make
+```
+
+Start the example server and test the '/api/users' paths:
+
+```bash
+./build/examples/beauty_example 127.0.0.1 8080 www/
+```

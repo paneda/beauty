@@ -5,6 +5,7 @@
 
 #include "file_io.hpp"
 #include "my_file_api.hpp"
+#include "my_router_api.hpp"
 
 using namespace std::literals::chrono_literals;
 using namespace beauty;
@@ -26,8 +27,13 @@ int main(int argc, char *argv[]) {
         // Initialise the server.
         FileIO fileIO(argv[3]);
         HttpPersistence persistentOption(5s, 1000, 0);
-        MyFileApi fileApi(argv[3]);
         Server s(ioc, argv[1], argv[2], &fileIO, persistentOption, 1024);
+
+        MyRouterApi routerApi;
+        MyFileApi fileApi(argv[3]);
+        s.addRequestHandler(std::bind(&MyRouterApi::handleRequest, &routerApi, _1, _2));
+        // Must be placed last, after other middleware, as it (in this example)
+        // prepares filePath_ and and reply headers for FileIO.
         s.addRequestHandler(std::bind(&MyFileApi::handleRequest, &fileApi, _1, _2));
         s.setDebugMsgHandler([](const std::string &msg) { std::cout << msg << std::endl; });
 
