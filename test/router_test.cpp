@@ -9,12 +9,12 @@ using namespace beauty;
 TEST_CASE("router functionality", "[router]") {
 	Router router;
 	bool handlerCalled = false;
-	std::map<std::string, std::string> capturedParams;
+	std::unordered_map<std::string, std::string> capturedParams;
 
 	SECTION("should match route with parameter and extract param") {
 		// Add a test route
 		router.addRoute("GET", "/users/{userId}", 
-			[&](const Request&, Reply&, const std::map<std::string, std::string>& params) {
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>& params) {
 				handlerCalled = true;
 				capturedParams = params;
 			});
@@ -37,7 +37,7 @@ TEST_CASE("router functionality", "[router]") {
 	SECTION("should return MethodNotSupported for existing path with different method") {
 		// Add a test route
 		router.addRoute("GET", "/users/{userId}", 
-			[&](const Request&, Reply&, const std::map<std::string, std::string>&) {});
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>&) {});
 
 		// Create a mock request with different method
 		std::vector<char> body;
@@ -55,7 +55,7 @@ TEST_CASE("router functionality", "[router]") {
 	SECTION("should return NoMatch for non-existing path") {
 		// Add a test route
 		router.addRoute("GET", "/users/{userId}", 
-			[&](const Request&, Reply&, const std::map<std::string, std::string>&) {});
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>&) {});
 		// Create a mock request with non-matching path
 		std::vector<char> body;
 		Request req(body);
@@ -72,7 +72,7 @@ TEST_CASE("router functionality", "[router]") {
 	SECTION("should match route without parameters") {
 		// Add a test route
 		router.addRoute("GET", "/status", 
-			[&](const Request&, Reply&, const std::map<std::string, std::string>&) {
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>&) {
 				handlerCalled = true;
 			});
 
@@ -92,7 +92,7 @@ TEST_CASE("router functionality", "[router]") {
 	SECTION("should not match partial paths") {
 		// Add a test route
 		router.addRoute("GET", "/users/{userId}/posts/{postId}", 
-			[&](const Request&, Reply&, const std::map<std::string, std::string>&) {
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>&) {
 				handlerCalled = true;
 			});
 
@@ -112,7 +112,7 @@ TEST_CASE("router functionality", "[router]") {
 	SECTION("should match complex paths with multiple parameters") {
 		// Add a test route
 		router.addRoute("GET", "/users/{userId}/posts/{postId}", 
-			[&](const Request&, Reply&, const std::map<std::string, std::string>& params) {
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>& params) {
 				handlerCalled = true;
 				capturedParams = params;
 			});
@@ -133,10 +133,30 @@ TEST_CASE("router functionality", "[router]") {
 		REQUIRE(capturedParams["userId"] == "456");
 		REQUIRE(capturedParams["postId"] == "789");
 	}
+	SECTION("should handle empty path") {
+		// Add a test route for empty path
+		router.addRoute("GET", "", 
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>&) {
+				handlerCalled = true;
+			});
+
+		// Create a mock request with empty path
+		std::vector<char> body;
+		Request req(body);
+		req.method_ = "GET";
+		req.requestPath_ = "";
+
+		Reply rep(1024);
+
+		HandlerResult handled = router.handle(req, rep);
+
+		REQUIRE(handled == HandlerResult::Matched);
+		REQUIRE(handlerCalled == true);
+	}
 	SECTION("should handle root path") {
 		// Add a test route
 		router.addRoute("GET", "/", 
-			[&](const Request&, Reply&, const std::map<std::string, std::string>&) {
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>&) {
 				handlerCalled = true;
 			});
 
@@ -153,10 +173,10 @@ TEST_CASE("router functionality", "[router]") {
 		REQUIRE(handled == HandlerResult::Matched);
 		REQUIRE(handlerCalled == true);
 	}
-	SECTION("should handle trailing slashes consistently") {
+	SECTION("should ignore trailing slashes in path matching") {
 		// Add a test route without trailing slash
 		router.addRoute("GET", "/api/resource", 
-			[&](const Request&, Reply&, const std::map<std::string, std::string>&) {
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>&) {
 				handlerCalled = true;
 			});
 
@@ -170,16 +190,87 @@ TEST_CASE("router functionality", "[router]") {
 
 		HandlerResult handled = router.handle(req, rep);
 
-		REQUIRE(handled == HandlerResult::NoMatch);
-		REQUIRE(handlerCalled == false);
+		REQUIRE(handled == HandlerResult::Matched);
+		REQUIRE(handlerCalled == true);
+	}
+	SECTION("should ignore trailing slashes in route definition") {
+		// Add a test route without trailing slash
+		router.addRoute("GET", "/api/resource/", 
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>&) {
+				handlerCalled = true;
+			});
 
-		// Reset and test without trailing slash
-		handlerCalled = false;
+		// Create a mock request without the trailing slash
+		std::vector<char> body;
+		Request req(body);
+		req.method_ = "GET";
 		req.requestPath_ = "/api/resource";
 
-		handled = router.handle(req, rep);
+		Reply rep(1024);
+
+		HandlerResult handled = router.handle(req, rep);
 
 		REQUIRE(handled == HandlerResult::Matched);
 		REQUIRE(handlerCalled == true);
+	}
+	SECTION("should handle multiple routes and match correct one") {
+		// Add multiple test routes
+		router.addRoute("POST", "/items", 
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>&) {
+				handlerCalled = true;
+			});
+		router.addRoute("GET", "/items/{itemId}", 
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>& params) {
+				handlerCalled = true;
+				capturedParams = params;
+			});
+		router.addRoute("GET", "/status", 
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>&) {
+				handlerCalled = true;
+			});
+
+		// Create a mock request that should match the second route
+		std::vector<char> body;
+		Request req(body);
+		req.method_ = "GET";
+		req.requestPath_ = "/items/42";
+
+		Reply rep(1024);
+
+		HandlerResult handled = router.handle(req, rep);
+
+		REQUIRE(handled == HandlerResult::Matched);
+		REQUIRE(handlerCalled == true);
+		REQUIRE(capturedParams.size() == 1);
+		REQUIRE(capturedParams["itemId"] == "42");
+	}
+	SECTION("should handle overlapping routes and match most specific one") {
+		// Add overlapping test routes
+		router.addRoute("GET", "/files/{fileId}", 
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>& params) {
+				handlerCalled = true;
+				capturedParams = params;
+			});
+		router.addRoute("GET", "/files/special", 
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>&) {
+				handlerCalled = true;
+				capturedParams.clear();
+				capturedParams["special"] = "true";
+			});
+
+		// Create a mock request that should match the more specific route
+		std::vector<char> body;
+		Request req(body);
+		req.method_ = "GET";
+		req.requestPath_ = "/files/special";
+
+		Reply rep(1024);
+
+		HandlerResult handled = router.handle(req, rep);
+
+		REQUIRE(handled == HandlerResult::Matched);
+		REQUIRE(handlerCalled == true);
+		REQUIRE(capturedParams.size() == 1);
+		REQUIRE(capturedParams["special"] == "true");
 	}
 }

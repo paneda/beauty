@@ -5,22 +5,30 @@
 namespace beauty {
 
 void Router::addRoute(const std::string& method, const std::string& pathPattern, Handler handler) {
+    // RouteEntry entry = parsePathPattern(pathPattern, handler);
+    // routes_[method].push_back(std::move(entry));
     RouteEntry entry = parsePathPattern(pathPattern, handler);
-    routes_[method].push_back(std::move(entry));
+    auto& vec = routes_[method];
+    vec.push_back(std::move(entry));
+    // Sort: more literal segments (fewer parameters) first
+    std::sort(vec.begin(), vec.end(), [](const RouteEntry& a, const RouteEntry& b) {
+        int aParams = std::count(a.isParameter.begin(), a.isParameter.end(), true);
+        int bParams = std::count(b.isParameter.begin(), b.isParameter.end(), true);
+        return aParams < bParams;
+    });
 }
 
 HandlerResult  Router::handle(const Request& req, Reply& rep) {
 	auto methodIt = routes_.find(req.method_);
-	std::map<std::string, std::string> params;
 
 	// Try to match path+method first
 	if (methodIt != routes_.end()) {
 		for (const auto& routeEntry : methodIt->second) {
+			std::unordered_map<std::string, std::string> params;
 			if (matchPath(routeEntry, req.requestPath_, params)) {
 				routeEntry.handler(req, rep, params);
 				return HandlerResult::Matched;
 			}
-			params.clear();
 		}
 	}
 
@@ -32,10 +40,10 @@ HandlerResult  Router::handle(const Request& req, Reply& rep) {
 			continue;
 		}
 		for (const auto& routeEntry : entries) {
+			std::unordered_map<std::string, std::string> params;
 			if (matchPath(routeEntry, req.requestPath_, params)) {
 				return HandlerResult::MethodNotSupported;
 			}
-			params.clear();
 		}
 	}
 
@@ -79,10 +87,6 @@ std::vector<std::string> Router::splitPath(const std::string& path) {
     if (cleanPath[0] == '/') {
         cleanPath = cleanPath.substr(1);
     }
-    // Remove trailing slash if present
-    if (!cleanPath.empty() && cleanPath[cleanPath.size() - 1] == '/') {
-        cleanPath = cleanPath.substr(0, cleanPath.size() - 1);
-    }
     
     if (cleanPath.empty()) {
         return segments;
@@ -101,7 +105,7 @@ std::vector<std::string> Router::splitPath(const std::string& path) {
 }
 
 bool Router::matchPath(const RouteEntry& routeEntry, const std::string& requestPath, 
-                                  std::map<std::string, std::string>& params) {
+                                  std::unordered_map<std::string, std::string>& params) {
     std::vector<std::string> requestSegments = splitPath(requestPath);
     
     // Check if segment counts match

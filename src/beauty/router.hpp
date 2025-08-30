@@ -1,7 +1,7 @@
 #pragma once
 
 #include <functional>
-#include <map>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
@@ -12,11 +12,11 @@ namespace beauty {
 
 enum class HandlerResult {Matched, MethodNotSupported, NoMatch};
 
-// Lightweight (optional) router
+// A lightweight (optional) router to be used in added RequestHandlers
 class Router {
    public:
     using Handler =
-        std::function<void(const Request&, Reply&, const std::map<std::string, std::string>&)>;
+        std::function<void(const Request&, Reply&, const std::unordered_map<std::string, std::string>&)>;
 
     // Add a route with method, path pattern and handler
     void addRoute(const std::string& method, const std::string& pathPattern, Handler handler);
@@ -32,7 +32,8 @@ class Router {
         Handler handler;
     };
 
-    std::map<std::string, std::vector<RouteEntry>> routes_;
+	// Map of method to list of route entries
+    std::unordered_map<std::string, std::vector<RouteEntry>> routes_;
 
     // Parse a path pattern into segments and parameter flags
     RouteEntry parsePathPattern(const std::string& pathPattern, Handler handler);
@@ -43,7 +44,7 @@ class Router {
     // Check if a request path matches a route pattern
     bool matchPath(const RouteEntry& routeEntry,
                    const std::string& requestPath,
-                   std::map<std::string, std::string>& params);
+                   std::unordered_map<std::string, std::string>& params);
 };
 
 }  // namespace beauty
