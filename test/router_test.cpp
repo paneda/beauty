@@ -273,4 +273,27 @@ TEST_CASE("router functionality", "[router]") {
 		REQUIRE(capturedParams.size() == 1);
 		REQUIRE(capturedParams["special"] == "true");
 	}
+	SECTION("should handle routes with similar prefixes") {
+		// Add routes with similar prefixes
+		router.addRoute("GET", "/api/v1/resource", 
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>&) {
+				handlerCalled = true;
+			});
+		router.addRoute("GET", "/api/v1/resource/{id}", 
+			[&](const Request&, Reply&, const std::unordered_map<std::string, std::string>& params) {
+				handlerCalled = true;
+				capturedParams = params;
+			});
+		// Create a mock request that should match the second route
+		std::vector<char> body;
+		Request req(body);
+		req.method_ = "GET";
+		req.requestPath_ = "/api/v1/resource/99";
+		Reply rep(1024);
+		HandlerResult handled = router.handle(req, rep);
+		REQUIRE(handled == HandlerResult::Matched);
+		REQUIRE(handlerCalled == true);
+		REQUIRE(capturedParams.size() == 1);
+		REQUIRE(capturedParams["id"] == "99");
+	}
 }
