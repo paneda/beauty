@@ -4,6 +4,7 @@ add_executable(${PROJECT_NAME}
 	pc/main.cpp
 	pc/file_io.cpp
 	pc/my_file_api.cpp
+	pc/my_router_api.cpp
 )
 
 include_directories(
