@@ -402,7 +402,7 @@ router.addRoute("GET", "/users/{userId}",
 ```cpp
 // Using the Router, a request handler is essentially implemented like this:
 void handleRequest(const beauty::Request& req, beauty::Reply& rep) {
-    if (router.handle(req, rep)) {
+    if (router.handle(req, rep) == HandlerResult::Matched) {
         return; // Request was handled by router
     }
 }
