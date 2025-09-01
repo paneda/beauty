@@ -5,8 +5,6 @@
 namespace beauty {
 
 void Router::addRoute(const std::string& method, const std::string& pathPattern, Handler handler) {
-    // RouteEntry entry = parsePathPattern(pathPattern, handler);
-    // routes_[method].push_back(std::move(entry));
     RouteEntry entry = parsePathPattern(pathPattern, handler);
     auto& vec = routes_[method];
     vec.push_back(std::move(entry));
