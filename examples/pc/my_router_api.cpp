@@ -69,9 +69,10 @@ void MyRouterApi::setupRoutes() {
 
 // Main handler that Beauty will call
 void MyRouterApi::handleRequest(const Request& req, Reply& rep) {
-    if (router_.handle(req, rep) == HandlerResult::Matched) {
+    auto result = router_.handle(req, rep);
+    if (result == HandlerResult::Matched) {
         return;  // Request was handled by router
-    } else if (router_.handle(req, rep) == HandlerResult::MethodNotSupported) {
+    } else if (result == HandlerResult::MethodNotSupported) {
         // Method not supported for this path.
         // Note: HTTP 1.1 requires 405 "Method Not Allowed" to include the
         // "Allow" header
