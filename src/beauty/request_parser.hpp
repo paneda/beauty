@@ -15,7 +15,7 @@ class RequestParser {
     void reset();
 
     // Result of parse.
-    enum result_type { good_complete, good_part, bad, indeterminate };
+    enum result_type { good_complete, good_part, bad, not_implemented, indeterminate };
 
     // Parse some data. The enum return value is good when a complete request
     // has been parsed, bad if the data is invalid, good_part when more

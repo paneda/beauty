@@ -199,7 +199,12 @@ RequestParser::result_type RequestParser::consume(Request &req,
                         contentLength_ = std::min(content.capacity(), contentLength_);
                     } else if (strcasecmp(h.name_.c_str(), "Transfer-Encoding") == 0) {
                         if (strcasecmp(h.value_.c_str(), "chunked") == 0) {
-                            return bad;
+                            if (req.httpVersionMajor_ < 1 ||
+                                (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ < 1)) {
+                                // chunked encoding not supported in HTTP/1.0 or earlier
+                                return bad;
+                            }
+                            return not_implemented;
                         }
                     }
                 }

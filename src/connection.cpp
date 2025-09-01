@@ -77,6 +77,9 @@ void Connection::doRead() {
                         reply_.stockReply(Reply::bad_request);
                         doWriteHeaders();
                     }
+                } else if (result == RequestParser::not_implemented) {
+                    reply_.stockReply(Reply::not_implemented);
+                    doWriteHeaders();
                 } else if (result == RequestParser::bad) {
                     reply_.stockReply(Reply::bad_request);
                     doWriteHeaders();
