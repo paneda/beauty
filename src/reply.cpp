@@ -22,6 +22,7 @@ const std::string internal_server_error = "HTTP/1.0 500 Internal Server Error\r\
 const std::string not_implemented = "HTTP/1.0 501 Not Implemented\r\n";
 const std::string bad_gateway = "HTTP/1.0 502 Bad Gateway\r\n";
 const std::string service_unavailable = "HTTP/1.0 503 Service Unavailable\r\n";
+const std::string version_not_supported = "HTTP/1.0 505 Version Not Supported\r\n";
 
 asio::const_buffer toBuffer(Reply::status_type status) {
     switch (status) {
@@ -57,6 +58,8 @@ asio::const_buffer toBuffer(Reply::status_type status) {
             return asio::buffer(bad_gateway);
         case Reply::service_unavailable:
             return asio::buffer(service_unavailable);
+        case Reply::version_not_supported:
+            return asio::buffer(version_not_supported);
         default:
             return asio::buffer(internal_server_error);
     }
@@ -215,6 +218,11 @@ const char service_unavailable[] =
     "<head><title>Service Unavailable</title></head>"
     "<body><h1>503 Service Unavailable</h1></body>"
     "</html>";
+const char version_not_supported[] =
+    "<html>"
+    "<head><title>Version Not Supported</title></head>"
+    "<body><h1>505 Version Not Supported</h1></body>"
+    "</html>";
 
 std::vector<char> toArray(Reply::status_type status) {
     switch (status) {
@@ -254,6 +262,9 @@ std::vector<char> toArray(Reply::status_type status) {
         case Reply::service_unavailable:
             return std::vector<char>(service_unavailable,
                                      service_unavailable + sizeof(service_unavailable));
+        case Reply::version_not_supported:
+            return std::vector<char>(version_not_supported,
+                                     version_not_supported + sizeof(version_not_supported));
         default:
             return std::vector<char>(internal_server_error,
                                      internal_server_error + sizeof(internal_server_error));

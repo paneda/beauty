@@ -141,6 +141,10 @@ RequestParser::result_type RequestParser::consume(Request &req,
         case expecting_newline_1:
             if (input == '\n') {
                 state_ = header_line_start;
+                if (req.httpVersionMajor_ > 1 ||
+                    (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ > 1)) {
+                    return version_not_supported;
+                }
                 // Set default keep-alive based on HTTP version.
                 // Presence of a Connection header may override this later.
                 req.keepAlive_ = (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ > 0);
