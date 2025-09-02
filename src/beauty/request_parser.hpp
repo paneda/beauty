@@ -26,6 +26,8 @@ class RequestParser {
     // Handle the next character of input.
     result_type consume(Request &req, std::vector<char> &content, char input);
 
+    result_type actOnHeaderValueIfNeeded(Request &req, std::vector<char> &content);
+
     // The current state of the parser.
     enum state {
         method_start,

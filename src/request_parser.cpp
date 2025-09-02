@@ -141,6 +141,9 @@ RequestParser::result_type RequestParser::consume(Request &req,
         case expecting_newline_1:
             if (input == '\n') {
                 state_ = header_line_start;
+                // Set default keep-alive based on HTTP version.
+                // Presence of a Connection header may override this later.
+                req.keepAlive_ = (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ > 0);
             } else {
                 return bad;
             }
@@ -190,23 +193,9 @@ RequestParser::result_type RequestParser::consume(Request &req,
             return indeterminate;
         case header_value:
             if (input == '\r') {
-                if (req.method_ == "POST" || req.method_ == "PUT" || req.method_ == "PATCH") {
-                    Header &h = req.headers_.back();
-
-                    if (strcasecmp(h.name_.c_str(), "Content-Length") == 0) {
-                        contentLength_ = atoi(h.value_.c_str());
-                        req.contentLength_ = contentLength_;
-                        contentLength_ = std::min(content.capacity(), contentLength_);
-                    } else if (strcasecmp(h.name_.c_str(), "Transfer-Encoding") == 0) {
-                        if (strcasecmp(h.value_.c_str(), "chunked") == 0) {
-                            if (req.httpVersionMajor_ < 1 ||
-                                (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ < 1)) {
-                                // chunked encoding not supported in HTTP/1.0 or earlier
-                                return bad;
-                            }
-                            return not_implemented;
-                        }
-                    }
+                result_type res = actOnHeaderValueIfNeeded(req, content);
+                if (res != indeterminate) {
+                    return res;
                 }
                 state_ = expecting_newline_2;
             } else if (isCtl(input)) {
@@ -223,25 +212,6 @@ RequestParser::result_type RequestParser::consume(Request &req,
             }
             return indeterminate;
         case expecting_newline_3: {
-            std::vector<Header>::iterator it =
-                std::find_if(req.headers_.begin(), req.headers_.end(), [](const Header &item) {
-                    return strcasecmp(item.name_.c_str(), "Connection") == 0;
-                });
-
-            if (it != req.headers_.end()) {
-                if (strcasecmp(it->value_.c_str(), "Keep-Alive") == 0) {
-                    req.keepAlive_ = true;
-                } else {
-                    req.keepAlive_ = false;
-                }
-            } else {
-                req.keepAlive_ = false;
-                if (req.httpVersionMajor_ > 1 ||
-                    (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ == 1)) {
-                    req.keepAlive_ = true;
-                }
-            }
-
             // start filling up body data
             content.clear();
             if (contentLength_ == 0) {
@@ -267,6 +237,45 @@ RequestParser::result_type RequestParser::consume(Request &req,
         default:
             return bad;
     }
+}
+
+RequestParser::result_type RequestParser::actOnHeaderValueIfNeeded(Request &req,
+                                                                   std::vector<char> &content) {
+    Header &h = req.headers_.back();
+
+    if (req.method_ == "POST" || req.method_ == "PUT" || req.method_ == "PATCH") {
+        if (strcasecmp(h.name_.c_str(), "Content-Length") == 0) {
+            contentLength_ = atoi(h.value_.c_str());
+            req.contentLength_ = contentLength_;
+            contentLength_ = std::min(content.capacity(), contentLength_);
+        } else if (strcasecmp(h.name_.c_str(), "Transfer-Encoding") == 0) {
+            if (strcasecmp(h.value_.c_str(), "chunked") == 0) {
+                if (req.httpVersionMajor_ < 1 ||
+                    (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ < 1)) {
+                    // chunked encoding not supported in HTTP/1.0 or earlier
+                    return bad;
+                }
+                return not_implemented;
+            }
+        }
+    }
+    if (strcasecmp(h.name_.c_str(), "Connection") == 0) {
+        if (req.httpVersionMajor_ < 1) {
+            return bad;  // Connection header not supported in < 1.0
+        }
+        if (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ < 1) {
+            // HTTP/1.0: Keep-Alive must be explicitly specified
+            if (strcasecmp(h.value_.c_str(), "Keep-Alive") == 0) {
+                req.keepAlive_ = true;
+            }
+        } else {
+            // HTTP/1.1+: Keep-Alive is default unless "close" is specified
+            if (strcasecmp(h.value_.c_str(), "close") == 0) {
+                req.keepAlive_ = false;
+            }
+        }
+    }
+    return indeterminate;
 }
 
 }  // namespace beauty
