@@ -48,6 +48,7 @@ TEST_CASE("parse GET request", "[request_parser]") {
         REQUIRE(fixture.request.uri_ == "/uri");
         REQUIRE(fixture.request.httpVersionMajor_ == 0);
         REQUIRE(fixture.request.httpVersionMinor_ == 9);
+        REQUIRE(fixture.request.keepAlive_ == false);
     }
     SECTION("should parse GET HTTP/1.0") {
         const std::string request = "GET /uri HTTP/1.0\r\n\r\n";
@@ -61,6 +62,19 @@ TEST_CASE("parse GET request", "[request_parser]") {
         REQUIRE(fixture.request.httpVersionMinor_ == 0);
         REQUIRE(fixture.request.keepAlive_ == false);
     }
+    SECTION("should parse GET HTTP/1.0 with Connection: Keep-Alive") {
+        const std::string request =
+            "GET /uri HTTP/1.0\r\n"
+            "Connection: Keep-Alive\r\n"
+            "\r\n";
+        auto result = fixture.parse(request);
+        REQUIRE(result == RequestParser::good_complete);
+        REQUIRE(fixture.request.method_ == "GET");
+        REQUIRE(fixture.request.uri_ == "/uri");
+        REQUIRE(fixture.request.httpVersionMajor_ == 1);
+        REQUIRE(fixture.request.httpVersionMinor_ == 0);
+        REQUIRE(fixture.request.keepAlive_ == true);
+    }
     SECTION("should parse GET HTTP/1.1") {
         const std::string request = "GET /uri HTTP/1.1\r\n\r\n";
 
@@ -72,6 +86,19 @@ TEST_CASE("parse GET request", "[request_parser]") {
         REQUIRE(fixture.request.httpVersionMajor_ == 1);
         REQUIRE(fixture.request.httpVersionMinor_ == 1);
         REQUIRE(fixture.request.keepAlive_);
+    }
+    SECTION("should parse GET HTTP/1.1 with Connection: close") {
+        const std::string request =
+            "GET /uri HTTP/1.1\r\n"
+            "Connection: close\r\n"
+            "\r\n";
+        auto result = fixture.parse(request);
+        REQUIRE(result == RequestParser::good_complete);
+        REQUIRE(fixture.request.method_ == "GET");
+        REQUIRE(fixture.request.uri_ == "/uri");
+        REQUIRE(fixture.request.httpVersionMajor_ == 1);
+        REQUIRE(fixture.request.httpVersionMinor_ == 1);
+        REQUIRE(fixture.request.keepAlive_ == false);
     }
     SECTION("should parse uri with query params") {
         const std::string request = "GET /uri?arg1=test&arg1=%20%21&arg3=test\r\n\r\n";
@@ -211,4 +238,49 @@ TEST_CASE("parse POST request partially", "[request_parser]") {
     REQUIRE(fixture.content_ == expectedContent);
     REQUIRE(fixture.request.getNoInitialBodyBytesReceived() == expectedContent.size());
     REQUIRE(fixture.request.body_ == expectedContent);
+}
+
+TEST_CASE("parse invalid request", "[request_parser]") {
+    RequestFixture fixture(1024);
+    SECTION("should return bad for invalid method") {
+        const std::string request = "GE T /uri HTTP/1.1\r\n\r\n";
+
+        auto result = fixture.parse(request);
+
+        REQUIRE(result == RequestParser::bad);
+    }
+    SECTION("should return bad for invalid uri") {
+        const std::string request = "GET /ur i HTTP/1.1\r\n\r\n";
+
+        auto result = fixture.parse(request);
+
+        REQUIRE(result == RequestParser::bad);
+    }
+    SECTION("should return bad for invalid http version") {
+        const std::string request = "GET /uri HTTX/1.1\r\n\r\n";
+
+        auto result = fixture.parse(request);
+
+        REQUIRE(result == RequestParser::bad);
+    }
+    SECTION("should return bad for invalid header line") {
+        const std::string request =
+            "GET /uri HTTP/1.1\r\n"
+            "Invalid-Header-Line\r\n"
+            "\r\n";
+
+        auto result = fixture.parse(request);
+
+        REQUIRE(result == RequestParser::bad);
+    }
+    SECTION("should return bad for empty header name") {
+        const std::string request =
+            "GET /uri HTTP/1.1\r\n"
+            ": no-name\r\n"
+            "\r\n";
+
+        auto result = fixture.parse(request);
+
+        REQUIRE(result == RequestParser::bad);
+    }
 }
