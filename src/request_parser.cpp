@@ -264,9 +264,6 @@ RequestParser::result_type RequestParser::actOnHeaderValueIfNeeded(Request &req,
         }
     }
     if (strcasecmp(h.name_.c_str(), "Connection") == 0) {
-        if (req.httpVersionMajor_ < 1) {
-            return bad;  // Connection header not supported in < 1.0
-        }
         if (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ < 1) {
             // HTTP/1.0: Keep-Alive must be explicitly specified
             if (strcasecmp(h.value_.c_str(), "Keep-Alive") == 0) {
