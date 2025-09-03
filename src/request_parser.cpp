@@ -57,10 +57,6 @@ RequestParser::result_type RequestParser::consume(Request &req,
         case uri:
             if (input == ' ') {
                 state_ = http_version_h;
-            } else if (input == '\r') {
-                req.httpVersionMajor_ = 0;
-                req.httpVersionMinor_ = 9;
-                return good_complete;
             } else if (isCtl(input)) {
                 return bad;
             } else {
