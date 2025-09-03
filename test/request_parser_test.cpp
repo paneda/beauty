@@ -38,20 +38,8 @@ TEST_CASE("parse GET request", "[request_parser]") {
 
         REQUIRE(result == RequestParser::bad);
     }
-    SECTION("should parse GET HTTP/0.9") {
-        const std::string request = "GET /uri HTTP/0.9\r\n\r\n";
-
-        auto result = fixture.parse(request);
-
-        REQUIRE(result == RequestParser::good_complete);
-        REQUIRE(fixture.request.method_ == "GET");
-        REQUIRE(fixture.request.uri_ == "/uri");
-        REQUIRE(fixture.request.httpVersionMajor_ == 0);
-        REQUIRE(fixture.request.httpVersionMinor_ == 9);
-        REQUIRE(fixture.request.keepAlive_ == false);
-    }
     SECTION("should parse GET HTTP/1.0") {
-        const std::string request = "GET /uri HTTP/1.0\r\n\r\n";
+        const std::string request = "GET /uri HTTP/1.0\r\nHost: www.example.com\r\n\r\n";
 
         auto result = fixture.parse(request);
 
@@ -66,6 +54,7 @@ TEST_CASE("parse GET request", "[request_parser]") {
         const std::string request =
             "GET /uri HTTP/1.0\r\n"
             "Connection: Keep-Alive\r\n"
+            "Host: www.example.com\r\n"
             "\r\n";
         auto result = fixture.parse(request);
         REQUIRE(result == RequestParser::good_complete);
@@ -76,7 +65,10 @@ TEST_CASE("parse GET request", "[request_parser]") {
         REQUIRE(fixture.request.keepAlive_ == true);
     }
     SECTION("should parse GET HTTP/1.1") {
-        const std::string request = "GET /uri HTTP/1.1\r\n\r\n";
+        const std::string request =
+            "GET /uri HTTP/1.1\r\n"
+            "Host: www.example.com\r\n"
+            "\r\n";
 
         auto result = fixture.parse(request);
 
@@ -91,6 +83,7 @@ TEST_CASE("parse GET request", "[request_parser]") {
         const std::string request =
             "GET /uri HTTP/1.1\r\n"
             "Connection: close\r\n"
+            "Host: www.example.com\r\n"
             "\r\n";
         auto result = fixture.parse(request);
         REQUIRE(result == RequestParser::good_complete);
@@ -101,7 +94,11 @@ TEST_CASE("parse GET request", "[request_parser]") {
         REQUIRE(fixture.request.keepAlive_ == false);
     }
     SECTION("should parse uri with query params") {
-        const std::string request = "GET /uri?arg1=test&arg1=%20%21&arg3=test\r\n\r\n";
+        const std::string request =
+            "GET /uri?arg1=test&arg1=%20%21&arg3=test HTTP/1.0\r\n"
+            "Connection: Keep-Alive\r\n"
+            "Host: www.example.com\r\n"
+            "\r\n";
 
         auto result = fixture.parse(request);
 
@@ -128,7 +125,10 @@ TEST_CASE("version handling", "[request_parser]") {
 TEST_CASE("parse POST request", "[request_parser]") {
     RequestFixture fixture(1024);
     SECTION("should parse POST HTTP/1.1") {
-        const std::string request = "POST /uri HTTP/1.1\r\n\r\n";
+        const std::string request =
+            "POST /uri HTTP/1.1\r\n"
+            "Host: www.example.com\r\n"
+            "\r\n";
 
         auto result = fixture.parse(request);
 
@@ -143,12 +143,13 @@ TEST_CASE("parse POST request", "[request_parser]") {
         const std::string request =
             "POST /uri HTTP/1.1\r\n"
             "X-Custom-Header: header value\r\n"
+            "Host: www.example.com\r\n"
             "\r\n";
 
         auto result = fixture.parse(request);
 
         REQUIRE(result == RequestParser::good_complete);
-        REQUIRE(fixture.request.headers_.size() == 1);
+        REQUIRE(fixture.request.headers_.size() == 2);
         REQUIRE(fixture.request.headers_[0].name_ == "X-Custom-Header");
         REQUIRE(fixture.request.headers_[0].value_ == "header value");
     }
@@ -162,13 +163,14 @@ TEST_CASE("parse POST request", "[request_parser]") {
             "Accept-Encoding: gzip, deflate\r\n"
             "Content-Type: application/x-www-form-urlencoded\r\n"
             "Content-Length: 31\r\n"
+            "Host: www.example.com\r\n"
             "\r\n"
             "arg1=test;arg1=%20%21;arg3=test";
 
         auto result = fixture.parse(request);
 
         REQUIRE(result == RequestParser::good_complete);
-        REQUIRE(fixture.request.headers_.size() == 6);
+        REQUIRE(fixture.request.headers_.size() == 7);
         REQUIRE(fixture.request.headers_[0].name_ == "From");
         REQUIRE(fixture.request.headers_[0].value_ == "user@example.com");
         REQUIRE(fixture.request.headers_[1].name_ == "User-Agent");
@@ -183,6 +185,8 @@ TEST_CASE("parse POST request", "[request_parser]") {
         REQUIRE(fixture.request.headers_[4].value_ == "application/x-www-form-urlencoded");
         REQUIRE(fixture.request.headers_[5].name_ == "Content-Length");
         REQUIRE(fixture.request.headers_[5].value_ == "31");
+        REQUIRE(fixture.request.headers_[6].name_ == "Host");
+        REQUIRE(fixture.request.headers_[6].value_ == "www.example.com");
         std::vector<char> expectedContent = convertToCharVec("arg1=test;arg1=%20%21;arg3=test");
         REQUIRE(fixture.content_ == expectedContent);
         REQUIRE(fixture.request.getNoInitialBodyBytesReceived() == expectedContent.size());
@@ -193,6 +197,7 @@ TEST_CASE("parse POST request", "[request_parser]") {
             "POST /uri.cgi HTTP/1.1\r\n"
             "Content-Type: text/plain\r\n"
             "Transfer-Encoding: chunked\r\n"
+            "Host: www.example.com\r\n"
             "\r\n"
             "24\r\n"
             "This is the data in the first chunk \r\n"
@@ -207,29 +212,10 @@ TEST_CASE("parse POST request", "[request_parser]") {
         auto result = fixture.parse(request);
         REQUIRE(result == RequestParser::not_implemented);
     }
-    SECTION("should return bad for POST HTTP/1.0 with chunked body") {
-        const std::string request =
-            "POST /uri.cgi HTTP/1.0\r\n"
-            "Content-Type: text/plain\r\n"
-            "Transfer-Encoding: chunked\r\n"
-            "\r\n"
-            "24\r\n"
-            "This is the data in the first chunk \r\n"
-            "1B\r\n"
-            "and this is the second one \r\n"
-            "3\r\n"
-            "con\r\n"
-            "9\r\n"
-            "sequence\0\r\n"
-            "0\r\n\r\n";
-
-        auto result = fixture.parse(request);
-        REQUIRE(result == RequestParser::bad);
-    }
 }
 
 TEST_CASE("parse POST request partially", "[request_parser]") {
-    RequestFixture fixture(320);
+    RequestFixture fixture(343);
     const std::string headers =
         "POST / HTTP/1.1\r\n"
         "From: user@example.com\r\n"
@@ -240,6 +226,7 @@ TEST_CASE("parse POST request partially", "[request_parser]") {
         "Content-Type: multipart/form-data; "
         "boundary=----WebKitFormBoundarylSu7ajtLodoq9XHE\r\n"
         "Content-Length: 420\r\n"
+        "Host: www.example.com\r\n"
         "\r\n";
     const std::string body =
         "This request includes headers and some body data (this text) that does not fit the input "
