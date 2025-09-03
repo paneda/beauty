@@ -19,7 +19,7 @@ class RequestParser {
         good_complete,
         good_part,
         bad,
-        not_implemented,
+        missing_content_length,
         version_not_supported,
         indeterminate
     };
@@ -33,7 +33,8 @@ class RequestParser {
     // Handle the next character of input.
     result_type consume(Request &req, std::vector<char> &content, char input);
 
-    result_type actOnHeaderValueIfNeeded(Request &req, std::vector<char> &content);
+    void storeHeaderValueIfNeeded(Request &req, std::vector<char> &content);
+    result_type checkRequestAfterAllHeaders(Request &req);
 
     // The current state of the parser.
     enum state {

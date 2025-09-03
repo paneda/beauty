@@ -18,6 +18,7 @@ const std::string bad_request = "HTTP/1.1 400 Bad Request\r\n";
 const std::string unauthorized = "HTTP/1.1 401 Unauthorized\r\n";
 const std::string forbidden = "HTTP/1.1 403 Forbidden\r\n";
 const std::string not_found = "HTTP/1.1 404 Not Found\r\n";
+const std::string length_required = "HTTP/1.1 411 Length Required\r\n";
 const std::string internal_server_error = "HTTP/1.1 500 Internal Server Error\r\n";
 const std::string not_implemented = "HTTP/1.1 501 Not Implemented\r\n";
 const std::string bad_gateway = "HTTP/1.1 502 Bad Gateway\r\n";
@@ -50,6 +51,8 @@ asio::const_buffer toBuffer(Reply::status_type status) {
             return asio::buffer(forbidden);
         case Reply::not_found:
             return asio::buffer(not_found);
+        case Reply::length_required:
+            return asio::buffer(length_required);
         case Reply::internal_server_error:
             return asio::buffer(internal_server_error);
         case Reply::not_implemented:
@@ -198,6 +201,11 @@ const char not_found[] =
     "<head><title>Not Found</title></head>"
     "<body><h1>404 Not Found</h1></body>"
     "</html>";
+const char length_required[] =
+    "<html>"
+    "<head><title>Length required</title></head>"
+    "<body><h1>411 Length Required</h1></body>"
+    "</html>";
 const char internal_server_error[] =
     "<html>"
     "<head><title>Internal Server Error</title></head>"
@@ -252,6 +260,8 @@ std::vector<char> toArray(Reply::status_type status) {
             return std::vector<char>(forbidden, forbidden + sizeof(forbidden));
         case Reply::not_found:
             return std::vector<char>(not_found, not_found + sizeof(not_found));
+        case Reply::length_required:
+            return std::vector<char>(length_required, length_required + sizeof(length_required));
         case Reply::internal_server_error:
             return std::vector<char>(internal_server_error,
                                      internal_server_error + sizeof(internal_server_error));

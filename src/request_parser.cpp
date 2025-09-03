@@ -193,10 +193,7 @@ RequestParser::result_type RequestParser::consume(Request &req,
             return indeterminate;
         case header_value:
             if (input == '\r') {
-                result_type res = actOnHeaderValueIfNeeded(req, content);
-                if (res != indeterminate) {
-                    return res;
-                }
+                storeHeaderValueIfNeeded(req, content);
                 state_ = expecting_newline_2;
             } else if (isCtl(input)) {
                 return bad;
@@ -212,6 +209,10 @@ RequestParser::result_type RequestParser::consume(Request &req,
             }
             return indeterminate;
         case expecting_newline_3: {
+            result_type res = checkRequestAfterAllHeaders(req);
+            if (res != indeterminate) {
+                return res;
+            }
             // start filling up body data
             content.clear();
             if (contentLength_ == 0) {
@@ -239,8 +240,7 @@ RequestParser::result_type RequestParser::consume(Request &req,
     }
 }
 
-RequestParser::result_type RequestParser::actOnHeaderValueIfNeeded(Request &req,
-                                                                   std::vector<char> &content) {
+void RequestParser::storeHeaderValueIfNeeded(Request &req, std::vector<char> &content) {
     Header &h = req.headers_.back();
 
     if (req.method_ == "POST" || req.method_ == "PUT" || req.method_ == "PATCH") {
@@ -250,12 +250,7 @@ RequestParser::result_type RequestParser::actOnHeaderValueIfNeeded(Request &req,
             contentLength_ = std::min(content.capacity(), contentLength_);
         } else if (strcasecmp(h.name_.c_str(), "Transfer-Encoding") == 0) {
             if (strcasecmp(h.value_.c_str(), "chunked") == 0) {
-                if (req.httpVersionMajor_ < 1 ||
-                    (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ < 1)) {
-                    // chunked encoding not supported in HTTP/1.0 or earlier
-                    return bad;
-                }
-                return not_implemented;
+                req.isChunked_ = true;
             }
         }
     }
@@ -270,6 +265,18 @@ RequestParser::result_type RequestParser::actOnHeaderValueIfNeeded(Request &req,
             if (strcasecmp(h.value_.c_str(), "close") == 0) {
                 req.keepAlive_ = false;
             }
+        }
+    }
+}
+
+RequestParser::result_type RequestParser::checkRequestAfterAllHeaders(Request &req) {
+    if ((req.method_ == "POST" || req.method_ == "PUT" || req.method_ == "PATCH")) {
+        if (req.isChunked_) {
+            // setting Transfer-Encoding: chunked and Content-Length is invalid
+            return req.contentLength_ == std::numeric_limits<size_t>::max() ? missing_content_length
+                                                                            : bad;
+        } else if (req.contentLength_ == std::numeric_limits<size_t>::max()) {
+            return missing_content_length;
         }
     }
     return indeterminate;

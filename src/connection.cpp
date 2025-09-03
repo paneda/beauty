@@ -77,8 +77,8 @@ void Connection::doRead() {
                         reply_.stockReply(Reply::bad_request);
                         doWriteHeaders();
                     }
-                } else if (result == RequestParser::not_implemented) {
-                    reply_.stockReply(Reply::not_implemented);
+                } else if (result == RequestParser::missing_content_length) {
+                    reply_.stockReply(Reply::length_required);
                     doWriteHeaders();
                 } else if (result == RequestParser::version_not_supported) {
                     reply_.stockReply(Reply::status_type::version_not_supported);
@@ -127,13 +127,15 @@ void Connection::doReadBody() {
                 unsigned multiPartCounter = reply_.multiPartCounter_;
 
                 requestHandler_.handlePartialWrite(connectionId_, request_, buffer_, reply_);
-                if (reply_.noBodyBytesReceived_ < request_.contentLength_) {
-                    if (multiPartCounter != reply_.multiPartCounter_) {
-                        doWritePartAck();
-                    } else {
-                        doReadBody();
+                if (request_.contentLength_ != std::numeric_limits<size_t>::max() &&
+                    reply_.noBodyBytesReceived_ < request_.contentLength_) {
+                        if (multiPartCounter != reply_.multiPartCounter_) {
+                            doWritePartAck();
+                        } else {
+                            doReadBody();
+                        }
                     }
-                } else {
+                else {
                     doWriteHeaders();
                 }
             } else if (ec != asio::error::operation_aborted) {

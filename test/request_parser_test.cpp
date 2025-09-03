@@ -128,6 +128,7 @@ TEST_CASE("parse POST request", "[request_parser]") {
         const std::string request =
             "POST /uri HTTP/1.1\r\n"
             "Host: www.example.com\r\n"
+            "Content-Length: 0\r\n"
             "\r\n";
 
         auto result = fixture.parse(request);
@@ -144,12 +145,13 @@ TEST_CASE("parse POST request", "[request_parser]") {
             "POST /uri HTTP/1.1\r\n"
             "X-Custom-Header: header value\r\n"
             "Host: www.example.com\r\n"
+            "Content-Length: 0\r\n"
             "\r\n";
 
         auto result = fixture.parse(request);
 
         REQUIRE(result == RequestParser::good_complete);
-        REQUIRE(fixture.request.headers_.size() == 2);
+        REQUIRE(fixture.request.headers_.size() == 3);
         REQUIRE(fixture.request.headers_[0].name_ == "X-Custom-Header");
         REQUIRE(fixture.request.headers_[0].value_ == "header value");
     }
@@ -192,7 +194,24 @@ TEST_CASE("parse POST request", "[request_parser]") {
         REQUIRE(fixture.request.getNoInitialBodyBytesReceived() == expectedContent.size());
         REQUIRE(fixture.request.body_ == expectedContent);
     }
-    SECTION("should return not implemented for POST HTTP/1.1 with chunked body") {
+    SECTION("should return missing_content_length POST HTTP/1.1 without Content-Length") {
+        const std::string request =
+            "POST /uri.cgi HTTP/1.1\r\n"
+            "From: user@example.com\r\n"
+            "User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:18.0) Gecko/20100101 "
+            "Firefox/18.0\r\n"
+            "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
+            "Accept-Encoding: gzip, deflate\r\n"
+            "Content-Type: application/x-www-form-urlencoded\r\n"
+            "Host: www.example.com\r\n"
+            "\r\n"
+            "arg1=test;arg1=%20%21;arg3=test";
+
+        auto result = fixture.parse(request);
+
+        REQUIRE(result == RequestParser::missing_content_length);
+    }
+    SECTION("should return missing_content_length for POST HTTP/1.1 with chunked body") {
         const std::string request =
             "POST /uri.cgi HTTP/1.1\r\n"
             "Content-Type: text/plain\r\n"
@@ -210,7 +229,28 @@ TEST_CASE("parse POST request", "[request_parser]") {
             "0\r\n\r\n";
 
         auto result = fixture.parse(request);
-        REQUIRE(result == RequestParser::not_implemented);
+        REQUIRE(result == RequestParser::missing_content_length);
+    }
+    SECTION("should return bad POST HTTP/1.1 with chunked body and Content-Length") {
+        const std::string request =
+            "POST /uri.cgi HTTP/1.1\r\n"
+            "Content-Type: text/plain\r\n"
+            "Transfer-Encoding: chunked\r\n"
+            "Host: www.example.com\r\n"
+            "Content-Length: 100\r\n"
+            "\r\n"
+            "24\r\n"
+            "This is the data in the first chunk \r\n"
+            "1B\r\n"
+            "and this is the second one \r\n"
+            "3\r\n"
+            "con\r\n"
+            "9\r\n"
+            "sequence\0\r\n"
+            "0\r\n\r\n";
+
+        auto result = fixture.parse(request);
+        REQUIRE(result == RequestParser::bad);
     }
 }
 
