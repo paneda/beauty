@@ -15,7 +15,14 @@ class RequestParser {
     void reset();
 
     // Result of parse.
-    enum result_type { good_complete, good_part, bad, indeterminate };
+    enum result_type {
+        good_complete,
+        good_part,
+        bad,
+        missing_content_length,
+        version_not_supported,
+        indeterminate
+    };
 
     // Parse some data. The enum return value is good when a complete request
     // has been parsed, bad if the data is invalid, good_part when more
@@ -25,6 +32,9 @@ class RequestParser {
    private:
     // Handle the next character of input.
     result_type consume(Request &req, std::vector<char> &content, char input);
+
+    void storeHeaderValueIfNeeded(Request &req, std::vector<char> &content);
+    result_type checkRequestAfterAllHeaders(Request &req);
 
     // The current state of the parser.
     enum state {

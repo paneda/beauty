@@ -57,10 +57,6 @@ RequestParser::result_type RequestParser::consume(Request &req,
         case uri:
             if (input == ' ') {
                 state_ = http_version_h;
-            } else if (input == '\r') {
-                req.httpVersionMajor_ = 0;
-                req.httpVersionMinor_ = 9;
-                return good_complete;
             } else if (isCtl(input)) {
                 return bad;
             } else {
@@ -141,6 +137,13 @@ RequestParser::result_type RequestParser::consume(Request &req,
         case expecting_newline_1:
             if (input == '\n') {
                 state_ = header_line_start;
+                if (req.httpVersionMajor_ > 1 ||
+                    (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ > 1)) {
+                    return version_not_supported;
+                }
+                // Set default keep-alive based on HTTP version.
+                // Presence of a Connection header may override this later.
+                req.keepAlive_ = (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ > 0);
             } else {
                 return bad;
             }
@@ -190,19 +193,7 @@ RequestParser::result_type RequestParser::consume(Request &req,
             return indeterminate;
         case header_value:
             if (input == '\r') {
-                if (req.method_ == "POST" || req.method_ == "PUT" || req.method_ == "PATCH") {
-                    Header &h = req.headers_.back();
-
-                    if (strcasecmp(h.name_.c_str(), "Content-Length") == 0) {
-                        contentLength_ = atoi(h.value_.c_str());
-                        req.contentLength_ = contentLength_;
-                        contentLength_ = std::min(content.capacity(), contentLength_);
-                    } else if (strcasecmp(h.name_.c_str(), "Transfer-Encoding") == 0) {
-                        if (strcasecmp(h.value_.c_str(), "chunked") == 0) {
-                            return bad;
-                        }
-                    }
-                }
+                storeHeaderValueIfNeeded(req, content);
                 state_ = expecting_newline_2;
             } else if (isCtl(input)) {
                 return bad;
@@ -218,25 +209,10 @@ RequestParser::result_type RequestParser::consume(Request &req,
             }
             return indeterminate;
         case expecting_newline_3: {
-            std::vector<Header>::iterator it =
-                std::find_if(req.headers_.begin(), req.headers_.end(), [](const Header &item) {
-                    return strcasecmp(item.name_.c_str(), "Connection") == 0;
-                });
-
-            if (it != req.headers_.end()) {
-                if (strcasecmp(it->value_.c_str(), "Keep-Alive") == 0) {
-                    req.keepAlive_ = true;
-                } else {
-                    req.keepAlive_ = false;
-                }
-            } else {
-                req.keepAlive_ = false;
-                if (req.httpVersionMajor_ > 1 ||
-                    (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ == 1)) {
-                    req.keepAlive_ = true;
-                }
+            result_type res = checkRequestAfterAllHeaders(req);
+            if (res != indeterminate) {
+                return res;
             }
-
             // start filling up body data
             content.clear();
             if (contentLength_ == 0) {
@@ -262,6 +238,48 @@ RequestParser::result_type RequestParser::consume(Request &req,
         default:
             return bad;
     }
+}
+
+void RequestParser::storeHeaderValueIfNeeded(Request &req, std::vector<char> &content) {
+    Header &h = req.headers_.back();
+
+    if (req.method_ == "POST" || req.method_ == "PUT" || req.method_ == "PATCH") {
+        if (strcasecmp(h.name_.c_str(), "Content-Length") == 0) {
+            contentLength_ = atoi(h.value_.c_str());
+            req.contentLength_ = contentLength_;
+            contentLength_ = std::min(content.capacity(), contentLength_);
+        } else if (strcasecmp(h.name_.c_str(), "Transfer-Encoding") == 0) {
+            if (strcasecmp(h.value_.c_str(), "chunked") == 0) {
+                req.isChunked_ = true;
+            }
+        }
+    }
+    if (strcasecmp(h.name_.c_str(), "Connection") == 0) {
+        if (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ < 1) {
+            // HTTP/1.0: Keep-Alive must be explicitly specified
+            if (strcasecmp(h.value_.c_str(), "Keep-Alive") == 0) {
+                req.keepAlive_ = true;
+            }
+        } else {
+            // HTTP/1.1+: Keep-Alive is default unless "close" is specified
+            if (strcasecmp(h.value_.c_str(), "close") == 0) {
+                req.keepAlive_ = false;
+            }
+        }
+    }
+}
+
+RequestParser::result_type RequestParser::checkRequestAfterAllHeaders(Request &req) {
+    if ((req.method_ == "POST" || req.method_ == "PUT" || req.method_ == "PATCH")) {
+        if (req.isChunked_) {
+            // setting Transfer-Encoding: chunked and Content-Length is invalid
+            return req.contentLength_ == std::numeric_limits<size_t>::max() ? missing_content_length
+                                                                            : bad;
+        } else if (req.contentLength_ == std::numeric_limits<size_t>::max()) {
+            return missing_content_length;
+        }
+    }
+    return indeterminate;
 }
 
 }  // namespace beauty

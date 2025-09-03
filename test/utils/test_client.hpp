@@ -60,6 +60,7 @@ class TestClient {
         std::deque<std::string> headers_;
         std::vector<char> content_;
         int statusCode_;
+        std::string httpVersion_;
     };
 
     TestResult getResult(size_t expectedContentLength) {
@@ -129,6 +130,7 @@ class TestClient {
 
             testResult_.action_ = TestResult::ReadRequestStatus;
             gotResult_.notify_one();
+            testResult_.httpVersion_ = httpVersion;
             testResult_.statusCode_ = statusCode;
 
             if (!responseStream) {
