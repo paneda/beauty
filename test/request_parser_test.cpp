@@ -111,6 +111,20 @@ TEST_CASE("parse GET request", "[request_parser]") {
     }
 }
 
+TEST_CASE("version handling", "[request_parser]") {
+    RequestFixture fixture(1024);
+
+    SECTION("should respond with 505, version not supported, for higher version requests") {
+        const std::string request =
+            "GET /uri HTTP/2.0\r\n"
+            "\r\n";
+
+        auto result = fixture.parse(request);
+
+        REQUIRE(result == RequestParser::version_not_supported);
+    }
+}
+
 TEST_CASE("parse POST request", "[request_parser]") {
     RequestFixture fixture(1024);
     SECTION("should parse POST HTTP/1.1") {

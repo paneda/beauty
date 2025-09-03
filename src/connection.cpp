@@ -80,6 +80,9 @@ void Connection::doRead() {
                 } else if (result == RequestParser::not_implemented) {
                     reply_.stockReply(Reply::not_implemented);
                     doWriteHeaders();
+                } else if (result == RequestParser::version_not_supported) {
+                    reply_.stockReply(Reply::status_type::version_not_supported);
+                    doWriteHeaders();
                 } else if (result == RequestParser::bad) {
                     reply_.stockReply(Reply::bad_request);
                     doWriteHeaders();
