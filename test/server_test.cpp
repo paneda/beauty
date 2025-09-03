@@ -129,6 +129,14 @@ TEST_CASE("server without handlers", "[server]") {
         REQUIRE(res.action_ == TestClient::TestResult::ReadRequestStatus);
         REQUIRE(res.statusCode_ == 501);
     }
+    SECTION("it should return version HTTP/1.1") {
+        openConnection(c, "127.0.0.1", port);
+        auto fut = createFutureResult(c);
+        c.sendRequest(GetIndexRequest);
+        auto res = fut.get();
+        REQUIRE(res.action_ == TestClient::TestResult::ReadRequestStatus);
+        REQUIRE(res.httpVersion_ == "HTTP/1.1");
+    }
     ioc.stop();
     t.join();
 }
