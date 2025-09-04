@@ -23,6 +23,18 @@ void RequestHandler::setFileNotFoundHandler(const handlerCallback &cb) {
     fileNotFoundCb_ = cb;
 }
 
+void RequestHandler::setExpectContinueHandler(const expectContinueCallback &cb) {
+    expectContinueCb_ = cb;
+}
+
+bool RequestHandler::shouldContinueAfterHeaders(unsigned connectionId, const Request &req) {
+    if (expectContinueCb_) {
+        return expectContinueCb_(connectionId, req);
+    }
+    // Default behavior: approve 100-continue for all requests
+    return true;
+}
+
 void RequestHandler::handleRequest(unsigned connectionId,
                                    const Request &req,
                                    std::vector<char> &content,

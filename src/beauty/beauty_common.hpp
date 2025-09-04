@@ -11,6 +11,8 @@ namespace beauty {
 
 using handlerCallback = std::function<void(const Request &req, Reply &rep)>;
 
+using expectContinueCallback = std::function<bool(unsigned connectionId, const Request &req)>;
+
 using debugMsgCallback = std::function<void(const std::string &msg)>;
 
 struct HttpPersistence {

@@ -22,6 +22,9 @@ class RequestHandler {
     // Handlers to be optionally implemented.
     void addRequestHandler(const handlerCallback &cb);
     void setFileNotFoundHandler(const handlerCallback &cb);
+    void setExpectContinueHandler(const expectContinueCallback &cb);
+
+    bool shouldContinueAfterHeaders(unsigned connectionId, const Request &req);
 
     void handleRequest(unsigned connectionId,
                        const Request &req,
@@ -50,6 +53,9 @@ class RequestHandler {
 
     // Callback to handle post file access, e.g. a custom not found handler.
     handlerCallback fileNotFoundCb_;
+
+    // Callback to handle Expect: 100-continue requests
+    expectContinueCallback expectContinueCb_;
 };
 
 }  // namespace beauty
