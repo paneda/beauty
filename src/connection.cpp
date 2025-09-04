@@ -61,23 +61,23 @@ void Connection::doRead() {
                         requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
                         doWriteHeaders();
                     } else {
-						reply_.addHeader("Connection", "close");
+                        reply_.addHeader("Connection", "close");
                         reply_.stockReply(Reply::bad_request);
                         doWriteHeaders();
                     }
                 } else if (result == RequestParser::good_headers_expect_continue) {
                     if (requestDecoder_.decodeRequest(request_, buffer_)) {
                         // Check if the application wants to continue with this request
-						requestHandler_.shouldContinueAfterHeaders(request_, reply_);
+                        requestHandler_.shouldContinueAfterHeaders(request_, reply_);
                         if (reply_.status_ == Reply::status_type::ok) {
                             doWrite100Continue();
                         } else {
                             // Application rejected the request, send its reply
-							reply_.addHeader("Connection", "close");
+                            reply_.addHeader("Connection", "close");
                             doWriteHeaders();
                         }
                     } else {
-						reply_.addHeader("Connection", "close");
+                        reply_.addHeader("Connection", "close");
                         reply_.stockReply(Reply::bad_request);
                         doWriteHeaders();
                     }
@@ -91,20 +91,20 @@ void Connection::doRead() {
                             doReadBody();
                         }
                     } else {
-						reply_.addHeader("Connection", "close");
+                        reply_.addHeader("Connection", "close");
                         reply_.stockReply(Reply::bad_request);
                         doWriteHeaders();
                     }
                 } else if (result == RequestParser::missing_content_length) {
-					reply_.addHeader("Connection", "close");
+                    reply_.addHeader("Connection", "close");
                     reply_.stockReply(Reply::length_required);
                     doWriteHeaders();
                 } else if (result == RequestParser::version_not_supported) {
-					reply_.addHeader("Connection", "close");
+                    reply_.addHeader("Connection", "close");
                     reply_.stockReply(Reply::status_type::version_not_supported);
                     doWriteHeaders();
                 } else if (result == RequestParser::bad) {
-					reply_.addHeader("Connection", "close");
+                    reply_.addHeader("Connection", "close");
                     reply_.stockReply(Reply::bad_request);
                     doWriteHeaders();
                 } else {
@@ -262,18 +262,19 @@ void Connection::doReadBodyAfter100Continue() {
             if (!ec) {
                 lastReceivedTime_ = std::chrono::steady_clock::now();
                 buffer_.resize(bytesTransferred);
-				reply_.noBodyBytesReceived_ += bytesTransferred;
+                reply_.noBodyBytesReceived_ += bytesTransferred;
 
                 if (reply_.noBodyBytesReceived_ < request_.contentLength_) {
-					// Corresponds to the "good_part" handling in doRead()
-					requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
-					if (reply_.isMultiPart_) {
-						doWritePartAck();
-					} else {
-						doReadBody();
-					}
+                    // Body is incomplete, set up like good_part case and continue with normal
+                    // doReadBody()
+                    requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
+                    if (reply_.isMultiPart_) {
+                        doWritePartAck();
+                    } else {
+                        doReadBody();  // Use normal body reading from here on
+                    }
                 } else {
-                    // Body complete, now process the full request
+                    // Body complete in one read - handle like good_complete case
                     requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
                     doWriteHeaders();
                 }
