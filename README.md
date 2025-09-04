@@ -1,22 +1,23 @@
 # Beauty
 Beauty is a web server designed for constrained environments. In particular it
-was developed to run on an ESP32.
-However it will run in any environment supporting asio (non-boost).
+was developed to run on ESP32 that provide Asio support.
+However it will run in any environment that supports Asio (non-boost).
 
 It is insipired by Express.js in that it executes a stack of middlewares that
 are executed in added order. See examples.
 
 Its main properties:
-* Supports HTTP 1.1 (configurable support for keep-alive connections)
+* Supports HTTP/1.1 (configurable support for persistent connections)
 * Multi-part file upload
+* 100-continue support
 * Adaptable to any file system (e.g. LittleFs on ESP32 or std::fstream)
 * Fast, asynchronous and lock-free implementation
-* Low heap memory requirement (configurable support of buffer sizes)
+* Low and predictable heap memory requirement (configurable support of buffer sizes)
 * No ESP-IDF/Arduino dependencies, i.e. the web application can be mocked and
   tested on PC during development
 
 # Dependencies
-* asio (non-boost)
+* Asio (non-boost)
 * c++11
 
 # Usage
@@ -39,7 +40,7 @@ Beauty can be used in both PlatformIO/Arduino and ESP-IDF development frameworks
 Check documentation in respective framework how to add external libraries.
 
 As asio::io_context::run() is blocking, the code below uses a RTOS thread as
-its probably the best fit for most applications. However if nothing else
+this is probably the best fit for most applications. However if nothing else
 needs to run in loop(), the RTOS thread can be omitted and the code below can
 be simplified to the "standard" Arduino setup() and loop() concept.
 
@@ -137,7 +138,7 @@ The definitions of `handlerCallback` and `debugMsgCallback` can be found in src/
 ## HTTP persistence options
 Beauty support HTTP/1.1 using Keep-Alive connections.
 The advantage of Keep-Alive connections is faster response time and avoid
-unnecessary re-allocation of buffers for repeated request/response cycles with
+unnecessary re-allocation of buffers for repeated request/response cycles from
 the same clients.
 The drawback is of coarse that memory may be used up more rapidly when serving
 many clients. The `connectionLimit` may serve as a trade-off to achieve both
@@ -202,10 +203,55 @@ The following methods are provided:
 |`void send(status_type, string contentType, char* data, size_t size)`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  |Use when pointing to memory holding the response body data.<br>**Note.** If combined with `addHeader()`, the contentType argument do add the `Content-Type` header. |
 |`void stockReply(status_code)`|Replies with a stock body for the status_code. |
 
-## HttpResult (optional)
-As the request and reply classes store data in `std::vector<char>` it becomes a bit hard to manipulate their data as e.g. JSON documents. Therefore, the HttpResult class provides a convenient way to do so.
 
-For high portability, HttpResult uses cJSON, so cJSON needs to be imported to your project. If you have a different preferred JSON library, you may use HttpResult as inspiration.
+## HTTP/1.1 100-continue Support
+The 100-continue mechanism allows HTTP clients to send request headers first,
+wait for server approval (100 Continue response), and only then send the
+potentially large request body. This is particularly useful for:
+
+- Authentication/authorization validation before accepting large uploads
+- Content-Type validation
+- Content-Length limits checking
+- Bandwidth optimization by avoiding unnecessary data transfer
+
+Beauty supports 100-continue as described in RFC 7231, section 5.1.1. By
+default, Beauty will approve all requests with the `Expect: 100-continue` header.
+However, a custom handler can be set to implement application-specific logic to
+approve or reject such requests. A handler can e.g. check for valid
+authentication tokens, validate content types, or enforce content length
+limits.
+
+A custom 100-continue handler can be set using the `setExpectContinueHandler`
+method of the `Server` class. For simplicity, the handler have the same signature as
+a request handler. I.e. the handler should send the 200 OK status code in the
+`Reply` object if the request is approved, or an appropriate error status code.
+
+The handler may be registered as follows:
+
+```cpp
+server.setExpectContinueHandler([](const beauty::Request& req, beauty::Reply& rep) -> void {
+    // Validate headers before accepting body
+    std::string auth = req.getHeaderValue("Authorization");
+    if (auth.empty()) {
+        rep.send(beauty::Reply::status_type::bad_request);
+    }
+    // Check content length
+    if (req.getContentLength() > MAX_ALLOWED_FILE_SIZE) {
+        rep.send(beauty::Reply::status_type::payload_too_large);
+    }
+    // Approve the request
+    rep.send(beauty::Reply::status_type::ok); // Actually sends 100 Continue
+});
+```
+
+## HttpResult (optional)
+As the request and reply classes store data in `std::vector<char>` it becomes
+a bit hard to manipulate their data as e.g. JSON documents. Therefore, the
+HttpResult class provides a convenient way to do so.
+
+For high portability and low footprint, HttpResult uses cJSON, so cJSON needs
+to be imported to your project. If you have a different preferred JSON library,
+you may use HttpResult as inspiration.
 
 ### Constructor
 HttpResult takes a reference to the `Reply::content_` buffer:

@@ -292,12 +292,7 @@ RequestParser::result_type RequestParser::checkRequestAfterAllHeaders(Request &r
         }
         contentLength_ = 0;
     } else if (req.method_ == "POST" || req.method_ == "PUT" || req.method_ == "PATCH") {
-        // Check for 100-continue expectation first
         if (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ > 0) {
-            if (req.expectContinue_) {
-                return good_headers_expect_continue;
-            }
-
             if (req.isChunked_) {
                 // setting Transfer-Encoding: chunked and Content-Length is invalid
                 return req.contentLength_ == std::numeric_limits<size_t>::max()
@@ -305,6 +300,10 @@ RequestParser::result_type RequestParser::checkRequestAfterAllHeaders(Request &r
                            : bad;
             } else if (req.contentLength_ == std::numeric_limits<size_t>::max()) {
                 return missing_content_length;
+            }
+
+            if (req.expectContinue_) {
+                return good_headers_expect_continue;
             }
         }
     }

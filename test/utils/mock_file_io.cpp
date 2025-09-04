@@ -69,7 +69,7 @@ beauty::Reply::status_type MockFileIO::writeFile(const std::string& id,
     }
     openFile.file_.insert(openFile.file_.end(), buf, buf + size);
     openFile.lastData_ = lastData;
-    return beauty::Reply::status_type::ok;
+    return beauty::Reply::status_type::created;
 }
 
 int MockFileIO::getOpenFileForWriteCalls() {

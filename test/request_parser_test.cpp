@@ -425,4 +425,14 @@ TEST_CASE("Request parser 100-continue", "[request_parser]") {
         REQUIRE(result == RequestParser::good_headers_expect_continue);
         REQUIRE(fixture.request.expectsContinue() == true);
     }
+
+    SECTION("should handle missing Content-Length with Expect: 100-continue") {
+        const std::string request =
+            "POST /upload HTTP/1.1\r\n"
+            "Host: example.com\r\n"
+            "Expect: 100-continue\r\n"
+            "\r\n";
+        auto result = fixture.parse_complete(request);
+        REQUIRE(result == RequestParser::missing_content_length);
+    }
 }

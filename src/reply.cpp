@@ -19,6 +19,7 @@ const std::string unauthorized = "HTTP/1.1 401 Unauthorized\r\n";
 const std::string forbidden = "HTTP/1.1 403 Forbidden\r\n";
 const std::string not_found = "HTTP/1.1 404 Not Found\r\n";
 const std::string length_required = "HTTP/1.1 411 Length Required\r\n";
+const std::string payload_too_large = "HTTP/1.1 413 Payload Too Large\r\n";
 const std::string internal_server_error = "HTTP/1.1 500 Internal Server Error\r\n";
 const std::string not_implemented = "HTTP/1.1 501 Not Implemented\r\n";
 const std::string bad_gateway = "HTTP/1.1 502 Bad Gateway\r\n";
@@ -53,6 +54,8 @@ asio::const_buffer toBuffer(Reply::status_type status) {
             return asio::buffer(not_found);
         case Reply::length_required:
             return asio::buffer(length_required);
+        case Reply::payload_too_large:
+            return asio::buffer(payload_too_large);
         case Reply::internal_server_error:
             return asio::buffer(internal_server_error);
         case Reply::not_implemented:
@@ -77,7 +80,8 @@ const char crlf[] = {'\r', '\n'};
 
 }  // namespace misc_strings
 
-Reply::Reply(size_t maxContentSize) : maxContentSize_(maxContentSize), multiPartParser_(content_) {
+Reply::Reply(size_t maxContentSize)
+    : status_(status_type::ok), maxContentSize_(maxContentSize), multiPartParser_(content_) {
     content_.reserve(maxContentSize);
     headers_.reserve(2);
 }
@@ -121,6 +125,7 @@ void Reply::sendPtr(status_type status,
 
 std::vector<asio::const_buffer> Reply::headerToBuffers() {
     std::vector<asio::const_buffer> buffers;
+
     buffers.push_back(status_strings::toBuffer(status_));
     for (std::size_t i = 0; i < headers_.size(); ++i) {
         Header& h = headers_[i];
@@ -206,6 +211,11 @@ const char length_required[] =
     "<head><title>Length required</title></head>"
     "<body><h1>411 Length Required</h1></body>"
     "</html>";
+const char payload_too_large[] =
+    "<html>"
+    "<head><title>Payload Too Large</title></head>"
+    "<body><h1>413 Payload Too Large</h1></body>"
+    "</html>";
 const char internal_server_error[] =
     "<html>"
     "<head><title>Internal Server Error</title></head>"
@@ -262,6 +272,9 @@ std::vector<char> toArray(Reply::status_type status) {
             return std::vector<char>(not_found, not_found + sizeof(not_found));
         case Reply::length_required:
             return std::vector<char>(length_required, length_required + sizeof(length_required));
+        case Reply::payload_too_large:
+            return std::vector<char>(payload_too_large,
+                                     payload_too_large + sizeof(payload_too_large));
         case Reply::internal_server_error:
             return std::vector<char>(internal_server_error,
                                      internal_server_error + sizeof(internal_server_error));
@@ -286,11 +299,12 @@ std::vector<char> toArray(Reply::status_type status) {
 void Reply::stockReply(Reply::status_type status) {
     status_ = status;
     content_ = stock_replies::toArray(status);
-    headers_.resize(2);
-    headers_[0].name_ = "Content-Length";
-    headers_[0].value_ = std::to_string(content_.size());
-    headers_[1].name_ = "Content-Type";
-    headers_[1].value_ = "text/html";
+    headers_.clear();
+    addHeader("Content-Length", std::to_string(content_.size()));
+    addHeader("Content-Type", "text/html");
+    if (!isStatusOk()) {
+        addHeader("Connection", "close");
+    }
 
     returnToClient_ = true;
 }
