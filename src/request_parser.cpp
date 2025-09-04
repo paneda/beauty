@@ -16,12 +16,24 @@ void RequestParser::reset() {
 RequestParser::result_type RequestParser::parse(Request &req, std::vector<char> &content) {
     auto begin = content.begin();
     auto end = content.end();
+    size_t totalContentLength = content.size();
     while (begin != end) {
         result_type result = consume(req, content, *begin++);
         if (result != indeterminate) {
             return result;
         }
     }
+
+    if (req.contentLength_ == std::numeric_limits<size_t>::max()) {
+        // As we may not have received the Content-Length header for HTP/1.0
+        // requests, we decide good_part or good_complete on whether the
+        // content fits in the buffer.
+        if (totalContentLength < content.capacity()) {
+            req.contentLength_ = content.size();
+            return good_complete;
+        }
+    }
+
     return good_part;
 }
 
@@ -243,18 +255,19 @@ RequestParser::result_type RequestParser::consume(Request &req,
 void RequestParser::storeHeaderValueIfNeeded(Request &req, std::vector<char> &content) {
     Header &h = req.headers_.back();
 
-    if (req.method_ == "POST" || req.method_ == "PUT" || req.method_ == "PATCH") {
-        if (strcasecmp(h.name_.c_str(), "Content-Length") == 0) {
-            contentLength_ = atoi(h.value_.c_str());
-            req.contentLength_ = contentLength_;
-            contentLength_ = std::min(content.capacity(), contentLength_);
-        } else if (strcasecmp(h.name_.c_str(), "Transfer-Encoding") == 0) {
-            if (strcasecmp(h.value_.c_str(), "chunked") == 0) {
-                req.isChunked_ = true;
-            }
+    if (strcasecmp(h.name_.c_str(), "Content-Length") == 0) {
+        contentLength_ = atoi(h.value_.c_str());
+        req.contentLength_ = contentLength_;
+        contentLength_ = std::min(content.capacity(), contentLength_);
+    } else if (strcasecmp(h.name_.c_str(), "Transfer-Encoding") == 0) {
+        if (strcasecmp(h.value_.c_str(), "chunked") == 0) {
+            req.isChunked_ = true;
         }
-    }
-    if (strcasecmp(h.name_.c_str(), "Connection") == 0) {
+    } else if (strcasecmp(h.name_.c_str(), "Expect") == 0) {
+        if (strcasecmp(h.value_.c_str(), "100-continue") == 0) {
+            req.expectContinue_ = true;
+        }
+    } else if (strcasecmp(h.name_.c_str(), "Connection") == 0) {
         if (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ < 1) {
             // HTTP/1.0: Keep-Alive must be explicitly specified
             if (strcasecmp(h.value_.c_str(), "Keep-Alive") == 0) {
@@ -270,13 +283,29 @@ void RequestParser::storeHeaderValueIfNeeded(Request &req, std::vector<char> &co
 }
 
 RequestParser::result_type RequestParser::checkRequestAfterAllHeaders(Request &req) {
-    if ((req.method_ == "POST" || req.method_ == "PUT" || req.method_ == "PATCH")) {
-        if (req.isChunked_) {
-            // setting Transfer-Encoding: chunked and Content-Length is invalid
-            return req.contentLength_ == std::numeric_limits<size_t>::max() ? missing_content_length
-                                                                            : bad;
-        } else if (req.contentLength_ == std::numeric_limits<size_t>::max()) {
-            return missing_content_length;
+    if ((req.method_ == "GET" || req.method_ == "DELETE" || req.method_ == "HEAD" ||
+         req.method_ == "TRACE" || req.method_ == "OPTIONS")) {
+        if (req.expectContinue_ || req.isChunked_ ||
+            req.contentLength_ != std::numeric_limits<size_t>::max()) {
+            // header are invalid for GET/HEAD/DELETE/TRACE/OPTIONS
+            return bad;
+        }
+        contentLength_ = 0;
+    } else if (req.method_ == "POST" || req.method_ == "PUT" || req.method_ == "PATCH") {
+        // Check for 100-continue expectation first
+        if (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ > 0) {
+            if (req.expectContinue_) {
+                return good_headers_expect_continue;
+            }
+
+            if (req.isChunked_) {
+                // setting Transfer-Encoding: chunked and Content-Length is invalid
+                return req.contentLength_ == std::numeric_limits<size_t>::max()
+                           ? missing_content_length
+                           : bad;
+            } else if (req.contentLength_ == std::numeric_limits<size_t>::max()) {
+                return missing_content_length;
+            }
         }
     }
     return indeterminate;
