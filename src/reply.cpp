@@ -286,11 +286,8 @@ std::vector<char> toArray(Reply::status_type status) {
 void Reply::stockReply(Reply::status_type status) {
     status_ = status;
     content_ = stock_replies::toArray(status);
-    headers_.resize(2);
-    headers_[0].name_ = "Content-Length";
-    headers_[0].value_ = std::to_string(content_.size());
-    headers_[1].name_ = "Content-Type";
-    headers_[1].value_ = "text/html";
+	addHeader("Content-Length", std::to_string(content_.size()));
+	addHeader("Content-Type", "text/html");
 
     returnToClient_ = true;
 }

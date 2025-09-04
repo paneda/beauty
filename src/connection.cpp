@@ -61,20 +61,24 @@ void Connection::doRead() {
                         requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
                         doWriteHeaders();
                     } else {
+						reply_.addHeader("Connection", "close");
                         reply_.stockReply(Reply::bad_request);
                         doWriteHeaders();
                     }
                 } else if (result == RequestParser::good_headers_expect_continue) {
                     if (requestDecoder_.decodeRequest(request_, buffer_)) {
                         // Check if the application wants to continue with this request
-                        if (requestHandler_.shouldContinueAfterHeaders(connectionId_, request_)) {
+						requestHandler_.shouldContinueAfterHeaders(request_, reply_);
+                        if (reply_.status_ == Reply::status_type::ok) {
                             doWrite100Continue();
                         } else {
-                            // Application rejected the request, send appropriate error
-                            reply_.stockReply(Reply::bad_request);
+                            // Application rejected the request, send its reply
+							// TODO: check for duplicate?
+							reply_.addHeader("Connection", "close");
                             doWriteHeaders();
                         }
                     } else {
+						reply_.addHeader("Connection", "close");
                         reply_.stockReply(Reply::bad_request);
                         doWriteHeaders();
                     }
@@ -88,16 +92,20 @@ void Connection::doRead() {
                             doReadBody();
                         }
                     } else {
+						reply_.addHeader("Connection", "close");
                         reply_.stockReply(Reply::bad_request);
                         doWriteHeaders();
                     }
                 } else if (result == RequestParser::missing_content_length) {
+					reply_.addHeader("Connection", "close");
                     reply_.stockReply(Reply::length_required);
                     doWriteHeaders();
                 } else if (result == RequestParser::version_not_supported) {
+					reply_.addHeader("Connection", "close");
                     reply_.stockReply(Reply::status_type::version_not_supported);
                     doWriteHeaders();
                 } else if (result == RequestParser::bad) {
+					reply_.addHeader("Connection", "close");
                     reply_.stockReply(Reply::bad_request);
                     doWriteHeaders();
                 } else {
@@ -228,13 +236,12 @@ void Connection::handleWriteCompleted() {
 
 void Connection::doWrite100Continue() {
     auto self(shared_from_this());
-    
+
     // Create 100 Continue response
     std::string continueResponse = "HTTP/1.1 100 Continue\r\n\r\n";
-    
+
     asio::async_write(
-        socket_, asio::buffer(continueResponse),
-        [this, self](std::error_code ec, std::size_t) {
+        socket_, asio::buffer(continueResponse), [this, self](std::error_code ec, std::size_t) {
             if (!ec) {
                 // Initialize reply for body reading - no body bytes received yet
                 reply_.noBodyBytesReceived_ = 0;
@@ -256,7 +263,7 @@ void Connection::doReadBodyAfter100Continue() {
             if (!ec) {
                 lastReceivedTime_ = std::chrono::steady_clock::now();
                 buffer_.resize(bytesTransferred);
-                
+
                 // Append received data to the request body
                 request_.body_.insert(request_.body_.end(), buffer_.begin(), buffer_.end());
                 reply_.noBodyBytesReceived_ += bytesTransferred;

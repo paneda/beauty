@@ -10,10 +10,17 @@ void defaultFileNotFoundHandler(const Request &, Reply &rep) {
     rep.stockReply(Reply::not_found);
 }
 
+void defaultExpectContinueHandler(const Request &, Reply &rep) {
+    // Default: approve all 100-continue requests
+    rep.send(Reply::ok);
+}
+
 }
 
 RequestHandler::RequestHandler(IFileIO *fileIO)
-    : fileIO_(fileIO), fileNotFoundCb_(defaultFileNotFoundHandler) {}
+    : fileIO_(fileIO),
+      fileNotFoundCb_(defaultFileNotFoundHandler),
+      expectContinueCb_(defaultExpectContinueHandler) {}
 
 void RequestHandler::addRequestHandler(const handlerCallback &cb) {
     requestHandlers_.push_back(cb);
@@ -23,16 +30,12 @@ void RequestHandler::setFileNotFoundHandler(const handlerCallback &cb) {
     fileNotFoundCb_ = cb;
 }
 
-void RequestHandler::setExpectContinueHandler(const expectContinueCallback &cb) {
+void RequestHandler::setExpectContinueHandler(const handlerCallback &cb) {
     expectContinueCb_ = cb;
 }
 
-bool RequestHandler::shouldContinueAfterHeaders(unsigned connectionId, const Request &req) {
-    if (expectContinueCb_) {
-        return expectContinueCb_(connectionId, req);
-    }
-    // Default behavior: approve 100-continue for all requests
-    return true;
+void RequestHandler::shouldContinueAfterHeaders(const Request &req, Reply &rep) {
+	expectContinueCb_(req, rep);
 }
 
 void RequestHandler::handleRequest(unsigned connectionId,
@@ -63,6 +66,7 @@ void RequestHandler::handleRequest(unsigned connectionId,
     }
 
     if (fileIO_ == nullptr) {
+		rep.addHeader("Connection", "close");
         rep.stockReply(Reply::not_implemented);
         return;
     }
@@ -74,6 +78,7 @@ void RequestHandler::handleRequest(unsigned connectionId,
             handlePartialWrite(connectionId, req, content, rep);
             return;
         } else {
+			rep.addHeader("Connection", "close");
             rep.stockReply(Reply::bad_request);
             return;
         }
@@ -87,6 +92,7 @@ void RequestHandler::handleRequest(unsigned connectionId,
         }
     }
 
+	rep.addHeader("Connection", "close");
     rep.stockReply(Reply::not_implemented);
 }
 
@@ -107,6 +113,7 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
     MultiPartParser::result_type result = rep.multiPartParser_.parse(content, parts);
 
     if (result == MultiPartParser::result_type::bad) {
+		rep.addHeader("Connection", "close");
         rep.stockReply(Reply::status_type::bad_request);
         return;
     }
