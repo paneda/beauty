@@ -69,6 +69,11 @@ struct Request {
         return noInitialBodyBytesReceived_;
     }
 
+    // check if request expects 100-continue
+    bool expectsContinue() const {
+        return expectContinue_;
+    }
+
    private:
     void reset() {
         method_.clear();
@@ -78,6 +83,7 @@ struct Request {
         body_.clear();
         contentLength_ = std::numeric_limits<size_t>::max();
         isChunked_ = false;
+        expectContinue_ = false;
         queryParams_.clear();
         formParams_.clear();
     }
@@ -105,6 +111,7 @@ struct Request {
     size_t noInitialBodyBytesReceived_ = 0;
     size_t contentLength_ = std::numeric_limits<size_t>::max();  // means not specified
     bool isChunked_ = false;
+    bool expectContinue_ = false;
 };
 
 }  // namespace beauty

@@ -598,3 +598,207 @@ TEST_CASE("server with write fileIO", "[server]") {
     ioc.stop();
     t.join();
 }
+
+TEST_CASE("server with 100-continue support", "[server]") {
+    asio::io_context ioc;
+    TestClient c(ioc);
+
+    std::vector<char> buffer;
+    MockRequestHandler mockRequestHandler(buffer);
+    HttpPersistence persistentOption(0s, 0, 0);
+    Server dut(ioc, "127.0.0.1", "0", nullptr, persistentOption);
+    uint16_t port = dut.getBindedPort();
+    
+    dut.addRequestHandler(std::bind(&MockRequestHandler::handleRequest,
+                                    &mockRequestHandler,
+                                    std::placeholders::_1,
+                                    std::placeholders::_2));
+    auto t = std::thread(&asio::io_context::run, &ioc);
+
+    SECTION("it should approve 100-continue when no handler is set") {
+        // Default behavior should approve all 100-continue requests
+        const std::string request100Continue =
+            "POST /upload HTTP/1.1\r\n"
+            "Host: 127.0.0.1\r\n"
+            "Content-Length: 12\r\n"
+            "Content-Type: application/json\r\n"
+            "Expect: 100-continue\r\n"
+            "Connection: close\r\n\r\n";
+        
+        const std::string requestBody = "Hello World!";
+        
+        mockRequestHandler.setReturnToClient(true);
+        openConnection(c, "127.0.0.1", port);
+
+        // Send the complete request as multipart to simulate 100-continue flow
+        std::future<TestClient::TestResult> futs[2] = {createFutureResult(c),
+                                                       createFutureResult(c)};
+        c.sendMultiPartRequest({request100Continue, requestBody});
+        
+        auto res1 = futs[0].get(); // Should be 100 Continue or similar
+        auto res2 = futs[1].get(); // Final response
+        
+        REQUIRE(mockRequestHandler.getNoCalls() == 1);
+        
+        // Verify the request was parsed correctly
+        Request req = mockRequestHandler.getReceivedRequest();
+        REQUIRE(req.method_ == "POST");
+        REQUIRE(req.requestPath_ == "/upload");
+        REQUIRE(req.expectsContinue() == true);
+        REQUIRE(req.body_.size() == 12);
+        REQUIRE(std::string(req.body_.begin(), req.body_.end()) == "Hello World!");
+    }
+
+    SECTION("it should call expect continue handler when set") {
+        bool handlerCalled = false;
+        unsigned capturedConnectionId = 0;
+        std::string capturedMethod;
+        
+        dut.setExpectContinueHandler([&](unsigned connectionId, const Request& req) -> bool {
+            handlerCalled = true;
+            capturedConnectionId = connectionId;
+            capturedMethod = req.method_;
+            return true; // Approve
+        });
+        
+        const std::string request100Continue =
+            "PUT /data HTTP/1.1\r\n"
+            "Host: 127.0.0.1\r\n"
+            "Content-Length: 8\r\n"
+            "Content-Type: text/plain\r\n"
+            "Expect: 100-continue\r\n"
+            "Connection: close\r\n\r\n";
+        
+        const std::string requestBody = "testdata";
+        
+        mockRequestHandler.setReturnToClient(true);
+        openConnection(c, "127.0.0.1", port);
+
+        std::future<TestClient::TestResult> futs[2] = {createFutureResult(c),
+                                                       createFutureResult(c)};
+        c.sendMultiPartRequest({request100Continue, requestBody});
+        
+        auto res1 = futs[0].get();
+        auto res2 = futs[1].get();
+        
+        REQUIRE(handlerCalled == true);
+        REQUIRE(capturedConnectionId > 0);
+        REQUIRE(capturedMethod == "PUT");
+        REQUIRE(mockRequestHandler.getNoCalls() == 1);
+        
+        Request req = mockRequestHandler.getReceivedRequest();
+        REQUIRE(req.expectsContinue() == true);
+        REQUIRE(std::string(req.body_.begin(), req.body_.end()) == "testdata");
+    }
+
+    SECTION("it should reject request when expect continue handler returns false") {
+        dut.setExpectContinueHandler([](unsigned /*connectionId*/, const Request& /*req*/) -> bool {
+            // Reject all requests
+            return false;
+        });
+        
+        const std::string requestHeaders =
+            "POST /upload HTTP/1.1\r\n"
+            "Host: 127.0.0.1\r\n"
+            "Content-Length: 12\r\n"
+            "Content-Type: application/json\r\n"
+            "Expect: 100-continue\r\n"
+            "Connection: close\r\n\r\n";
+        
+        const std::string requestBody = "Hello World!";
+        
+        openConnection(c, "127.0.0.1", port);
+
+        std::future<TestClient::TestResult> futs[2] = {createFutureResult(c),
+                                                       createFutureResult(c)};
+        c.sendMultiPartRequest({requestHeaders, requestBody});
+        
+        auto res1 = futs[0].get();
+        auto res2 = futs[1].get();
+        
+        // Should get 400 Bad Request when rejected
+        REQUIRE(res1.action_ == TestClient::TestResult::ReadRequestStatus);
+        REQUIRE(res1.statusCode_ == 400);
+        
+        // Request handler should not be called since request was rejected
+        REQUIRE(mockRequestHandler.getNoCalls() == 0);
+    }
+
+    SECTION("it should validate headers in expect continue handler") {
+        bool authenticationPassed = false;
+        
+        dut.setExpectContinueHandler([&](unsigned /*connectionId*/, const Request& req) -> bool {
+            // Check for authorization header
+            std::string auth = req.getHeaderValue("Authorization");
+            if (auth == "Bearer valid-token") {
+                authenticationPassed = true;
+                return true;
+            }
+            return false; // Reject unauthorized requests
+        });
+        
+        const std::string requestWithAuth =
+            "POST /secure HTTP/1.1\r\n"
+            "Host: 127.0.0.1\r\n"
+            "Authorization: Bearer valid-token\r\n"
+            "Content-Length: 6\r\n"
+            "Content-Type: application/json\r\n"
+            "Expect: 100-continue\r\n"
+            "Connection: close\r\n\r\n";
+        
+        const std::string requestBody = "secret";
+        
+        mockRequestHandler.setReturnToClient(true);
+        openConnection(c, "127.0.0.1", port);
+
+        std::future<TestClient::TestResult> futs[2] = {createFutureResult(c),
+                                                       createFutureResult(c)};
+        c.sendMultiPartRequest({requestWithAuth, requestBody});
+        
+        auto res1 = futs[0].get();
+        auto res2 = futs[1].get();
+        
+        REQUIRE(authenticationPassed == true);
+        REQUIRE(mockRequestHandler.getNoCalls() == 1);
+        
+        Request req = mockRequestHandler.getReceivedRequest();
+        REQUIRE(req.getHeaderValue("Authorization") == "Bearer valid-token");
+        REQUIRE(std::string(req.body_.begin(), req.body_.end()) == "secret");
+    }
+
+    SECTION("it should handle request without expect continue header normally") {
+        bool handlerCalled = false;
+        
+        dut.setExpectContinueHandler([&](unsigned /*connectionId*/, const Request& /*req*/) -> bool {
+            handlerCalled = true;
+            return true;
+        });
+        
+        // Regular POST request without Expect: 100-continue
+        const std::string regularRequest =
+            "POST /upload HTTP/1.1\r\n"
+            "Host: 127.0.0.1\r\n"
+            "Content-Length: 12\r\n"
+            "Content-Type: application/json\r\n"
+            "Connection: close\r\n\r\n"
+            "Hello World!";
+        
+        mockRequestHandler.setReturnToClient(true);
+        openConnection(c, "127.0.0.1", port);
+
+        auto fut = createFutureResult(c);
+        c.sendRequest(regularRequest);
+        auto res = fut.get();
+        
+        // Expect continue handler should not be called for regular requests
+        REQUIRE(handlerCalled == false);
+        REQUIRE(mockRequestHandler.getNoCalls() == 1);
+        
+        Request req = mockRequestHandler.getReceivedRequest();
+        REQUIRE(req.expectsContinue() == false);
+        REQUIRE(std::string(req.body_.begin(), req.body_.end()) == "Hello World!");
+    }
+
+    ioc.stop();
+    t.join();
+}

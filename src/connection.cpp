@@ -64,6 +64,20 @@ void Connection::doRead() {
                         reply_.stockReply(Reply::bad_request);
                         doWriteHeaders();
                     }
+                } else if (result == RequestParser::good_headers_expect_continue) {
+                    if (requestDecoder_.decodeRequest(request_, buffer_)) {
+                        // Check if the application wants to continue with this request
+                        if (requestHandler_.shouldContinueAfterHeaders(connectionId_, request_)) {
+                            doWrite100Continue();
+                        } else {
+                            // Application rejected the request, send appropriate error
+                            reply_.stockReply(Reply::bad_request);
+                            doWriteHeaders();
+                        }
+                    } else {
+                        reply_.stockReply(Reply::bad_request);
+                        doWriteHeaders();
+                    }
                 } else if (result == RequestParser::good_part) {
                     if (requestDecoder_.decodeRequest(request_, buffer_)) {
                         reply_.noBodyBytesReceived_ = request_.getNoInitialBodyBytesReceived();
@@ -127,15 +141,13 @@ void Connection::doReadBody() {
                 unsigned multiPartCounter = reply_.multiPartCounter_;
 
                 requestHandler_.handlePartialWrite(connectionId_, request_, buffer_, reply_);
-                if (request_.contentLength_ != std::numeric_limits<size_t>::max() &&
-                    reply_.noBodyBytesReceived_ < request_.contentLength_) {
-                        if (multiPartCounter != reply_.multiPartCounter_) {
-                            doWritePartAck();
-                        } else {
-                            doReadBody();
-                        }
+                if (reply_.noBodyBytesReceived_ < request_.contentLength_) {
+                    if (multiPartCounter != reply_.multiPartCounter_) {
+                        doWritePartAck();
+                    } else {
+                        doReadBody();
                     }
-                else {
+                } else {
                     doWriteHeaders();
                 }
             } else if (ec != asio::error::operation_aborted) {
@@ -212,6 +224,58 @@ void Connection::handleWriteCompleted() {
         socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
         connectionManager_.stop(shared_from_this());
     }
+}
+
+void Connection::doWrite100Continue() {
+    auto self(shared_from_this());
+    
+    // Create 100 Continue response
+    std::string continueResponse = "HTTP/1.1 100 Continue\r\n\r\n";
+    
+    asio::async_write(
+        socket_, asio::buffer(continueResponse),
+        [this, self](std::error_code ec, std::size_t) {
+            if (!ec) {
+                // Initialize reply for body reading - no body bytes received yet
+                reply_.noBodyBytesReceived_ = 0;
+                // Now read the body using special method for 100-continue
+                doReadBodyAfter100Continue();
+            } else {
+                connectionManager_.debugMsg("doWrite100Continue: " + ec.message() + ':' +
+                                            std::to_string(ec.value()));
+                shutdown();
+            }
+        });
+}
+
+void Connection::doReadBodyAfter100Continue() {
+    buffer_.resize(maxContentSize_);
+    auto self(shared_from_this());
+    socket_.async_read_some(
+        asio::buffer(buffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
+            if (!ec) {
+                lastReceivedTime_ = std::chrono::steady_clock::now();
+                buffer_.resize(bytesTransferred);
+                
+                // Append received data to the request body
+                request_.body_.insert(request_.body_.end(), buffer_.begin(), buffer_.end());
+                reply_.noBodyBytesReceived_ += bytesTransferred;
+
+                if (request_.contentLength_ != std::numeric_limits<size_t>::max() &&
+                    reply_.noBodyBytesReceived_ < request_.contentLength_) {
+                    // Need more data
+                    doReadBodyAfter100Continue();
+                } else {
+                    // Body complete, now process the full request
+                    requestHandler_.handleRequest(connectionId_, request_, request_.body_, reply_);
+                    doWriteHeaders();
+                }
+            } else if (ec != asio::error::operation_aborted) {
+                connectionManager_.debugMsg("doReadBodyAfter100Continue: " + ec.message() + ':' +
+                                            std::to_string(ec.value()));
+                connectionManager_.stop(shared_from_this());
+            }
+        });
 }
 
 void Connection::shutdown() {
