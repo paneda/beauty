@@ -73,7 +73,6 @@ void Connection::doRead() {
                             doWrite100Continue();
                         } else {
                             // Application rejected the request, send its reply
-							// TODO: check for duplicate?
 							reply_.addHeader("Connection", "close");
                             doWriteHeaders();
                         }
@@ -263,18 +262,19 @@ void Connection::doReadBodyAfter100Continue() {
             if (!ec) {
                 lastReceivedTime_ = std::chrono::steady_clock::now();
                 buffer_.resize(bytesTransferred);
+				reply_.noBodyBytesReceived_ += bytesTransferred;
 
-                // Append received data to the request body
-                request_.body_.insert(request_.body_.end(), buffer_.begin(), buffer_.end());
-                reply_.noBodyBytesReceived_ += bytesTransferred;
-
-                if (request_.contentLength_ != std::numeric_limits<size_t>::max() &&
-                    reply_.noBodyBytesReceived_ < request_.contentLength_) {
-                    // Need more data
-                    doReadBodyAfter100Continue();
+                if (reply_.noBodyBytesReceived_ < request_.contentLength_) {
+					// Corresponds to the "good_part" handling in doRead()
+					requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
+					if (reply_.isMultiPart_) {
+						doWritePartAck();
+					} else {
+						doReadBody();
+					}
                 } else {
                     // Body complete, now process the full request
-                    requestHandler_.handleRequest(connectionId_, request_, request_.body_, reply_);
+                    requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
                     doWriteHeaders();
                 }
             } else if (ec != asio::error::operation_aborted) {
