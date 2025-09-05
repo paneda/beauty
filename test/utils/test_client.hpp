@@ -63,19 +63,78 @@ class TestClient {
         std::string httpVersion_;
     };
 
-    TestResult getResult(size_t expectedContentLength) {
+    TestResult getConnectedResult(size_t expectedContentLength) {
         expectedContentLength_ = expectedContentLength;
         std::unique_lock<std::mutex> lock(mutex_);
-        auto test = gotResult_.wait_for(lock, std::chrono::seconds(2));
-        if (test == std::cv_status::timeout) {
-            TestResult ret;
-            ret.action_ = TestResult::TimedOut;
-            ret.statusCode_ = 0;
-            ret.headers_.clear();
-            ret.content_.clear();
-            return ret;
-        }
+		while(true) {
+			auto test = gotResult_.wait_for(lock, std::chrono::seconds(2));
+			if (test == std::cv_status::timeout) {
+				TestResult ret;
+				ret.action_ = TestResult::TimedOut;
+				ret.statusCode_ = 0;
+				ret.headers_.clear();
+				ret.content_.clear();
+				return ret;
+			}
+			if (testResult_.action_ == TestResult::Opened ||
+				testResult_.action_ == TestResult::TimedOut ||
+				testResult_.action_ == TestResult::Failed) {
+				return testResult_;
+			}
+		}
         return testResult_;
+    }
+
+    TestResult getStatusLineResult() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        while (true) {
+            auto test = gotResult_.wait_for(lock, std::chrono::seconds(2));
+            if (test == std::cv_status::timeout) {
+                TestResult ret;
+                ret.action_ = TestResult::TimedOut;
+                return ret;
+            }
+            if (testResult_.action_ == TestResult::ReadRequestStatus ||
+                testResult_.action_ == TestResult::TimedOut ||
+                testResult_.action_ == TestResult::Failed) {
+                return testResult_;
+            }
+        }
+    }
+
+    TestResult getHeaderResult() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        while (true) {
+            auto test = gotResult_.wait_for(lock, std::chrono::seconds(2));
+            if (test == std::cv_status::timeout) {
+                TestResult ret;
+                ret.action_ = TestResult::TimedOut;
+                return ret;
+            }
+            if (testResult_.action_ == TestResult::ReadHeaders ||
+                testResult_.action_ == TestResult::TimedOut ||
+                testResult_.action_ == TestResult::Failed) {
+                return testResult_;
+            }
+        }
+    }
+
+    TestResult getContentResult(size_t expectedContentLength) {
+        expectedContentLength_ = expectedContentLength;
+        std::unique_lock<std::mutex> lock(mutex_);
+        while (true) {
+            auto test = gotResult_.wait_for(lock, std::chrono::seconds(2));
+            if (test == std::cv_status::timeout) {
+                TestResult ret;
+                ret.action_ = TestResult::TimedOut;
+                return ret;
+            }
+            if (testResult_.action_ == TestResult::ReadContent ||
+                testResult_.action_ == TestResult::TimedOut ||
+                testResult_.action_ == TestResult::Failed) {
+                return testResult_;
+            }
+        }
     }
 
    private:
@@ -141,9 +200,9 @@ class TestClient {
                 std::cout << "Invalid protocol\n";
                 return;
             }
-            if (statusCode != 200 && statusCode != 201) {
-                return;
-            }
+            // if (statusCode != 100 && statusCode != 200 && statusCode != 201) {
+            //     return;
+            // }
             if (!isMultiPart_) {
                 // Read the response headers, which are terminated by a blank line.
                 asio::async_read_until(
@@ -173,6 +232,7 @@ class TestClient {
     }
 
     void handleReadHeaders(const std::error_code& err) {
+		printf("handleReadHeaders\n");
         if (!err) {
             // Process the response headers.
             std::istream responseStream(&response_);
@@ -180,26 +240,54 @@ class TestClient {
             while (std::getline(responseStream, header) && header != "\r") {
                 testResult_.headers_.push_back(header);
             }
+
             testResult_.action_ = TestResult::ReadHeaders;
             gotResult_.notify_one();
 
-            // Write whatever content we already have to output.
-            if (response_.size() > 0) {
-                if (response_.size() == expectedContentLength_) {
-                    testResult_.content_.resize(response_.size() /
-                                                sizeof(decltype(testResult_.content_)::value_type));
-                    asio::buffer_copy(asio::buffer(testResult_.content_), response_.data());
-                    testResult_.action_ = TestResult::ReadContent;
-                    gotResult_.notify_one();
+			// Check headers and behave like a normal HTTP client.
+            bool connectionClose = false;
+            size_t contentLength = 0;
+            for (const auto& h : testResult_.headers_) {
+                if (h.find("Connection: close") != std::string::npos) {
+                    connectionClose = true;
+                }
+                if (h.find("Content-Length:") != std::string::npos) {
+                    auto pos = h.find(":");
+                    if (pos != std::string::npos) {
+                        auto lenStr = h.substr(pos + 1);
+						lenStr.erase(0, lenStr.find_first_not_of(" \t"));
+                        try {
+                            contentLength = std::stoul(lenStr);
+                        } catch (const std::exception& e) {
+                            std::cout << "Failed to parse Content-Length: " << e.what() << std::endl;
+                        }
+                    }
                 }
             }
 
-            // Start reading remaining data until EOF.
-            asio::async_read(
-                socket_,
-                response_,
-                asio::transfer_at_least(1),
-                std::bind(&TestClient::handleReadContent, this, asio::placeholders::error));
+            if (expectedContentLength_ == 0) {
+                expectedContentLength_ = contentLength;
+            }
+
+            if (connectionClose) {
+                // The server will close the connection after sending the response.
+                // We can read until EOF.
+                asio::async_read(
+                    socket_,
+                    response_,
+                    asio::transfer_at_least(1),
+                    std::bind(&TestClient::handleReadContent, this, asio::placeholders::error));
+                return;
+            } else if (expectedContentLength_ > 0) {
+                // Start reading the body until we have all expected bytes
+                asio::async_read(
+                    socket_,
+                    response_,
+                    asio::transfer_exactly(expectedContentLength_ - response_.size()),
+                    std::bind(&TestClient::handleReadContent, this, asio::placeholders::error));
+            } else {
+                // No body, we're done
+            }
         } else {
             std::cout << "Error5: " << err.message() << ":" << err.value() << "\n";
         }
