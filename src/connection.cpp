@@ -166,7 +166,7 @@ void Connection::doReadBody() {
 }
 
 void Connection::doWriteHeaders() {
-    handleKeepAlive();
+    handleConnectionHeaders();
     auto self(shared_from_this());
     asio::async_write(
         socket_, reply_.headerToBuffers(), [this, self](std::error_code ec, std::size_t) {
@@ -207,16 +207,27 @@ void Connection::doWriteContent() {
         });
 }
 
-void Connection::handleKeepAlive() {
+void Connection::handleConnectionHeaders() {
     nrOfRequest_++;
-    if (useKeepAlive_ && request_.keepAlive_) {
-        reply_.addHeader("Connection", "keep-alive");
-        reply_.addHeader("Keep-Alive",
-                         "timeout=" + std::to_string(keepAliveTimeout_.count()) +
-                             ", max=" + std::to_string(keepAliveMax_));
-    } else {
-        reply_.addHeader("Connection", "close");
-    }
+
+    // Check if Connection: close is already set in reply headers
+    auto it = std::find_if(reply_.headers_.begin(), reply_.headers_.end(), [](const Header &h) {
+        return strcasecmp(h.name_.c_str(), "Connection") == 0 &&
+               strcasecmp(h.value_.c_str(), "close") == 0;
+    });
+
+	if (it == reply_.headers_.end()) {
+		if (useKeepAlive_ && request_.keepAlive_) {
+			reply_.addHeader("Connection", "keep-alive");
+			reply_.addHeader("Keep-Alive",
+							 "timeout=" + std::to_string(keepAliveTimeout_.count()) +
+								 ", max=" + std::to_string(keepAliveMax_));
+		} else {
+			if (it == reply_.headers_.end()) {
+				reply_.addHeader("Connection", "close");
+			}
+		}
+	}
 }
 
 void Connection::handleWriteCompleted() {

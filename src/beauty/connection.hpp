@@ -51,7 +51,7 @@ class Connection : public std::enable_shared_from_this<Connection> {
     void doWriteContent();
     void doWrite100Continue();
 
-    void handleKeepAlive();
+    void handleConnectionHeaders();
     void handleWriteCompleted();
 
     void shutdown();
