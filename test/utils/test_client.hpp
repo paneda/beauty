@@ -269,6 +269,10 @@ class TestClient {
                 expectedContentLength_ = contentLength;
             }
 
+            std::cout << "Expected content length: " << expectedContentLength_ << std::endl;
+            std::cout << "Response buffer size after headers: " << response_.size() << std::endl;
+            std::cout << "Headers received: " << testResult_.headers_.size() << std::endl;
+
             if (connectionClose) {
                 // The server will close the connection after sending the response.
                 // We can read until EOF.

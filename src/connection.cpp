@@ -222,22 +222,27 @@ void Connection::handleConnectionHeaders() {
 			reply_.addHeader("Keep-Alive",
 							 "timeout=" + std::to_string(keepAliveTimeout_.count()) +
 								 ", max=" + std::to_string(keepAliveMax_));
+			closeConnection_ = false;
 		} else {
 			if (it == reply_.headers_.end()) {
 				reply_.addHeader("Connection", "close");
+				closeConnection_ = true;
 			}
 		}
+	} else {
+		closeConnection_ = true;
 	}
 }
 
 void Connection::handleWriteCompleted() {
-    if (useKeepAlive_ && request_.keepAlive_) {
+    if (!closeConnection_) {
         requestParser_.reset();
         request_.reset();
         reply_.reset();
         doRead();
     } else {
         // initiate graceful connection closure.
+		printf("Closing connection\n");
         std::error_code ignored_ec;
         socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
         connectionManager_.stop(shared_from_this());

@@ -100,6 +100,8 @@ class Connection : public std::enable_shared_from_this<Connection> {
 
     // Request counter
     size_t nrOfRequest_ = 0;
+
+	bool closeConnection_ = false;
 };
 
 }  // namespace beauty
