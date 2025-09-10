@@ -536,6 +536,49 @@ TEST_CASE("server with write fileIO", "[server]") {
         REQUIRE(result == expected);
     }
 
+    SECTION("it should handle large multipart request that exceeds buffer size") {
+        // Create a multipart request with total size > 1024 bytes to test doReadBody chunked
+        // reading
+        const std::string boundary = "boundary123456789";  // Boundary without leading --
+
+        // Create file content that makes total request > 1024 bytes
+        std::string largeFileContent(1024, 'A');  // 1024 A's
+
+        std::string requestBody =
+            "--" + boundary +
+            "\r\n"
+            "Content-Disposition: form-data; name=\"largefile\"; filename=\"largefile.txt\"\r\n"
+            "Content-Type: text/plain\r\n\r\n" +
+            largeFileContent + "\r\n" + "--" + boundary + "--\r\n";
+
+        std::string requestHeaders =
+            "POST / HTTP/1.1\r\n"
+            "Host: 127.0.0.1:8081\r\n"
+            "Accept-Encoding: gzip, deflate, br\r\n"
+            "Connection: keep-alive\r\n"
+            "Content-Type: multipart/form-data; boundary=" +
+            boundary +
+            "\r\n"
+            "Content-Length: " +
+            std::to_string(requestBody.length()) + "\r\n\r\n";
+
+        // Verify total request size > 1024 to trigger chunked reading
+        REQUIRE((requestHeaders + requestBody).length() > 1024);
+
+        openConnection(c, "127.0.0.1", port);
+        auto fut = createFutureResult(c, ExpectedResult::Headers);
+        c.sendRequest(requestHeaders + requestBody);
+        auto res = fut.get();
+
+        REQUIRE(res.statusCode_ == 201);  // MockFileIO::openFileForWrite returns 201
+        REQUIRE(mockFileIO.getOpenFileForWriteCalls() == 1);
+        REQUIRE(mockFileIO.getLastData("/largefile.txt0") == true);
+        std::vector<char> result = mockFileIO.getMockWriteFile("/largefile.txt0");
+        std::vector<char> expected(largeFileContent.begin(), largeFileContent.end());
+        CHECK(result.size() == expected.size());
+        REQUIRE(result == expected);
+    }
+
     ioc.stop();
     t.join();
 }
@@ -704,7 +747,7 @@ TEST_CASE("request handler with 100-continue support", "[server]") {
     t.join();
 }
 
-TEST_CASE("fileIO with 100-continue support", "[server]") {
+TEST_CASE("server with write fileIO with 100-continue support", "[server]") {
     asio::io_context ioc;
     TestClient c(ioc);
 
@@ -753,6 +796,59 @@ TEST_CASE("fileIO with 100-continue support", "[server]") {
         std::vector<char> expected = {'F', 'i', 'r', 's', 't', ' ', 'p', 'a', 'r', 't', '\n'};
         REQUIRE(result == expected);
     }
+
+    SECTION(
+        "it should handle large multipart request with expect 100-continue that exceeds buffer "
+        "size") {
+        // Create a multipart request with total size > 1024 bytes to test
+        // doReadBodyAfter100Continue chunked reading
+        const std::string boundary = "boundary987654321";  // Boundary without leading --
+
+        // Create file content that makes total request > 1024 bytes
+        std::string largeFileContent(800, 'B');  // 800 B's
+
+        std::string requestBody =
+            "--" + boundary +
+            "\r\n"
+            "Content-Disposition: form-data; name=\"largefile\"; filename=\"largefile100.txt\"\r\n"
+            "Content-Type: text/plain\r\n\r\n" +
+            largeFileContent + "\r\n" + "--" + boundary + "--\r\n";
+
+        std::string request100Continue =
+            "POST / HTTP/1.1\r\n"
+            "Host: 127.0.0.1:8081\r\n"
+            "Accept-Encoding: gzip, deflate, br\r\n"
+            "Connection: keep-alive\r\n"
+            "Content-Type: multipart/form-data; boundary=" +
+            boundary +
+            "\r\n"
+            "Content-Length: " +
+            std::to_string(requestBody.length()) +
+            "\r\n"
+            "Expect: 100-continue\r\n\r\n";
+
+        // Verify total request size > 1024 to trigger chunked reading
+        REQUIRE((request100Continue + requestBody).length() > 1024);
+
+        openConnection(c, "127.0.0.1", port);
+        std::future<TestClient::TestResult> fut =
+            std::async(std::launch::async, [&c]() { return c.getExpect100Result(); });
+        c.sendRequestWithExpect100(request100Continue, requestBody);
+        auto res = fut.get();
+
+        REQUIRE(res.statusCode_ == 201);  // MockFileIO::writeFile returns 201
+        REQUIRE(res.headers_.size() == 3);
+        REQUIRE(res.headers_[0] == "Content-Length: 0");
+        REQUIRE(res.headers_[1] == "Connection: keep-alive");
+        REQUIRE(res.headers_[2].find("Keep-Alive:") == 0);
+
+        REQUIRE(mockFileIO.getOpenFileForWriteCalls() == 1);
+        REQUIRE(mockFileIO.getLastData("/largefile100.txt0") == true);
+        std::vector<char> result = mockFileIO.getMockWriteFile("/largefile100.txt0");
+        std::vector<char> expected(largeFileContent.begin(), largeFileContent.end());
+        REQUIRE(result == expected);
+    }
+
     ioc.stop();
     t.join();
 }
