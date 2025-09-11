@@ -492,11 +492,16 @@ TEST_CASE("server with write fileIO", "[server]") {
         mockFileIO.setMockFailToOpenWriteFile();
 
         openConnection(c, "127.0.0.1", port);
-        auto fut = createFutureResult(c, ExpectedResult::Headers);
+        auto fut = createFutureResult(c, ExpectedResult::Content);
         c.sendRequest(requestHeaders + requestBody);
         auto res = fut.get();
 
+        REQUIRE(res.action_ == TestClient::TestResult::ReadContent);
+        REQUIRE(res.headers_.size() == 3);
         REQUIRE(res.statusCode_ == 500);  // MockFileIO::openFileForWrite
+        std::string expectedContent =
+            R"({"status":500,"message":"MockFileIO test error: simulated failure to open file for write"})";
+        REQUIRE(res.content_ == convertToCharVec(expectedContent));
     }
     SECTION("it should handle multiple parts in a multipart request") {
         const std::string requestHeaders =

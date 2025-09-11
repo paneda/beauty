@@ -43,7 +43,7 @@ void MockFileIO::closeReadFile(const std::string& id) {
 beauty::Reply::status_type MockFileIO::openFileForWrite(const std::string& id,
                                                         const beauty::Request&,
                                                         beauty::Reply&,
-                                                        std::string&) {
+                                                        std::string& errMsg) {
     OpenWriteFile& openFile = openWriteFiles_[id];
     if (openFile.isOpen_) {
         throw std::runtime_error("MockFileIO test error: File already opened");
@@ -51,6 +51,7 @@ beauty::Reply::status_type MockFileIO::openFileForWrite(const std::string& id,
     countOpenFileForWriteCalls_++;
     if (mockFailToOpenWriteFile_) {
         openWriteFiles_.erase(id);
+        errMsg = "MockFileIO test error: simulated failure to open file for write";
         return beauty::Reply::status_type::internal_server_error;
     }
     openFile.isOpen_ = true;

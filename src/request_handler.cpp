@@ -111,6 +111,10 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
     }
 
     writeFileParts(connectionId, req, rep, parts);
+    if (!rep.isStatusOk()) {
+        rep.addHeader("Content-Length", std::to_string(rep.content_.size()));
+        return;
+    }
 
     if (result == MultiPartParser::result_type::done) {
         rep.multiPartParser_.flush(content, parts);
@@ -120,8 +124,10 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
     // done with content unless there's 'bad' messages that should be return to
     // client
     if (rep.isStatusOk()) {
-        rep.addHeader("Content-Length", "0");
         rep.content_.clear();
+    }
+    if (result == MultiPartParser::result_type::done) {
+        rep.addHeader("Content-Length", std::to_string(rep.content_.size()));
     }
 }
 
@@ -185,7 +191,11 @@ void RequestHandler::writeFileParts(unsigned connectionId,
             rep.status_ = fileIO_->openFileForWrite(
                 rep.filePath_ + std::to_string(connectionId), req, rep, err);
             if (!rep.isStatusOk()) {
-                rep.content_.insert(rep.content_.begin(), err.begin(), err.end());
+                // Use same json format as stockReply()
+                std::string jsonErr =
+                    "{\"status\":" + std::to_string(rep.status_) + ",\"message\":\"" + err + "\"}";
+                rep.content_.assign(jsonErr.begin(), jsonErr.end());
+                rep.addHeader("Content-Type", "application/json");
                 return;
             }
         }
@@ -207,7 +217,11 @@ void RequestHandler::writeFileParts(unsigned connectionId,
                 rep.lastOpenFileForWriteId_ = rep.filePath_ + std::to_string(connectionId);
                 rep.status_ = fileIO_->openFileForWrite(rep.lastOpenFileForWriteId_, req, rep, err);
                 if (!rep.isStatusOk()) {
-                    rep.content_.insert(rep.content_.begin(), err.begin(), err.end());
+                    // Use same json format as stockReply()
+                    std::string jsonErr = "{\"status\":" + std::to_string(rep.status_) +
+                                          ",\"message\":\"" + err + "\"}";
+                    rep.content_.assign(jsonErr.begin(), jsonErr.end());
+                    rep.addHeader("Content-Type", "application/json");
                     return;
                 }
             }
