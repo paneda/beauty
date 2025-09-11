@@ -149,98 +149,26 @@ std::vector<asio::const_buffer> Reply::contentToBuffers() {
 }
 
 namespace stock_replies {
-
-const char ok[] = "";
-const char created[] =
-    "<html>"
-    "<head><title>Created</title></head>"
-    "<body><h1>201 Created</h1></body>"
-    "</html>";
-const char accepted[] =
-    "<html>"
-    "<head><title>Accepted</title></head>"
-    "<body><h1>202 Accepted</h1></body>"
-    "</html>";
-const char no_content[] =
-    "<html>"
-    "<head><title>No Content</title></head>"
-    "<body><h1>204 Content</h1></body>"
-    "</html>";
-const char multiple_choices[] =
-    "<html>"
-    "<head><title>Multiple Choices</title></head>"
-    "<body><h1>300 Multiple Choices</h1></body>"
-    "</html>";
-const char moved_permanently[] =
-    "<html>"
-    "<head><title>Moved Permanently</title></head>"
-    "<body><h1>301 Moved Permanently</h1></body>"
-    "</html>";
-const char moved_temporarily[] =
-    "<html>"
-    "<head><title>Moved Temporarily</title></head>"
-    "<body><h1>302 Moved Temporarily</h1></body>"
-    "</html>";
-const char not_modified[] =
-    "<html>"
-    "<head><title>Not Modified</title></head>"
-    "<body><h1>304 Not Modified</h1></body>"
-    "</html>";
-const char bad_request[] =
-    "<html>"
-    "<head><title>Bad Request</title></head>"
-    "<body><h1>400 Bad Request</h1></body>"
-    "</html>";
-const char unauthorized[] =
-    "<html>"
-    "<head><title>Unauthorized</title></head>"
-    "<body><h1>401 Unauthorized</h1></body>"
-    "</html>";
-const char forbidden[] =
-    "<html>"
-    "<head><title>Forbidden</title></head>"
-    "<body><h1>403 Forbidden</h1></body>"
-    "</html>";
-const char not_found[] =
-    "<html>"
-    "<head><title>Not Found</title></head>"
-    "<body><h1>404 Not Found</h1></body>"
-    "</html>";
-const char length_required[] =
-    "<html>"
-    "<head><title>Length required</title></head>"
-    "<body><h1>411 Length Required</h1></body>"
-    "</html>";
-const char payload_too_large[] =
-    "<html>"
-    "<head><title>Payload Too Large</title></head>"
-    "<body><h1>413 Payload Too Large</h1></body>"
-    "</html>";
-const char internal_server_error[] =
-    "<html>"
-    "<head><title>Internal Server Error</title></head>"
-    "<body><h1>500 Internal Server Error</h1></body>"
-    "</html>";
-const char not_implemented[] =
-    "<html>"
-    "<head><title>Not Implemented</title></head>"
-    "<body><h1>501 Not Implemented</h1></body>"
-    "</html>";
-const char bad_gateway[] =
-    "<html>"
-    "<head><title>Bad Gateway</title></head>"
-    "<body><h1>502 Bad Gateway</h1></body>"
-    "</html>";
-const char service_unavailable[] =
-    "<html>"
-    "<head><title>Service Unavailable</title></head>"
-    "<body><h1>503 Service Unavailable</h1></body>"
-    "</html>";
-const char version_not_supported[] =
-    "<html>"
-    "<head><title>Version Not Supported</title></head>"
-    "<body><h1>505 Version Not Supported</h1></body>"
-    "</html>";
+// JSON error bodies
+const char ok[] = R"({"status":200,"message":"OK"})";
+const char created[] = R"({"status":201,"message":"Created"})";
+const char accepted[] = R"({"status":202,"message":"Accepted"})";
+const char no_content[] = R"({"status":204,"message":"No Content"})";
+const char multiple_choices[] = R"({"status":300,"message":"Multiple Choices"})";
+const char moved_permanently[] = R"({"status":301,"message":"Moved Permanently"})";
+const char moved_temporarily[] = R"({"status":302,"message":"Moved Temporarily"})";
+const char not_modified[] = R"({"status":304,"message":"Not Modified"})";
+const char bad_request[] = R"({"status":400,"error":"Bad Request"})";
+const char unauthorized[] = R"({"status":401,"error":"Unauthorized"})";
+const char forbidden[] = R"({"status":403,"error":"Forbidden"})";
+const char not_found[] = R"({"status":404,"error":"Not Found"})";
+const char length_required[] = R"({"status":411,"error":"Length Required"})";
+const char payload_too_large[] = R"({"status":413,"error":"Payload Too Large"})";
+const char internal_server_error[] = R"({"status":500,"error":"Internal Server Error"})";
+const char not_implemented[] = R"({"status":501,"error":"Not Implemented"})";
+const char bad_gateway[] = R"({"status":502,"error":"Bad Gateway"})";
+const char service_unavailable[] = R"({"status":503,"error":"Service Unavailable"})";
+const char version_not_supported[] = R"({"status":505,"error":"Version Not Supported"})";
 
 std::vector<char> toArray(Reply::status_type status) {
     switch (status) {
@@ -301,11 +229,10 @@ void Reply::stockReply(Reply::status_type status) {
     content_ = stock_replies::toArray(status);
     headers_.clear();
     addHeader("Content-Length", std::to_string(content_.size()));
-    addHeader("Content-Type", "text/html");
+    addHeader("Content-Type", "application/json");
     if (!isStatusOk()) {
         addHeader("Connection", "close");
     }
-
     returnToClient_ = true;
 }
 
