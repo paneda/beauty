@@ -96,7 +96,12 @@ bool Reply::hasHeaders() const {
 
 void Reply::send(status_type status) {
     status_ = status;
-    headers_.push_back({"Content-Length", "0"});
+
+    if (status < 200 || status == no_content) {
+        content_.clear();
+    } else {
+        headers_.push_back({"Content-Length", "0"});
+    }
 
     returnToClient_ = true;
 }
@@ -228,7 +233,11 @@ void Reply::stockReply(Reply::status_type status) {
     status_ = status;
     content_ = stock_replies::toArray(status);
     headers_.clear();
-    addHeader("Content-Length", std::to_string(content_.size()));
+    if (status_ == no_content) {
+        content_.clear();
+    } else {
+        addHeader("Content-Length", std::to_string(content_.size()));
+    }
     addHeader("Content-Type", "application/json");
     if (!isStatusOk()) {
         addHeader("Connection", "close");

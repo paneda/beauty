@@ -111,7 +111,7 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
     }
 
     writeFileParts(connectionId, req, rep, parts);
-    if (!rep.isStatusOk()) {
+    if (!rep.isStatusOk() && rep.status_ != Reply::status_type::no_content) {
         rep.addHeader("Content-Length", std::to_string(rep.content_.size()));
         return;
     }
@@ -126,7 +126,8 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
     if (rep.isStatusOk()) {
         rep.content_.clear();
     }
-    if (result == MultiPartParser::result_type::done) {
+    if (result == MultiPartParser::result_type::done &&
+        rep.status_ != Reply::status_type::no_content) {
         rep.addHeader("Content-Length", std::to_string(rep.content_.size()));
     }
 }
