@@ -29,6 +29,18 @@ int main(int argc, char *argv[]) {
         HttpPersistence persistentOption(5s, 1000, 0);
         Server s(ioc, argv[1], argv[2], &fileIO, persistentOption, 1024);
 
+        s.setExpectContinueHandler([](const Request& req, Reply& rep) -> void {
+			const std::string token = req.getHeaderValue("authorization").substr(7);
+			if (token == "valid_token") {
+				rep.send(Reply::status_type::ok);  // Approve the request (will
+                                                   // return 100 Continue)
+				return;
+			}
+			// Unauthorized
+            rep.addHeader("WWW-Authenticate", "Basic realm=\"Access to the site\"");
+            rep.send(Reply::status_type::unauthorized);
+        });
+
         MyRouterApi routerApi;
         MyFileApi fileApi(argv[3]);
         s.addRequestHandler(std::bind(&MyRouterApi::handleRequest, &routerApi, _1, _2));
