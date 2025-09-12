@@ -1,3 +1,4 @@
+#include <iostream>
 #include "beauty/multipart_parser.hpp"
 #include "beauty/connection_manager.hpp"
 #include "beauty/connection.hpp"
@@ -94,6 +95,14 @@ void Connection::doRead() {
                         doWriteHeaders();
                     }
                 } else if (result == RequestParser::good_part) {
+                    // If we haven't received any body bytes yet, but expect some,
+                    // we need to wait for more data
+                    if (request_.contentLength_ > 0 &&
+                        request_.getNoInitialBodyBytesReceived() == 0) {
+                        doRead();
+                        return;
+                    }
+
                     if (requestDecoder_.decodeRequest(request_, buffer_)) {
                         reply_.noBodyBytesReceived_ = request_.getNoInitialBodyBytesReceived();
 
@@ -224,35 +233,43 @@ void Connection::doWriteContent() {
 void Connection::handleConnection() {
     nrOfRequest_++;
 
-    // Check if Connection: close is already set in reply headers
+    // Check if server or application wants to close the connection
     auto it = std::find_if(reply_.headers_.begin(), reply_.headers_.end(), [](const Header &h) {
         return strcasecmp(h.name_.c_str(), "Connection") == 0 &&
                strcasecmp(h.value_.c_str(), "close") == 0;
     });
-
-    if (it == reply_.headers_.end()) {
-        if (useKeepAlive_ && request_.keepAlive_) {
-            reply_.addHeader("Connection", "keep-alive");
-            reply_.addHeader("Keep-Alive",
-                             "timeout=" + std::to_string(keepAliveTimeout_.count()) +
-                                 ", max=" + std::to_string(keepAliveMax_));
-            closeConnection_ = false;
-        } else {
-            if (it == reply_.headers_.end()) {
-                reply_.addHeader("Connection", "close");
-                closeConnection_ = true;
-            }
-        }
-    } else {
+    if (it != reply_.headers_.end()) {
         closeConnection_ = true;
+        return;
     }
+
+    // Check if client wants to close the connection
+    if (request_.keepAlive_ == false) {
+        reply_.addHeader("Connection", "close");
+        closeConnection_ = true;
+        return;
+    }
+
+    // Check if we should use keep-alive
+    if (useKeepAlive_) {
+        reply_.addHeader("Connection", "keep-alive");
+        reply_.addHeader("Keep-Alive",
+                         "timeout=" + std::to_string(keepAliveTimeout_.count()) +
+                             ", max=" + std::to_string(keepAliveMax_));
+        return;
+    }
+
+    reply_.addHeader("Connection", "close");
+    closeConnection_ = true;
 }
 
 void Connection::handleWriteCompleted() {
+    requestParser_.reset();
+    request_.reset();
+    reply_.reset();
+    firstBodyReadAfter100Continue_ = true;  // Reset for next request
+
     if (!closeConnection_) {
-        requestParser_.reset();
-        request_.reset();
-        reply_.reset();
         doRead();
     } else {
         // initiate graceful connection closure.
