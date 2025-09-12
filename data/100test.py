@@ -5,10 +5,11 @@ import requests
 def test_post_with_expect(auth_token, payload, url="http://localhost:8080"):
 
     headers = {
-        "Content-Type": "text/plain",
+        "Content-Type": "application/json",
         "Content-Length": str(len(payload)),
-        "Expect": "100-continue",
+#        "Expect": "100-continue",
         "Authorization": auth_token,
+        "Connection": "close",  # Force connection close after each request
     }
 
     try:
@@ -23,7 +24,6 @@ def test_post_with_expect(auth_token, payload, url="http://localhost:8080"):
 
 
 if __name__ == "__main__":
-    server_url = "http://localhost:8080"
     print("--- Starting 100 Continue Client Tests ---")
     print("This script simulates various POST request using the Expect header.\n")
 
@@ -33,7 +33,12 @@ if __name__ == "__main__":
     test_post_with_expect("Bearer valid_token", payload=payload)
 
     print("---------------------------------------")
-    print(f"Testing with payload within limits but invalid Authorization...")
-    payload = "x" * 1024 # within 1024 bytes limit in example server
-    test_post_with_expect("Bearer invalid_token", payload=payload)
+    print(f"Testing invalid json and valid Authorization...")
+    payload = "{\"name\": \"John Doe\" " # invalid json, missing closing brace
+    test_post_with_expect("Bearer valid_token", payload=payload, url="http://localhost:8080/api/users")
+
+    print("---------------------------------------")
+    print(f"Testing valid json and valid Authorization...")
+    payload = "{\"name\": \"John Doe\"}"
+    test_post_with_expect("Bearer valid_token", payload=payload, url="http://localhost:8080/api/users")
 
