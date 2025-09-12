@@ -82,6 +82,7 @@ struct Request {
         requestPath_.clear();
         body_.clear();
         contentLength_ = std::numeric_limits<size_t>::max();
+        noInitialBodyBytesReceived_ = 0;
         isChunked_ = false;
         expectContinue_ = false;
         queryParams_.clear();

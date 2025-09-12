@@ -109,6 +109,7 @@ class Reply {
         noBodyBytesReceived_ = 0;
         isMultiPart_ = false;
         lastOpenFileForWriteId_ = "";
+        multiPartParser_.reset();  // Reset multipart parser state between requests
     }
 
     // Helper to provide standard server replies.

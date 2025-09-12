@@ -1,6 +1,6 @@
-#include "beauty/reply.hpp"
-
 #include <string>
+
+#include "beauty/reply.hpp"
 
 namespace beauty {
 

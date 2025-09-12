@@ -205,7 +205,7 @@ RequestParser::result_type RequestParser::consume(Request &req,
             return indeterminate;
         case header_value:
             if (input == '\r') {
-                storeHeaderValueIfNeeded(req, content);
+                storeHeaderValueIfNeeded(req);
                 state_ = expecting_newline_2;
             } else if (isCtl(input)) {
                 return bad;
@@ -252,13 +252,13 @@ RequestParser::result_type RequestParser::consume(Request &req,
     }
 }
 
-void RequestParser::storeHeaderValueIfNeeded(Request &req, std::vector<char> &content) {
+void RequestParser::storeHeaderValueIfNeeded(Request &req) {
     Header &h = req.headers_.back();
 
     if (strcasecmp(h.name_.c_str(), "Content-Length") == 0) {
-        contentLength_ = atoi(h.value_.c_str());
-        req.contentLength_ = contentLength_;
-        contentLength_ = std::min(content.capacity(), contentLength_);
+        size_t actualContentLength = atoi(h.value_.c_str());
+        req.contentLength_ = actualContentLength;
+        contentLength_ = actualContentLength;
     } else if (strcasecmp(h.name_.c_str(), "Transfer-Encoding") == 0) {
         if (strcasecmp(h.value_.c_str(), "chunked") == 0) {
             req.isChunked_ = true;
