@@ -47,7 +47,7 @@ bool Connection::useKeepAlive() const {
 
 void Connection::doRead() {
     auto self(shared_from_this());
-    // asio uses buffer_.size() to limit amount of read data so must restore
+    // Asio uses buffer_.size() to limit amount of read data so must restore
     // size before reading. Note: operation is "cheap" as maxContentSize is
     // already reserved.
     buffer_.resize(maxContentSize_);
@@ -68,13 +68,13 @@ void Connection::doRead() {
                     }
                 } else if (result == RequestParser::good_headers_expect_continue) {
                     if (requestDecoder_.decodeRequest(request_, buffer_)) {
-                        // Check if this will be a large non-multipart request (unsupported)
                         if (request_.contentLength_ > maxContentSize_) {
                             bool isMultipart = MultiPartParser::isMultipartRequest(request_);
 
                             if (!isMultipart) {
-                                // Beauty only supports multipart uploads for large body data that
-                                // doesn't fit in buffer
+                                // By design Beauty only supports large body data
+                                // uploads using multipart/form-data. It will not
+                                // allocate buffer > maxContentSize_ for non-multipart data
                                 reply_.stockReply(Reply::payload_too_large);
                                 doWriteHeaders();
                                 return;
@@ -111,8 +111,9 @@ void Connection::doRead() {
                         bool isMultipart = MultiPartParser::isMultipartRequest(request_);
 
                         if (!isMultipart) {
-                            // Beauty only supports multipart uploads for large body data that
-                            // doesn't fit in buffer
+                            // By design Beauty only supports large body data
+                            // uploads using multipart/form-data. It will not
+                            // allocate buffer > maxContentSize_ for non-multipart data
                             reply_.stockReply(Reply::payload_too_large);
                             doWriteHeaders();
                             return;
@@ -233,7 +234,7 @@ void Connection::doWriteContent() {
 void Connection::handleConnection() {
     nrOfRequest_++;
 
-    // Check if server or application wants to close the connection
+    // Check if server wants to close the connection
     auto it = std::find_if(reply_.headers_.begin(), reply_.headers_.end(), [](const Header &h) {
         return strcasecmp(h.name_.c_str(), "Connection") == 0 &&
                strcasecmp(h.value_.c_str(), "close") == 0;
@@ -259,6 +260,8 @@ void Connection::handleConnection() {
         return;
     }
 
+    // Default in HTTP/1.1 is keep-alive, but if server does not want to use
+    // it, we must close the connection here
     reply_.addHeader("Connection", "close");
     closeConnection_ = true;
 }
@@ -272,7 +275,7 @@ void Connection::handleWriteCompleted() {
     if (!closeConnection_) {
         doRead();
     } else {
-        // initiate graceful connection closure.
+        // Initiate graceful connection closure
         std::error_code ignored_ec;
         socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
         connectionManager_.stop(shared_from_this());
@@ -349,7 +352,7 @@ void Connection::doReadBodyAfter100Continue() {
 }
 
 void Connection::shutdown() {
-    // initiate graceful connection closure.
+    // Initiate graceful connection closure
     std::error_code ignored_ec;
     socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
     connectionManager_.stop(shared_from_this());
