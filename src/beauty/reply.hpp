@@ -38,6 +38,8 @@ class Reply {
         not_found = 404,
         method_not_allowed = 405,
         length_required = 411,
+        payload_too_large = 413,
+        expectation_failed = 417,
         internal_server_error = 500,
         not_implemented = 501,
         bad_gateway = 502,
@@ -47,9 +49,6 @@ class Reply {
 
     // Content to be sent in the reply.
     std::vector<char> content_;
-
-    // Helper to provide standard replies.
-    void stockReply(status_type status);
 
     // File path to open.
     std::string filePath_;
@@ -111,8 +110,16 @@ class Reply {
         noBodyBytesReceived_ = 0;
         isMultiPart_ = false;
         lastOpenFileForWriteId_ = "";
-        multiPartCounter_ = 0;
+        multiPartParser_.reset();  // Reset multipart parser state between requests
     }
+
+    // Helper to provide standard server replies.
+    void stockReply(status_type status);
+
+    bool isStatusOk() const {
+        return status_ == ok || status_ == created || status_ == accepted || status_ == no_content;
+    }
+
     // Headers to be included in the reply.
     status_type status_;
     std::vector<Header> headers_;
@@ -136,7 +143,6 @@ class Reply {
 
     // Keep track of the last opened file in multi-part transfers.
     std::string lastOpenFileForWriteId_;
-    unsigned multiPartCounter_ = 0;
 
     // Parser to handle multipart uploads.
     MultiPartParser multiPartParser_;

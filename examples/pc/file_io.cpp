@@ -53,5 +53,5 @@ Reply::status_type FileIO::writeFile(const std::string &id,
         openWriteFiles_[id].close();
         openWriteFiles_.erase(id);
     }
-    return Reply::ok;
+    return Reply::status_type::created;
 }

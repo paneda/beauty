@@ -4,16 +4,19 @@
 
 namespace beauty {
 
-namespace {
+RequestHandler::RequestHandler(IFileIO *fileIO)
+    : fileIO_(fileIO),
+      fileNotFoundCb_(defaultFileNotFoundHandler),
+      expectContinueCb_(defaultExpectContinueHandler) {}
 
-void defaultFileNotFoundHandler(const Request &, Reply &rep) {
+void RequestHandler::defaultFileNotFoundHandler(const Request &, Reply &rep) {
     rep.stockReply(Reply::not_found);
 }
 
+void RequestHandler::defaultExpectContinueHandler(const Request &, Reply &rep) {
+    // Default: approve all 100-continue requests
+    rep.send(Reply::ok);
 }
-
-RequestHandler::RequestHandler(IFileIO *fileIO)
-    : fileIO_(fileIO), fileNotFoundCb_(defaultFileNotFoundHandler) {}
 
 void RequestHandler::addRequestHandler(const handlerCallback &cb) {
     requestHandlers_.push_back(cb);
@@ -21,6 +24,14 @@ void RequestHandler::addRequestHandler(const handlerCallback &cb) {
 
 void RequestHandler::setFileNotFoundHandler(const handlerCallback &cb) {
     fileNotFoundCb_ = cb;
+}
+
+void RequestHandler::setExpectContinueHandler(const handlerCallback &cb) {
+    expectContinueCb_ = cb;
+}
+
+void RequestHandler::shouldContinueAfterHeaders(const Request &req, Reply &rep) {
+    expectContinueCb_(req, rep);
 }
 
 void RequestHandler::handleRequest(unsigned connectionId,
@@ -56,7 +67,7 @@ void RequestHandler::handleRequest(unsigned connectionId,
     }
 
     if (req.method_ == "POST") {
-        if (rep.multiPartParser_.parseHeader(req)) {
+        if (rep.isMultiPart_ || rep.multiPartParser_.parseHeader(req)) {
             rep.status_ = Reply::ok;
             rep.isMultiPart_ = true;
             handlePartialWrite(connectionId, req, content, rep);
@@ -65,11 +76,11 @@ void RequestHandler::handleRequest(unsigned connectionId,
             rep.stockReply(Reply::bad_request);
             return;
         }
-
     } else if (req.method_ == "GET") {
         if (openAndReadFile(connectionId, req, rep) > 0) {
             return;
         } else {
+            rep.headers_.clear();
             fileNotFoundCb_(req, rep);
             return;
         }
@@ -91,6 +102,10 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
                                         const Request &req,
                                         std::vector<char> &content,
                                         Reply &rep) {
+    if (rep.finalPart_) {
+        return;
+    }
+
     std::deque<MultiPartParser::ContentPart> parts;
     MultiPartParser::result_type result = rep.multiPartParser_.parse(content, parts);
 
@@ -100,6 +115,10 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
     }
 
     writeFileParts(connectionId, req, rep, parts);
+    if (!rep.isStatusOk() && rep.status_ != Reply::status_type::no_content) {
+        rep.addHeader("Content-Length", std::to_string(rep.content_.size()));
+        return;
+    }
 
     if (result == MultiPartParser::result_type::done) {
         rep.multiPartParser_.flush(content, parts);
@@ -108,8 +127,12 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
 
     // done with content unless there's 'bad' messages that should be return to
     // client
-    if (rep.status_ == Reply::status_type::ok) {
+    if (rep.isStatusOk()) {
         rep.content_.clear();
+    }
+    if (result == MultiPartParser::result_type::done &&
+        rep.status_ != Reply::status_type::no_content) {
+        rep.addHeader("Content-Length", std::to_string(rep.content_.size()));
     }
 }
 
@@ -172,10 +195,12 @@ void RequestHandler::writeFileParts(unsigned connectionId,
             std::string err;
             rep.status_ = fileIO_->openFileForWrite(
                 rep.filePath_ + std::to_string(connectionId), req, rep, err);
-            rep.multiPartCounter_++;
-            if (rep.status_ != Reply::status_type::ok &&
-                rep.status_ != Reply::status_type::created) {
-                rep.content_.insert(rep.content_.begin(), err.begin(), err.end());
+            if (!rep.isStatusOk()) {
+                // Use same json format as stockReply()
+                std::string jsonErr =
+                    "{\"status\":" + std::to_string(rep.status_) + ",\"message\":\"" + err + "\"}";
+                rep.content_.assign(jsonErr.begin(), jsonErr.end());
+                rep.addHeader("Content-Type", "application/json");
                 return;
             }
         }
@@ -196,24 +221,26 @@ void RequestHandler::writeFileParts(unsigned connectionId,
                 rep.filePath_ = req.requestPath_ + part.filename_;
                 rep.lastOpenFileForWriteId_ = rep.filePath_ + std::to_string(connectionId);
                 rep.status_ = fileIO_->openFileForWrite(rep.lastOpenFileForWriteId_, req, rep, err);
-                rep.multiPartCounter_++;
-                if (rep.status_ != Reply::status_type::ok &&
-                    rep.status_ != Reply::status_type::created) {
-                    rep.content_.insert(rep.content_.begin(), err.begin(), err.end());
+                if (!rep.isStatusOk()) {
+                    // Use same json format as stockReply()
+                    std::string jsonErr = "{\"status\":" + std::to_string(rep.status_) +
+                                          ",\"message\":\"" + err + "\"}";
+                    rep.content_.assign(jsonErr.begin(), jsonErr.end());
+                    rep.addHeader("Content-Type", "application/json");
                     return;
                 }
             }
             size_t size = part.end_ - part.start_;
             rep.status_ = fileIO_->writeFile(
                 rep.lastOpenFileForWriteId_, req, &(*part.start_), size, part.foundEnd_, err);
-            if (rep.status_ != Reply::status_type::ok &&
-                rep.status_ != Reply::status_type::created) {
+            if (!rep.isStatusOk()) {
                 rep.lastOpenFileForWriteId_.clear();
                 rep.content_.insert(rep.content_.begin(), err.begin(), err.end());
                 return;
             }
             if (part.foundEnd_) {
                 rep.lastOpenFileForWriteId_.clear();
+                rep.finalPart_ = true;
             }
         }
     }

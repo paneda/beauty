@@ -22,6 +22,9 @@ class RequestHandler {
     // Handlers to be optionally implemented.
     void addRequestHandler(const handlerCallback &cb);
     void setFileNotFoundHandler(const handlerCallback &cb);
+    void setExpectContinueHandler(const handlerCallback &cb);
+
+    void shouldContinueAfterHeaders(const Request &req, Reply &rep);
 
     void handleRequest(unsigned connectionId,
                        const Request &req,
@@ -42,6 +45,9 @@ class RequestHandler {
                         Reply &rep,
                         std::deque<MultiPartParser::ContentPart> &parts);
 
+    static void defaultFileNotFoundHandler(const Request &, Reply &rep);
+    static void defaultExpectContinueHandler(const Request &, Reply &rep);
+
     // Provided FileIO to be implemented by each specific projects.
     IFileIO *fileIO_ = nullptr;
 
@@ -50,6 +56,9 @@ class RequestHandler {
 
     // Callback to handle post file access, e.g. a custom not found handler.
     handlerCallback fileNotFoundCb_;
+
+    // Callback to handle Expect: 100-continue requests
+    handlerCallback expectContinueCb_;
 };
 
 }  // namespace beauty

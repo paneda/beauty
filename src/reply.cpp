@@ -1,6 +1,6 @@
-#include "beauty/reply.hpp"
-
 #include <string>
+
+#include "beauty/reply.hpp"
 
 namespace beauty {
 
@@ -19,6 +19,8 @@ const std::string unauthorized = "HTTP/1.1 401 Unauthorized\r\n";
 const std::string forbidden = "HTTP/1.1 403 Forbidden\r\n";
 const std::string not_found = "HTTP/1.1 404 Not Found\r\n";
 const std::string length_required = "HTTP/1.1 411 Length Required\r\n";
+const std::string payload_too_large = "HTTP/1.1 413 Payload Too Large\r\n";
+const std::string expectation_failed = "HTTP/1.1 417 Expectation Failed\r\n";
 const std::string internal_server_error = "HTTP/1.1 500 Internal Server Error\r\n";
 const std::string not_implemented = "HTTP/1.1 501 Not Implemented\r\n";
 const std::string bad_gateway = "HTTP/1.1 502 Bad Gateway\r\n";
@@ -53,6 +55,10 @@ asio::const_buffer toBuffer(Reply::status_type status) {
             return asio::buffer(not_found);
         case Reply::length_required:
             return asio::buffer(length_required);
+        case Reply::payload_too_large:
+            return asio::buffer(payload_too_large);
+        case Reply::expectation_failed:
+            return asio::buffer(expectation_failed);
         case Reply::internal_server_error:
             return asio::buffer(internal_server_error);
         case Reply::not_implemented:
@@ -77,7 +83,8 @@ const char crlf[] = {'\r', '\n'};
 
 }  // namespace misc_strings
 
-Reply::Reply(size_t maxContentSize) : maxContentSize_(maxContentSize), multiPartParser_(content_) {
+Reply::Reply(size_t maxContentSize)
+    : status_(status_type::ok), maxContentSize_(maxContentSize), multiPartParser_(content_) {
     content_.reserve(maxContentSize);
     headers_.reserve(2);
 }
@@ -92,7 +99,12 @@ bool Reply::hasHeaders() const {
 
 void Reply::send(status_type status) {
     status_ = status;
-    headers_.push_back({"Content-Length", "0"});
+
+    if (status < 200 || status == no_content) {
+        content_.clear();
+    } else {
+        headers_.push_back({"Content-Length", "0"});
+    }
 
     returnToClient_ = true;
 }
@@ -121,6 +133,7 @@ void Reply::sendPtr(status_type status,
 
 std::vector<asio::const_buffer> Reply::headerToBuffers() {
     std::vector<asio::const_buffer> buffers;
+
     buffers.push_back(status_strings::toBuffer(status_));
     for (std::size_t i = 0; i < headers_.size(); ++i) {
         Header& h = headers_[i];
@@ -144,93 +157,27 @@ std::vector<asio::const_buffer> Reply::contentToBuffers() {
 }
 
 namespace stock_replies {
-
-const char ok[] = "";
-const char created[] =
-    "<html>"
-    "<head><title>Created</title></head>"
-    "<body><h1>201 Created</h1></body>"
-    "</html>";
-const char accepted[] =
-    "<html>"
-    "<head><title>Accepted</title></head>"
-    "<body><h1>202 Accepted</h1></body>"
-    "</html>";
-const char no_content[] =
-    "<html>"
-    "<head><title>No Content</title></head>"
-    "<body><h1>204 Content</h1></body>"
-    "</html>";
-const char multiple_choices[] =
-    "<html>"
-    "<head><title>Multiple Choices</title></head>"
-    "<body><h1>300 Multiple Choices</h1></body>"
-    "</html>";
-const char moved_permanently[] =
-    "<html>"
-    "<head><title>Moved Permanently</title></head>"
-    "<body><h1>301 Moved Permanently</h1></body>"
-    "</html>";
-const char moved_temporarily[] =
-    "<html>"
-    "<head><title>Moved Temporarily</title></head>"
-    "<body><h1>302 Moved Temporarily</h1></body>"
-    "</html>";
-const char not_modified[] =
-    "<html>"
-    "<head><title>Not Modified</title></head>"
-    "<body><h1>304 Not Modified</h1></body>"
-    "</html>";
-const char bad_request[] =
-    "<html>"
-    "<head><title>Bad Request</title></head>"
-    "<body><h1>400 Bad Request</h1></body>"
-    "</html>";
-const char unauthorized[] =
-    "<html>"
-    "<head><title>Unauthorized</title></head>"
-    "<body><h1>401 Unauthorized</h1></body>"
-    "</html>";
-const char forbidden[] =
-    "<html>"
-    "<head><title>Forbidden</title></head>"
-    "<body><h1>403 Forbidden</h1></body>"
-    "</html>";
-const char not_found[] =
-    "<html>"
-    "<head><title>Not Found</title></head>"
-    "<body><h1>404 Not Found</h1></body>"
-    "</html>";
-const char length_required[] =
-    "<html>"
-    "<head><title>Length required</title></head>"
-    "<body><h1>411 Length Required</h1></body>"
-    "</html>";
-const char internal_server_error[] =
-    "<html>"
-    "<head><title>Internal Server Error</title></head>"
-    "<body><h1>500 Internal Server Error</h1></body>"
-    "</html>";
-const char not_implemented[] =
-    "<html>"
-    "<head><title>Not Implemented</title></head>"
-    "<body><h1>501 Not Implemented</h1></body>"
-    "</html>";
-const char bad_gateway[] =
-    "<html>"
-    "<head><title>Bad Gateway</title></head>"
-    "<body><h1>502 Bad Gateway</h1></body>"
-    "</html>";
-const char service_unavailable[] =
-    "<html>"
-    "<head><title>Service Unavailable</title></head>"
-    "<body><h1>503 Service Unavailable</h1></body>"
-    "</html>";
-const char version_not_supported[] =
-    "<html>"
-    "<head><title>Version Not Supported</title></head>"
-    "<body><h1>505 Version Not Supported</h1></body>"
-    "</html>";
+// JSON error bodies
+const char ok[] = R"({"status":200,"message":"OK"})";
+const char created[] = R"({"status":201,"message":"Created"})";
+const char accepted[] = R"({"status":202,"message":"Accepted"})";
+const char no_content[] = R"({"status":204,"message":"No Content"})";
+const char multiple_choices[] = R"({"status":300,"message":"Multiple Choices"})";
+const char moved_permanently[] = R"({"status":301,"message":"Moved Permanently"})";
+const char moved_temporarily[] = R"({"status":302,"message":"Moved Temporarily"})";
+const char not_modified[] = R"({"status":304,"message":"Not Modified"})";
+const char bad_request[] = R"({"status":400,"message":"Bad Request"})";
+const char unauthorized[] = R"({"status":401,"message":"Unauthorized"})";
+const char forbidden[] = R"({"status":403,"message":"Forbidden"})";
+const char not_found[] = R"({"status":404,"message":"Not Found"})";
+const char length_required[] = R"({"status":411,"message":"Length Required"})";
+const char payload_too_large[] = R"({"status":413,"message":"Payload Too Large"})";
+const char expectation_failed[] = R"({"status":417,"message":"Expectation Failed"})";
+const char internal_server_error[] = R"({"status":500,"message":"Internal Server Error"})";
+const char not_implemented[] = R"({"status":501,"message":"Not Implemented"})";
+const char bad_gateway[] = R"({"status":502,"message":"Bad Gateway"})";
+const char service_unavailable[] = R"({"status":503,"message":"Service Unavailable"})";
+const char version_not_supported[] = R"({"status":505,"message":"Version Not Supported"})";
 
 std::vector<char> toArray(Reply::status_type status) {
     switch (status) {
@@ -262,6 +209,12 @@ std::vector<char> toArray(Reply::status_type status) {
             return std::vector<char>(not_found, not_found + sizeof(not_found));
         case Reply::length_required:
             return std::vector<char>(length_required, length_required + sizeof(length_required));
+        case Reply::payload_too_large:
+            return std::vector<char>(payload_too_large,
+                                     payload_too_large + sizeof(payload_too_large));
+        case Reply::expectation_failed:
+            return std::vector<char>(expectation_failed,
+                                     expectation_failed + sizeof(expectation_failed));
         case Reply::internal_server_error:
             return std::vector<char>(internal_server_error,
                                      internal_server_error + sizeof(internal_server_error));
@@ -286,12 +239,16 @@ std::vector<char> toArray(Reply::status_type status) {
 void Reply::stockReply(Reply::status_type status) {
     status_ = status;
     content_ = stock_replies::toArray(status);
-    headers_.resize(2);
-    headers_[0].name_ = "Content-Length";
-    headers_[0].value_ = std::to_string(content_.size());
-    headers_[1].name_ = "Content-Type";
-    headers_[1].value_ = "text/html";
-
+    headers_.clear();
+    if (status_ == no_content) {
+        content_.clear();
+    } else {
+        addHeader("Content-Length", std::to_string(content_.size()));
+    }
+    addHeader("Content-Type", "application/json");
+    if (!isStatusOk()) {
+        addHeader("Connection", "close");
+    }
     returnToClient_ = true;
 }
 

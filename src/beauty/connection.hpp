@@ -43,13 +43,14 @@ class Connection : public std::enable_shared_from_this<Connection> {
     // Perform an asynchronous read operation.
     void doRead();
     void doReadBody();
+    void doReadBodyAfter100Continue();
 
     // Perform an asynchronous write operation.
-    void doWritePartAck();
     void doWriteHeaders();
     void doWriteContent();
+    void doWrite100Continue();
 
-    void handleKeepAlive();
+    void handleConnection();
     void handleWriteCompleted();
 
     void shutdown();
@@ -98,6 +99,10 @@ class Connection : public std::enable_shared_from_this<Connection> {
 
     // Request counter
     size_t nrOfRequest_ = 0;
+
+    bool closeConnection_ = false;
+
+    bool firstBodyReadAfter100Continue_ = true;
 };
 
 }  // namespace beauty

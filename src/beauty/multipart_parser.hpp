@@ -34,6 +34,8 @@ class MultiPartParser {
     // Return true if Content-Type is set to multipart.
     bool parseHeader(const Request &req);
 
+    static bool isMultipartRequest(const Request &req);
+
     // Parse multipart content. The enum return value is done when all parts
     // has been parsed, bad if the data is invalid, indeterminate when more
     // data is required.
