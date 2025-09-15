@@ -31,7 +31,7 @@ RequestParser::result_type RequestParser::parse(Request &req, std::vector<char> 
     }
 
     if (req.contentLength_ == std::numeric_limits<size_t>::max()) {
-        // As we may not have received the Content-Length header for HTP/1.0
+        // As we may not have received the Content-Length header for HTTP/1.0
         // requests, we decide good_part or good_complete on whether the
         // content fits in the buffer.
         if (totalContentLength < content.capacity()) {
