@@ -880,7 +880,7 @@ TEST_CASE("server with write fileIO with 100-continue support", "[server]") {
         REQUIRE(requestBody.length() == 221);
 
         openConnection(c, "127.0.0.1", port);
-        auto fut = createFutureResult(c, ExpectedResult::Headers);
+        auto fut = createFutureResult(c, ExpectedResult::Content);
         // send a normal request with body instead of using 100-continue method
         c.sendRequest(requestHeaders + requestBody);
         auto res = fut.get();
