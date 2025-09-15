@@ -95,7 +95,6 @@ void Connection::doRead() {
                         doWriteHeaders();
                     }
                 } else if (result == RequestParser::expect_continue_with_body) {
-                    puts("expect_continue_with_body");
                     // Parser detected 100-continue protocol violation: client sent Expect header
                     // with body data without waiting for 100 Continue response
                     reply_.stockReply(Reply::expectation_failed);
