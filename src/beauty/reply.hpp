@@ -39,6 +39,7 @@ class Reply {
         method_not_allowed = 405,
         length_required = 411,
         payload_too_large = 413,
+        expectation_failed = 417,
         internal_server_error = 500,
         not_implemented = 501,
         bad_gateway = 502,

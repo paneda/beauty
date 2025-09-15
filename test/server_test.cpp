@@ -760,6 +760,16 @@ TEST_CASE("server with write fileIO with 100-continue support", "[server]") {
     HttpPersistence persistentOption(5s, 0, 0);
     Server dut(ioc, "127.0.0.1", "0", &mockFileIO, persistentOption);
     uint16_t port = dut.getBindedPort();
+
+    // add a dummy that does nothing
+    std::vector<char> buffer;
+    MockRequestHandler mockRequestHandler(buffer);
+    mockRequestHandler.setReturnToClient(false);
+    dut.addRequestHandler(std::bind(&MockRequestHandler::handleRequest,
+                                    &mockRequestHandler,
+                                    std::placeholders::_1,
+                                    std::placeholders::_2));
+
     auto t = std::thread(&asio::io_context::run, &ioc);
 
     SECTION("it should handle a complete multipart request with expect 100-continue") {
@@ -802,9 +812,7 @@ TEST_CASE("server with write fileIO with 100-continue support", "[server]") {
         REQUIRE(result == expected);
     }
 
-    SECTION(
-        "it should handle large multipart request with expect 100-continue that exceeds buffer "
-        "size") {
+    SECTION("it should handle large multipart request with expect 100-continue") {
         // Create a multipart request with total size > 1024 bytes to test
         // doReadBodyAfter100Continue chunked reading
         const std::string boundary = "boundary987654321";  // Boundary without leading --
@@ -852,6 +860,32 @@ TEST_CASE("server with write fileIO with 100-continue support", "[server]") {
         std::vector<char> result = mockFileIO.getMockWriteFile("/largefile100.txt0");
         std::vector<char> expected(largeFileContent.begin(), largeFileContent.end());
         REQUIRE(result == expected);
+    }
+    SECTION("it should return 417 expected fail when client send body with 100-continue") {
+        const std::string requestHeaders =
+            "POST / HTTP/1.1\r\n"
+            "Host: 127.0.0.1:8081\r\n"
+            "Accept-Encoding: gzip, deflate, br\r\n"
+            "Connection: keep-alive\r\n"
+            "Expect: 100-continue\r\n"
+            "Content-Type: multipart/form-data; "
+            "boundary=--------------------------338874100326900647006157\r\n"
+            "Content-Length: 221\r\n\r\n";
+        const std::string requestBody =
+            "--------------------------338874100326900647006157\r\n"
+            "Content-Disposition: form-data; name=\"file1\"; filename=\"firstpart.txt\"\r\n"
+            "Content-Type: text/plain\r\n\r\n"
+            "First part\n\r\n"
+            "----------------------------338874100326900647006157--\r\n";
+        REQUIRE(requestBody.length() == 221);
+
+        openConnection(c, "127.0.0.1", port);
+        auto fut = createFutureResult(c, ExpectedResult::Headers);
+        // send a normal request with body instead of using 100-continue method
+        c.sendRequest(requestHeaders + requestBody);
+        auto res = fut.get();
+
+        REQUIRE(res.statusCode_ == 417);  // Expectation Failed
     }
 
     ioc.stop();

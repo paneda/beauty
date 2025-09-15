@@ -21,6 +21,7 @@ class RequestParser {
         good_complete,
         good_part,
         good_headers_expect_continue,
+        expect_continue_with_body,  // Protocol violation: Expect 100-continue with body data
         bad,
         not_implemented,
         version_not_supported,

@@ -1,6 +1,18 @@
 #!/usr/bin/env python3
 import requests
 import io
+import hashlib
+import os
+
+def calculate_md5(content):
+    """
+    Calculate the MD5 checksum of the given content.
+    :param content: bytes
+    :return: str (MD5 checksum in hexadecimal format)
+    """
+    md5_hash = hashlib.md5()
+    md5_hash.update(content)
+    return md5_hash.hexdigest()
 
 def upload_virtual_files(files_to_upload, headers={}, url="http://localhost:8080"):
     """
@@ -21,10 +33,19 @@ if __name__ == "__main__":
     print("--- Starting Client Tests ---")
     print("This script makes various POST multipart requests in a rapid sequence.\n")
     small_content = b"Hello, this is a small virtual file."
-    large_content = b"A" * (10 * 1024 * 1024)  # 10MB
+    large_content = os.urandom(10 * 1024 * 1024)  # 10MB of random data
     file1_content = b"B" * (128)
     file2_content = b"C" * (256)
     file3_content = b"D" * (512)
+
+    print("---------------------------------------")
+    print(f"Test to upload file with Expect: 100-continue header...")
+    headers = {"Expect": "100-continue"}
+    # The request lib does not support sending large files with Expect: 100-continue
+    # It will just send the whole request at once.
+    # So the server should reject it with 417 as the request is non-compliant
+    files_to_upload = [("should_not_be_uploaded.bin", large_content)]
+    upload_virtual_files(files_to_upload, headers=headers)
 
     print("---------------------------------------")
     print(f"Testing uploading a small virtual file...")
@@ -33,6 +54,8 @@ if __name__ == "__main__":
 
     print("---------------------------------------")
     print(f"Testing uploading a large virtual file...")
+    large_content_md5 = calculate_md5(large_content)
+    print(f"MD5 checksum of large_content: {large_content_md5}\n")
     files_to_upload = [("large.bin", large_content)]
     upload_virtual_files(files_to_upload)
 

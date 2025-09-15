@@ -20,6 +20,7 @@ const std::string forbidden = "HTTP/1.1 403 Forbidden\r\n";
 const std::string not_found = "HTTP/1.1 404 Not Found\r\n";
 const std::string length_required = "HTTP/1.1 411 Length Required\r\n";
 const std::string payload_too_large = "HTTP/1.1 413 Payload Too Large\r\n";
+const std::string expectation_failed = "HTTP/1.1 417 Expectation Failed\r\n";
 const std::string internal_server_error = "HTTP/1.1 500 Internal Server Error\r\n";
 const std::string not_implemented = "HTTP/1.1 501 Not Implemented\r\n";
 const std::string bad_gateway = "HTTP/1.1 502 Bad Gateway\r\n";
@@ -56,6 +57,8 @@ asio::const_buffer toBuffer(Reply::status_type status) {
             return asio::buffer(length_required);
         case Reply::payload_too_large:
             return asio::buffer(payload_too_large);
+        case Reply::expectation_failed:
+            return asio::buffer(expectation_failed);
         case Reply::internal_server_error:
             return asio::buffer(internal_server_error);
         case Reply::not_implemented:
@@ -169,6 +172,7 @@ const char forbidden[] = R"({"status":403,"error":"Forbidden"})";
 const char not_found[] = R"({"status":404,"error":"Not Found"})";
 const char length_required[] = R"({"status":411,"error":"Length Required"})";
 const char payload_too_large[] = R"({"status":413,"error":"Payload Too Large"})";
+const char expectation_failed[] = R"({"status":417,"error":"Expectation Failed"})";
 const char internal_server_error[] = R"({"status":500,"error":"Internal Server Error"})";
 const char not_implemented[] = R"({"status":501,"error":"Not Implemented"})";
 const char bad_gateway[] = R"({"status":502,"error":"Bad Gateway"})";
@@ -208,6 +212,9 @@ std::vector<char> toArray(Reply::status_type status) {
         case Reply::payload_too_large:
             return std::vector<char>(payload_too_large,
                                      payload_too_large + sizeof(payload_too_large));
+        case Reply::expectation_failed:
+            return std::vector<char>(expectation_failed,
+                                     expectation_failed + sizeof(expectation_failed));
         case Reply::internal_server_error:
             return std::vector<char>(internal_server_error,
                                      internal_server_error + sizeof(internal_server_error));

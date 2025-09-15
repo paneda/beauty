@@ -17,9 +17,15 @@ RequestParser::result_type RequestParser::parse(Request &req, std::vector<char> 
     auto begin = content.begin();
     auto end = content.end();
     size_t totalContentLength = content.size();
+
     while (begin != end) {
         result_type result = consume(req, content, *begin++);
         if (result != indeterminate) {
+            // Check for 100-continue protocol violation after parsing completes
+            if (result == good_headers_expect_continue && std::distance(begin, end) > 0) {
+                // Client sent Expect: 100-continue but included body data without waiting
+                return expect_continue_with_body;
+            }
             return result;
         }
     }

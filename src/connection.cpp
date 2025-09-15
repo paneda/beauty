@@ -94,6 +94,12 @@ void Connection::doRead() {
                         reply_.stockReply(Reply::bad_request);
                         doWriteHeaders();
                     }
+                } else if (result == RequestParser::expect_continue_with_body) {
+                    puts("expect_continue_with_body");
+                    // Parser detected 100-continue protocol violation: client sent Expect header
+                    // with body data without waiting for 100 Continue response
+                    reply_.stockReply(Reply::expectation_failed);
+                    doWriteHeaders();
                 } else if (result == RequestParser::good_part) {
                     // If we haven't received any body bytes yet, but expect some,
                     // we need to wait for more data
@@ -315,8 +321,15 @@ void Connection::doReadBodyAfter100Continue() {
 
                 if (firstBodyReadAfter100Continue_) {
                     firstBodyReadAfter100Continue_ = false;
-                    // Clear 100-continue headers
+
+                    // Clear 100-continue response data
                     reply_.headers_.clear();
+                    reply_.returnToClient_ = false;
+                    reply_.status_ = Reply::status_type::ok;
+                    reply_.content_.clear();
+                    reply_.contentPtr_ = nullptr;
+                    reply_.contentSize_ = 0;
+
                     // handleRequest needs to be called first time to handle
                     // either "single part" or multi-part body processing
                     requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
@@ -341,6 +354,7 @@ void Connection::doReadBodyAfter100Continue() {
                     }
                     doReadBodyAfter100Continue();
                 } else {
+                    requestHandler_.handlePartialWrite(connectionId_, request_, buffer_, reply_);
                     doWriteHeaders();
                 }
             } else if (ec != asio::error::operation_aborted) {

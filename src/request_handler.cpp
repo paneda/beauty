@@ -102,6 +102,10 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
                                         const Request &req,
                                         std::vector<char> &content,
                                         Reply &rep) {
+    if (rep.finalPart_) {
+        return;
+    }
+
     std::deque<MultiPartParser::ContentPart> parts;
     MultiPartParser::result_type result = rep.multiPartParser_.parse(content, parts);
 
@@ -236,6 +240,7 @@ void RequestHandler::writeFileParts(unsigned connectionId,
             }
             if (part.foundEnd_) {
                 rep.lastOpenFileForWriteId_.clear();
+                rep.finalPart_ = true;
             }
         }
     }
