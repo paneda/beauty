@@ -166,18 +166,18 @@ const char multiple_choices[] = R"({"status":300,"message":"Multiple Choices"})"
 const char moved_permanently[] = R"({"status":301,"message":"Moved Permanently"})";
 const char moved_temporarily[] = R"({"status":302,"message":"Moved Temporarily"})";
 const char not_modified[] = R"({"status":304,"message":"Not Modified"})";
-const char bad_request[] = R"({"status":400,"error":"Bad Request"})";
-const char unauthorized[] = R"({"status":401,"error":"Unauthorized"})";
-const char forbidden[] = R"({"status":403,"error":"Forbidden"})";
-const char not_found[] = R"({"status":404,"error":"Not Found"})";
-const char length_required[] = R"({"status":411,"error":"Length Required"})";
-const char payload_too_large[] = R"({"status":413,"error":"Payload Too Large"})";
-const char expectation_failed[] = R"({"status":417,"error":"Expectation Failed"})";
-const char internal_server_error[] = R"({"status":500,"error":"Internal Server Error"})";
-const char not_implemented[] = R"({"status":501,"error":"Not Implemented"})";
-const char bad_gateway[] = R"({"status":502,"error":"Bad Gateway"})";
-const char service_unavailable[] = R"({"status":503,"error":"Service Unavailable"})";
-const char version_not_supported[] = R"({"status":505,"error":"Version Not Supported"})";
+const char bad_request[] = R"({"status":400,"message":"Bad Request"})";
+const char unauthorized[] = R"({"status":401,"message":"Unauthorized"})";
+const char forbidden[] = R"({"status":403,"message":"Forbidden"})";
+const char not_found[] = R"({"status":404,"message":"Not Found"})";
+const char length_required[] = R"({"status":411,"message":"Length Required"})";
+const char payload_too_large[] = R"({"status":413,"message":"Payload Too Large"})";
+const char expectation_failed[] = R"({"status":417,"message":"Expectation Failed"})";
+const char internal_server_error[] = R"({"status":500,"message":"Internal Server Error"})";
+const char not_implemented[] = R"({"status":501,"message":"Not Implemented"})";
+const char bad_gateway[] = R"({"status":502,"message":"Bad Gateway"})";
+const char service_unavailable[] = R"({"status":503,"message":"Service Unavailable"})";
+const char version_not_supported[] = R"({"status":505,"message":"Version Not Supported"})";
 
 std::vector<char> toArray(Reply::status_type status) {
     switch (status) {
