@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "beauty/request.hpp"
 #include "beauty/header.hpp"
 #include "beauty/multipart_parser.hpp"
 
@@ -117,7 +118,7 @@ class Reply {
     }
 
     // Helper to provide standard server replies.
-    void stockReply(status_type status);
+    void stockReply(const Request& req, status_type status);
 
     bool isStatusOk() const {
         return status_ == ok || status_ == created || status_ == accepted || status_ == no_content;

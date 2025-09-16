@@ -25,6 +25,9 @@ class TestClient {
     }
 
     void sendRequest(const std::string& request) {
+        // Extract method from request to know how to handle response
+        currentRequestMethod_ = extractMethodFromRequest(request);
+
         std::ostream requestStream(&request_);
         requestStream << request;
         asio::async_write(
@@ -331,7 +334,7 @@ class TestClient {
 
             // Check if we can complete the request immediately
             bool canCompleteImmediately = false;
-            if (contentLength > 0) {
+            if (contentLength > 0 && currentRequestMethod_ != "HEAD") {
                 if (response_.size() >= contentLength) {
                     // Content already available
                     canCompleteImmediately = true;
@@ -340,20 +343,20 @@ class TestClient {
                     canCompleteImmediately = false;
                 }
             } else {
-                // No body expected
+                // No body expected (either contentLength == 0 OR it's a HEAD request)
                 canCompleteImmediately = true;
             }
 
             if (canCompleteImmediately) {
                 // Skip ReadHeaders notification and go directly to ReadContent
-                if (contentLength > 0) {
+                if (contentLength > 0 && currentRequestMethod_ != "HEAD") {
                     // Content already in buffer, process immediately
                     testResult_.content_.resize(contentLength);
                     asio::buffer_copy(asio::buffer(testResult_.content_), response_.data());
                     testResult_.action_ = TestResult::ReadContent;
                     gotResult_.notify_one();
                 } else {
-                    // No body expected, setting ReadHeaders
+                    // No body expected (or HEAD request), setting ReadHeaders
                     testResult_.action_ = TestResult::ReadHeaders;
                     gotResult_.notify_one();
                 }
@@ -372,7 +375,6 @@ class TestClient {
                         std::bind(&TestClient::handleReadContent, this, asio::placeholders::error));
                 } else {
                     // Start reading the remaining body bytes
-                    std::cout << "Need to read more content\n";
                     asio::async_read(
                         socket_,
                         response_,
@@ -597,8 +599,8 @@ class TestClient {
                 }
             }
 
-            if (contentLength > 0) {
-                // Read content
+            if (contentLength > 0 && currentRequestMethod_ != "HEAD") {
+                // Read content (only for non-HEAD requests)
                 if (response_.size() >= contentLength) {
                     // Content already available
                     testResult_.content_.resize(contentLength);
@@ -615,7 +617,7 @@ class TestClient {
                                                asio::placeholders::error));
                 }
             } else {
-                // No content expected
+                // No content expected (or HEAD request)
                 testResult_.action_ = TestResult::ReadHeaders;
                 gotResult_.notify_one();
             }
@@ -650,4 +652,16 @@ class TestClient {
     // 100-continue support
     std::string expect100Body_;
     bool expect100WaitingForFinalResponse_ = false;
+
+    // Request method tracking for proper response handling
+    std::string currentRequestMethod_;
+
+    // Helper method to extract HTTP method from request string
+    std::string extractMethodFromRequest(const std::string& request) {
+        size_t spacePos = request.find(' ');
+        if (spacePos != std::string::npos) {
+            return request.substr(0, spacePos);
+        }
+        return "GET";  // Default fallback
+    }
 };

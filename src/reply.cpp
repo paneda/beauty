@@ -248,7 +248,7 @@ std::vector<char> toArray(Reply::status_type status) {
 
 }  // namespace stock_replies
 
-void Reply::stockReply(Reply::status_type status) {
+void Reply::stockReply(const Request& req, Reply::status_type status) {
     status_ = status;
     content_ = stock_replies::toArray(status);
     headers_.clear();
@@ -258,8 +258,13 @@ void Reply::stockReply(Reply::status_type status) {
         addHeader("Content-Length", std::to_string(content_.size()));
     }
     addHeader("Content-Type", "application/json");
+
     if (!isStatusOk()) {
         addHeader("Connection", "close");
+    }
+
+    if (req.method_ == "HEAD") {
+        content_.clear();
     }
     returnToClient_ = true;
 }

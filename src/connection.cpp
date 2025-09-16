@@ -63,7 +63,7 @@ void Connection::doRead() {
                         requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
                         doWriteHeaders();
                     } else {
-                        reply_.stockReply(Reply::bad_request);
+                        reply_.stockReply(request_, Reply::bad_request);
                         doWriteHeaders();
                     }
                 } else if (result == RequestParser::good_headers_expect_continue) {
@@ -75,7 +75,7 @@ void Connection::doRead() {
                                 // By design Beauty only supports large body data
                                 // uploads using multipart/form-data. It will not
                                 // allocate buffer > maxContentSize_ for non-multipart data
-                                reply_.stockReply(Reply::payload_too_large);
+                                reply_.stockReply(request_, Reply::payload_too_large);
                                 doWriteHeaders();
                                 return;
                             }
@@ -91,13 +91,13 @@ void Connection::doRead() {
                             doWriteHeaders();
                         }
                     } else {
-                        reply_.stockReply(Reply::bad_request);
+                        reply_.stockReply(request_, Reply::bad_request);
                         doWriteHeaders();
                     }
                 } else if (result == RequestParser::expect_continue_with_body) {
                     // Parser detected 100-continue protocol violation: client sent Expect header
                     // with body data without waiting for 100 Continue response
-                    reply_.stockReply(Reply::expectation_failed);
+                    reply_.stockReply(request_, Reply::expectation_failed);
                     doWriteHeaders();
                 } else if (result == RequestParser::good_part) {
                     // If we haven't received any body bytes yet, but expect some,
@@ -119,7 +119,7 @@ void Connection::doRead() {
                             // By design Beauty only supports large body data
                             // uploads using multipart/form-data. It will not
                             // allocate buffer > maxContentSize_ for non-multipart data
-                            reply_.stockReply(Reply::payload_too_large);
+                            reply_.stockReply(request_, Reply::payload_too_large);
                             doWriteHeaders();
                             return;
                         }
@@ -136,17 +136,17 @@ void Connection::doRead() {
 
                         doReadBody();
                     } else {
-                        reply_.stockReply(Reply::bad_request);
+                        reply_.stockReply(request_, Reply::bad_request);
                         doWriteHeaders();
                     }
                 } else if (result == RequestParser::missing_content_length) {
-                    reply_.stockReply(Reply::length_required);
+                    reply_.stockReply(request_, Reply::length_required);
                     doWriteHeaders();
                 } else if (result == RequestParser::version_not_supported) {
-                    reply_.stockReply(Reply::status_type::version_not_supported);
+                    reply_.stockReply(request_, Reply::status_type::version_not_supported);
                     doWriteHeaders();
                 } else if (result == RequestParser::bad) {
-                    reply_.stockReply(Reply::bad_request);
+                    reply_.stockReply(request_, Reply::bad_request);
                     doWriteHeaders();
                 } else {
                     doRead();

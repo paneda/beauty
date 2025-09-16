@@ -9,8 +9,8 @@ RequestHandler::RequestHandler(IFileIO *fileIO)
       fileNotFoundCb_(defaultFileNotFoundHandler),
       expectContinueCb_(defaultExpectContinueHandler) {}
 
-void RequestHandler::defaultFileNotFoundHandler(const Request &, Reply &rep) {
-    rep.stockReply(Reply::not_found);
+void RequestHandler::defaultFileNotFoundHandler(const Request &req, Reply &rep) {
+    rep.stockReply(req, Reply::not_found);
 }
 
 void RequestHandler::defaultExpectContinueHandler(const Request &, Reply &rep) {
@@ -49,7 +49,8 @@ void RequestHandler::handleRequest(unsigned connectionId,
     }
 
     // if path ends in slash (i.e. is a directory) then add "index.html"
-    if (req.method_ == "GET" && rep.filePath_[rep.filePath_.size() - 1] == '/') {
+    if ((req.method_ == "GET" || req.method_ == "HEAD") &&
+        rep.filePath_[rep.filePath_.size() - 1] == '/') {
         rep.filePath_ += "index.html";
         rep.fileExtension_ = "html";
     }
@@ -57,12 +58,15 @@ void RequestHandler::handleRequest(unsigned connectionId,
     for (const auto &requestHandler_ : requestHandlers_) {
         requestHandler_(req, rep);
         if (rep.returnToClient_) {
+            if (req.method_ == "HEAD") {
+                rep.content_.clear();
+            }
             return;
         }
     }
 
     if (fileIO_ == nullptr) {
-        rep.stockReply(Reply::not_implemented);
+        rep.stockReply(req, Reply::not_implemented);
         return;
     }
 
@@ -73,10 +77,10 @@ void RequestHandler::handleRequest(unsigned connectionId,
             handlePartialWrite(connectionId, req, content, rep);
             return;
         } else {
-            rep.stockReply(Reply::bad_request);
+            rep.stockReply(req, Reply::bad_request);
             return;
         }
-    } else if (req.method_ == "GET") {
+    } else if (req.method_ == "GET" || req.method_ == "HEAD") {
         if (openAndReadFile(connectionId, req, rep) > 0) {
             return;
         } else {
@@ -86,7 +90,7 @@ void RequestHandler::handleRequest(unsigned connectionId,
         }
     }
 
-    rep.stockReply(Reply::not_implemented);
+    rep.stockReply(req, Reply::not_implemented);
 }
 
 void RequestHandler::handlePartialRead(unsigned connectionId, const Request &req, Reply &rep) {
@@ -110,7 +114,7 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
     MultiPartParser::result_type result = rep.multiPartParser_.parse(content, parts);
 
     if (result == MultiPartParser::result_type::bad) {
-        rep.stockReply(Reply::status_type::bad_request);
+        rep.stockReply(req, Reply::status_type::bad_request);
         return;
     }
 
@@ -145,14 +149,20 @@ void RequestHandler::closeFile(unsigned connectionId) {
 bool RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, Reply &rep) {
     // open the file to send back
     size_t contentSize = fileIO_->openFileForRead(std::to_string(connectionId), req, rep);
+
     if (contentSize > 0) {
-        // fill initial content
-        rep.replyPartial_ = contentSize > rep.maxContentSize_;
-        rep.status_ = Reply::ok;
-        readFromFile(connectionId, req, rep);
-        if (!rep.replyPartial_) {
-            // all data fits in initial content
+        if (req.method_ == "HEAD") {
+            // HEAD request, no content
+            rep.content_.clear();
             fileIO_->closeReadFile(std::to_string(connectionId));
+        } else {
+            // fill initial content
+            rep.replyPartial_ = contentSize > rep.maxContentSize_;
+            readFromFile(connectionId, req, rep);
+            if (!rep.replyPartial_) {
+                // all data fits in initial content
+                fileIO_->closeReadFile(std::to_string(connectionId));
+            }
         }
 
         // Content-Length is always set by server
