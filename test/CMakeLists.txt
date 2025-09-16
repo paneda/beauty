@@ -14,6 +14,8 @@ add_executable(${PROJECT_NAME}
 	${CMAKE_CURRENT_SOURCE_DIR}/utils/mock_request_handler.cpp
 )
 
+target_compile_definitions(${PROJECT_NAME} PRIVATE BEAUTY_ENABLE_TESTING)
+
 target_link_libraries(${PROJECT_NAME} PRIVATE Catch2::Catch2WithMain asio::asio cjson ${CMAKE_PROJECT_NAME})
 
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)

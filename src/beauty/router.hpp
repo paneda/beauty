@@ -10,7 +10,7 @@
 
 namespace beauty {
 
-enum class HandlerResult { Matched, MethodNotSupported, NoMatch };
+enum class HandlerResult { Matched, NoMatch };
 
 // A lightweight (optional) router to be used in added RequestHandlers
 class Router {
@@ -23,9 +23,6 @@ class Router {
 
     // Handle an incoming request
     HandlerResult handle(const Request& req, Reply& rep);
-
-    // Get allowed methods for last MethodNotSupported result
-    const std::string& getAllowedMethodsWhenMethodNotSupported() const;
 
    private:
     struct RouteEntry {
@@ -48,10 +45,6 @@ class Router {
 
     // Map of method to list of route entries
     std::unordered_map<std::string, std::vector<RouteEntry>> routes_;
-
-    // Store allowed methods when method not supported
-    // Used to set "Allow" header in 405 responses
-    std::string allowedMethodsWhenMethodNotSupported_;
 };
 
 }  // namespace beauty

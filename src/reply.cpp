@@ -18,7 +18,11 @@ const std::string bad_request = "HTTP/1.1 400 Bad Request\r\n";
 const std::string unauthorized = "HTTP/1.1 401 Unauthorized\r\n";
 const std::string forbidden = "HTTP/1.1 403 Forbidden\r\n";
 const std::string not_found = "HTTP/1.1 404 Not Found\r\n";
+const std::string method_not_allowed = "HTTP/1.1 405 Method Not Allowed\r\n";
+const std::string conflict = "HTTP/1.1 409 Conflict\r\n";
+const std::string gone = "HTTP/1.1 410 Gone\r\n";
 const std::string length_required = "HTTP/1.1 411 Length Required\r\n";
+const std::string precondition_failed = "HTTP/1.1 412 Precondition Failed\r\n";
 const std::string payload_too_large = "HTTP/1.1 413 Payload Too Large\r\n";
 const std::string expectation_failed = "HTTP/1.1 417 Expectation Failed\r\n";
 const std::string internal_server_error = "HTTP/1.1 500 Internal Server Error\r\n";
@@ -53,8 +57,16 @@ asio::const_buffer toBuffer(Reply::status_type status) {
             return asio::buffer(forbidden);
         case Reply::not_found:
             return asio::buffer(not_found);
+        case Reply::method_not_allowed:
+            return asio::buffer(method_not_allowed);
+        case Reply::conflict:
+            return asio::buffer(conflict);
+        case Reply::gone:
+            return asio::buffer(gone);
         case Reply::length_required:
             return asio::buffer(length_required);
+        case Reply::precondition_failed:
+            return asio::buffer(precondition_failed);
         case Reply::payload_too_large:
             return asio::buffer(payload_too_large);
         case Reply::expectation_failed:
@@ -236,7 +248,7 @@ std::vector<char> toArray(Reply::status_type status) {
 
 }  // namespace stock_replies
 
-void Reply::stockReply(Reply::status_type status) {
+void Reply::stockReply(const Request& req, Reply::status_type status) {
     status_ = status;
     content_ = stock_replies::toArray(status);
     headers_.clear();
@@ -246,8 +258,13 @@ void Reply::stockReply(Reply::status_type status) {
         addHeader("Content-Length", std::to_string(content_.size()));
     }
     addHeader("Content-Type", "application/json");
+
     if (!isStatusOk()) {
         addHeader("Connection", "close");
+    }
+
+    if (req.method_ == "HEAD") {
+        content_.clear();
     }
     returnToClient_ = true;
 }

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "beauty/request.hpp"
 #include "beauty/header.hpp"
 #include "beauty/multipart_parser.hpp"
 
@@ -39,8 +40,8 @@ class Reply {
         method_not_allowed = 405,
         conflict = 409,
         gone = 410,
-        precondition_failed = 412,
         length_required = 411,
+        precondition_failed = 412,
         payload_too_large = 413,
         expectation_failed = 417,
         internal_server_error = 500,
@@ -117,7 +118,7 @@ class Reply {
     }
 
     // Helper to provide standard server replies.
-    void stockReply(status_type status);
+    void stockReply(const Request& req, status_type status);
 
     bool isStatusOk() const {
         return status_ == ok || status_ == created || status_ == accepted || status_ == no_content;

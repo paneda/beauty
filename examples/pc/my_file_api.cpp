@@ -12,7 +12,8 @@ MyFileApi::MyFileApi(const std::string &docRoot) : docRoot_(docRoot) {}
 
 void MyFileApi::handleRequest(const Request &req, Reply &rep) {
     HttpResult res(rep.content_);
-    if (req.method_ == "GET") {
+    // Note: For HEAD requests, Beauty will clear rep.content_ before sending
+    if (req.method_ == "GET" || req.method_ == "HEAD") {
         if (req.startsWith("/list-files")) {
             res.buildJsonResponse([&]() -> cJSON * {
                 cJSON *fileArray = cJSON_CreateArray();

@@ -61,6 +61,9 @@ std::vector<char> convertToCharVec(const std::string& s) {
 const std::string GetIndexRequest =
     "GET /index.html HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: */*\r\nConnection: close\r\n\r\n";
 
+const std::string HeadIndexRequest =
+    "HEAD /index.html HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: */*\r\nConnection: close\r\n\r\n";
+
 const std::string GetUriWithQueryRequest =
     "GET /file.bin?myKey=myVal HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: */*\r\nConnection: "
     "keep-alive\r\n\r\n";
@@ -78,7 +81,7 @@ TEST_CASE("server should return binded port", "[server]") {
     REQUIRE(port != 0);
 }
 
-TEST_CASE("contruction", "[server]") {
+TEST_CASE("construction", "[server]") {
     SECTION("it should allow connection with simple constructor") {
         asio::io_context ioc;
         HttpPersistence persistentOption(0s, 0, 0);
@@ -282,6 +285,21 @@ TEST_CASE("server with file handler", "[server]") {
         REQUIRE(res.headers_[1] == "Content-Type: text/plain");
         REQUIRE(res.headers_[2] == "Connection: close");
         REQUIRE(res.content_ == convertToCharVec(mockedContent));
+    }
+    SECTION("it should return correct header for HEAD request") {
+        openConnection(c, "127.0.0.1", port);
+
+        mockFileIO.createMockFile(100);
+        auto fut = createFutureResult(c, ExpectedResult::Headers);
+        c.sendRequest(HeadIndexRequest);
+
+        auto res = fut.get();
+        REQUIRE(res.action_ == TestClient::TestResult::ReadHeaders);
+        REQUIRE(res.statusCode_ == 200);
+        REQUIRE(res.headers_.size() == 3);
+        REQUIRE(res.headers_[0] == "Content-Length: 100");
+        REQUIRE(res.headers_[1] == "Content-Type: text/html");
+        REQUIRE(res.headers_[2] == "Connection: close");
     }
 
     ioc.stop();

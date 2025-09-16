@@ -72,13 +72,6 @@ void MyRouterApi::handleRequest(const Request& req, Reply& rep) {
     auto result = router_.handle(req, rep);
     if (result == HandlerResult::Matched) {
         return;  // Request was handled by router
-    } else if (result == HandlerResult::MethodNotSupported) {
-        // Method not supported for this path.
-        // Note: HTTP 1.1 requires 405 "Method Not Allowed" to include the
-        // "Allow" header
-        rep.addHeader("Allow", router_.getAllowedMethodsWhenMethodNotSupported());
-        rep.send(Reply::status_type::method_not_allowed);
-        return;
     }
 
     // If no route matched let another handler or finally FileIO match the route.
