@@ -1,4 +1,5 @@
 #include <sstream>
+#include <algorithm>
 
 #include "beauty/router.hpp"
 
@@ -32,6 +33,27 @@ void Router::addRoute(const std::string& method, const std::string& pathPattern,
 HandlerResult Router::handle(const Request& req, Reply& rep) {
     auto methodIt = routes_.find(req.method_);
 
+    // Handle OPTIONS method specially
+    if (req.method_ == "OPTIONS") {
+        std::vector<std::string> allowedMethods = findAllowedMethods(req.requestPath_);
+
+        if (!allowedMethods.empty()) {
+            std::ostringstream oss;
+            for (size_t i = 0; i < allowedMethods.size(); ++i) {
+                if (i > 0)
+                    oss << ", ";
+                oss << allowedMethods[i];
+            }
+
+            rep.addHeader("Allow", oss.str());
+            rep.send(Reply::ok);
+            return HandlerResult::Matched;
+        } else {
+            // Path not found, return 404
+            return HandlerResult::NoMatch;
+        }
+    }
+
     // Try to match path+method first
     if (methodIt != routes_.end()) {
         for (const auto& routeEntry : methodIt->second) {
@@ -45,30 +67,20 @@ HandlerResult Router::handle(const Request& req, Reply& rep) {
 
     // If not matched, check if path exists for any other method and collect allowed methods
     if (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ == 1) {
-        bool pathMatched = false;
-        std::ostringstream oss;
-        bool first = true;
-        for (const auto& it : routes_) {
-            const std::string& otherMethod = it.first;
-            if (otherMethod == req.method_) {
-                continue;
-            }
-            const std::vector<RouteEntry>& entries = it.second;
-            for (const auto& routeEntry : entries) {
-                std::unordered_map<std::string, std::string> params;
-                if (matchPath(routeEntry, req.requestPath_, params)) {
-                    if (!first) {
-                        oss << ", ";
-                    }
-                    oss << otherMethod;
-                    first = false;
-                    pathMatched = true;
-                    break;  // Only need to add each method once
-                }
-            }
-        }
+        std::vector<std::string> allowedMethods = findAllowedMethods(req.requestPath_);
 
-        if (pathMatched) {
+        // Remove the current method from allowed methods (since it didn't match)
+        allowedMethods.erase(std::remove(allowedMethods.begin(), allowedMethods.end(), req.method_),
+                             allowedMethods.end());
+
+        if (!allowedMethods.empty()) {
+            std::ostringstream oss;
+            for (size_t i = 0; i < allowedMethods.size(); ++i) {
+                if (i > 0)
+                    oss << ", ";
+                oss << allowedMethods[i];
+            }
+
             rep.addHeader("Allow", oss.str());
             rep.addHeader("Connection", "close");
             rep.send(Reply::method_not_allowed);
@@ -78,6 +90,24 @@ HandlerResult Router::handle(const Request& req, Reply& rep) {
 
     // No path matched at all
     return HandlerResult::NoMatch;
+}
+
+std::vector<std::string> Router::findAllowedMethods(const std::string& requestPath) {
+    std::vector<std::string> allowedMethods;
+
+    for (const auto& it : routes_) {
+        const std::string& method = it.first;
+        const std::vector<RouteEntry>& entries = it.second;
+        for (const auto& routeEntry : entries) {
+            std::unordered_map<std::string, std::string> params;
+            if (matchPath(routeEntry, requestPath, params)) {
+                allowedMethods.push_back(method);
+                break;  // Only need to add each method once
+            }
+        }
+    }
+
+    return allowedMethods;
 }
 
 Router::RouteEntry Router::parsePathPattern(const std::string& pathPattern, Handler handler) {
