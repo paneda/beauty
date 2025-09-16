@@ -397,4 +397,33 @@ TEST_CASE("router functionality", "[router]") {
         REQUIRE(capturedParams.size() == 1);
         REQUIRE(capturedParams["id"] == "99");
     }
+    SECTION("should handle OPTIONS request for existing path") {
+        // Add a test route
+        router.addRoute(
+            "GET",
+            "/options/test",
+            [&](const Request&, Reply&, const std::unordered_map<std::string, std::string>&) {
+                handlerCalled = true;
+            });
+        router.addRoute(
+            "POST",
+            "/options/test",
+            [&](const Request&, Reply&, const std::unordered_map<std::string, std::string>&) {
+                handlerCalled = true;
+            });
+        // Create a mock OPTIONS request
+        std::vector<char> body;
+        Request req(body);
+        req.method_ = "OPTIONS";
+        req.requestPath_ = "/options/test";
+        req.httpVersionMajor_ = 1;
+        req.httpVersionMinor_ = 1;
+        Reply rep(1024);
+        HandlerResult handled = router.handle(req, rep);
+        REQUIRE(handled == HandlerResult::Matched);
+        REQUIRE(handlerCalled == false);  // Handler should not be called for OPTIONS
+        auto allowedMethods = rep.getHeaderValue("Allow");
+        REQUIRE(split_methods(allowedMethods) == std::set<std::string>({"GET", "HEAD", "POST"}));
+        REQUIRE(rep.getStatus() == Reply::ok);
+    }
 }

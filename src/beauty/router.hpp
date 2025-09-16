@@ -43,6 +43,9 @@ class Router {
                    const std::string& requestPath,
                    std::unordered_map<std::string, std::string>& params);
 
+    // Find all methods that support a given path
+    std::vector<std::string> findAllowedMethods(const std::string& requestPath);
+
     // Map of method to list of route entries
     std::unordered_map<std::string, std::vector<RouteEntry>> routes_;
 };
