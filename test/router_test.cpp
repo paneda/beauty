@@ -2,7 +2,6 @@
 #include <sstream>
 #include <cassert>
 #include <catch2/catch_test_macros.hpp>
-
 #include "beauty/router.hpp"
 
 using namespace beauty;
@@ -55,8 +54,7 @@ TEST_CASE("router functionality", "[router]") {
         REQUIRE(capturedParams["userId"] == "123");
     }
     SECTION(
-        "should return MethodNotSupported for HTTP 1.1 request and existing path with different "
-        "method") {
+        "should set Allow header for HTTP 1.1 request and existing path with different method") {
         // Add a test route
         router.addRoute(
             "GET",
@@ -83,11 +81,13 @@ TEST_CASE("router functionality", "[router]") {
 
         HandlerResult handled = router.handle(req, rep);
 
-        REQUIRE(handled == HandlerResult::MethodNotSupported);
+        REQUIRE(handled == HandlerResult::NoMatch);
         REQUIRE(handlerCalled == false);
-        auto allowedMethods = router.getAllowedMethodsWhenMethodNotSupported();
+        auto allowedMethods = rep.getHeaderValue("Allow");
         // Test allowed methods regardless of order
-        REQUIRE(split_methods(allowedMethods) == std::set<std::string>({"GET", "POST", "DELETE"}));
+        REQUIRE(split_methods(allowedMethods) ==
+                std::set<std::string>({"GET", "HEAD", "POST", "DELETE"}));
+        REQUIRE(rep.getStatus() == Reply::method_not_allowed);
     }
     SECTION("should return NoMatch for HTTP 1.0 request and existing path with different method") {
         // Add a test route

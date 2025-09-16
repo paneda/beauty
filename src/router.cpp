@@ -14,6 +14,19 @@ void Router::addRoute(const std::string& method, const std::string& pathPattern,
         int bParams = std::count(b.isParameter.begin(), b.isParameter.end(), true);
         return aParams < bParams;
     });
+
+    // If this is a GET route, also add a HEAD route with the same handler
+    if (method == "GET") {
+        RouteEntry headEntry = parsePathPattern(pathPattern, handler);
+        auto& headVec = routes_["HEAD"];
+        headVec.push_back(std::move(headEntry));
+        // Sort HEAD routes the same way
+        std::sort(headVec.begin(), headVec.end(), [](const RouteEntry& a, const RouteEntry& b) {
+            int aParams = std::count(a.isParameter.begin(), a.isParameter.end(), true);
+            int bParams = std::count(b.isParameter.begin(), b.isParameter.end(), true);
+            return aParams < bParams;
+        });
+    }
 }
 
 HandlerResult Router::handle(const Request& req, Reply& rep) {
@@ -56,18 +69,15 @@ HandlerResult Router::handle(const Request& req, Reply& rep) {
         }
 
         if (pathMatched) {
-            allowedMethodsWhenMethodNotSupported_ = oss.str();
-            return HandlerResult::MethodNotSupported;
+            rep.addHeader("Allow", oss.str());
+            rep.addHeader("Connection", "close");
+            rep.send(Reply::method_not_allowed);
+            return HandlerResult::NoMatch;
         }
     }
 
     // No path matched at all
-    allowedMethodsWhenMethodNotSupported_.clear();
     return HandlerResult::NoMatch;
-}
-
-const std::string& Router::getAllowedMethodsWhenMethodNotSupported() const {
-    return allowedMethodsWhenMethodNotSupported_;
 }
 
 Router::RouteEntry Router::parsePathPattern(const std::string& pathPattern, Handler handler) {
