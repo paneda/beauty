@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <vector>
 
@@ -12,6 +13,19 @@ namespace beauty {
 
 enum class HandlerResult { Matched, NoMatch };
 
+// CORS configuration structure
+struct CorsConfig {
+    std::unordered_set<std::string> allowedOrigins;
+    std::unordered_set<std::string> allowedHeaders;
+    std::unordered_set<std::string> exposedHeaders;
+    bool allowCredentials = false;
+    int maxAge = 86400;  // 24 hours
+
+    // Helper methods
+    bool isOriginAllowed(const std::string& origin) const;
+    bool isWildcardOrigin() const;
+};
+
 // A lightweight (optional) router to be used in added RequestHandlers
 class Router {
    public:
@@ -20,6 +34,9 @@ class Router {
 
     // Add a route with method, path pattern and handler
     void addRoute(const std::string& method, const std::string& pathPattern, Handler handler);
+
+    // Configure CORS settings
+    void configureCors(const CorsConfig& config);
 
     // Handle an incoming request
     HandlerResult handle(const Request& req, Reply& rep);
@@ -46,8 +63,24 @@ class Router {
     // Find all methods that support a given path
     std::vector<std::string> findAllowedMethods(const std::string& requestPath);
 
+    // Handle CORS preflight request
+    bool handleCorsPreflight(const Request& req, Reply& rep);
+
+    // Check if a header is CORS-safelisted
+    bool isCorsSafelistedHeader(const std::string& header);
+
+    // Add CORS headers to response
+    void addCorsHeaders(const Request& req, Reply& rep);
+
+    // Check if request is a CORS preflight request
+    bool isPreflightRequest(const Request& req);
+
     // Map of method to list of route entries
     std::unordered_map<std::string, std::vector<RouteEntry>> routes_;
+
+    // CORS configuration
+    CorsConfig corsConfig_;
+    bool corsEnabled_ = false;
 };
 
 }  // namespace beauty

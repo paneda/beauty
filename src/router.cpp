@@ -1,9 +1,27 @@
+#include <cctype>
+#include <set>
 #include <sstream>
 #include <algorithm>
 
 #include "beauty/router.hpp"
 
 namespace beauty {
+
+// CorsConfig helper methods
+bool CorsConfig::isOriginAllowed(const std::string& origin) const {
+    if (isWildcardOrigin())
+        return true;
+    return allowedOrigins.find(origin) != allowedOrigins.end();
+}
+
+bool CorsConfig::isWildcardOrigin() const {
+    return allowedOrigins.find("*") != allowedOrigins.end();
+}
+
+void Router::configureCors(const CorsConfig& config) {
+    corsConfig_ = config;
+    corsEnabled_ = true;
+}
 
 void Router::addRoute(const std::string& method, const std::string& pathPattern, Handler handler) {
     RouteEntry entry = parsePathPattern(pathPattern, handler);
@@ -33,6 +51,11 @@ void Router::addRoute(const std::string& method, const std::string& pathPattern,
 HandlerResult Router::handle(const Request& req, Reply& rep) {
     auto methodIt = routes_.find(req.method_);
 
+    // Handle CORS preflight requests first
+    if (corsEnabled_ && isPreflightRequest(req)) {
+        return handleCorsPreflight(req, rep) ? HandlerResult::Matched : HandlerResult::NoMatch;
+    }
+
     // Handle OPTIONS method specially
     if (req.method_ == "OPTIONS") {
         std::vector<std::string> allowedMethods = findAllowedMethods(req.requestPath_);
@@ -46,6 +69,9 @@ HandlerResult Router::handle(const Request& req, Reply& rep) {
             }
 
             rep.addHeader("Allow", oss.str());
+            if (corsEnabled_) {
+                addCorsHeaders(req, rep);
+            }
             rep.send(Reply::ok);
             return HandlerResult::Matched;
         } else {
@@ -60,6 +86,10 @@ HandlerResult Router::handle(const Request& req, Reply& rep) {
             std::unordered_map<std::string, std::string> params;
             if (matchPath(routeEntry, req.requestPath_, params)) {
                 routeEntry.handler(req, rep, params);
+                // Add CORS headers to successful responses
+                if (corsEnabled_) {
+                    addCorsHeaders(req, rep);
+                }
                 return HandlerResult::Matched;
             }
         }
@@ -187,6 +217,138 @@ bool Router::matchPath(const RouteEntry& routeEntry,
     }
 
     return true;
+}
+
+bool Router::isPreflightRequest(const Request& req) {
+    if (req.method_ != "OPTIONS")
+        return false;
+
+    // Check for required CORS preflight headers
+    std::string origin = req.getHeaderValue("Origin");
+    std::string requestMethod = req.getHeaderValue("Access-Control-Request-Method");
+
+    return !origin.empty() && !requestMethod.empty();
+}
+
+bool Router::handleCorsPreflight(const Request& req, Reply& rep) {
+    std::string origin = req.getHeaderValue("Origin");
+    std::string requestMethod = req.getHeaderValue("Access-Control-Request-Method");
+    std::string requestHeaders = req.getHeaderValue("Access-Control-Request-Headers");
+
+    // Check if origin is allowed
+    if (!corsConfig_.isOriginAllowed(origin)) {
+        return false;  // Forbidden
+    }
+
+    // Check if the requested method is supported for this path
+    std::vector<std::string> allowedMethods = findAllowedMethods(req.requestPath_);
+    if (std::find(allowedMethods.begin(), allowedMethods.end(), requestMethod) ==
+        allowedMethods.end()) {
+        return false;  // Method not allowed for this path
+    }
+
+    // Set CORS preflight response headers
+    rep.addHeader("Access-Control-Allow-Origin", corsConfig_.isWildcardOrigin() ? "*" : origin);
+
+    // Allow the requested method plus any other methods for this path
+    std::ostringstream methodsOss;
+    for (size_t i = 0; i < allowedMethods.size(); ++i) {
+        if (i > 0)
+            methodsOss << ", ";
+        methodsOss << allowedMethods[i];
+    }
+    rep.addHeader("Access-Control-Allow-Methods", methodsOss.str());
+
+    // Handle requested headers
+    if (!requestHeaders.empty()) {
+        std::vector<std::string> nonSafelistedHeaders;
+
+        // Parse the requested headers
+        std::istringstream iss(requestHeaders);
+        std::string header;
+        while (std::getline(iss, header, ',')) {
+            // Remove leading/trailing whitespace
+            header.erase(0, header.find_first_not_of(" \t"));
+            header.erase(header.find_last_not_of(" \t") + 1);
+
+            // Skip CORS-safelisted headers (they don't need explicit permission)
+            if (isCorsSafelistedHeader(header)) {
+                continue;
+            }
+
+            // For non-safelisted headers, check if they're in our allowed list
+            if (corsConfig_.allowedHeaders.find(header) != corsConfig_.allowedHeaders.end()) {
+                nonSafelistedHeaders.push_back(header);
+            }
+        }
+
+        // Only set the header if we have non-safelisted headers to return
+        if (!nonSafelistedHeaders.empty()) {
+            std::ostringstream headersOss;
+            for (size_t i = 0; i < nonSafelistedHeaders.size(); ++i) {
+                if (i > 0)
+                    headersOss << ", ";
+                headersOss << nonSafelistedHeaders[i];
+            }
+            rep.addHeader("Access-Control-Allow-Headers", headersOss.str());
+        }
+    }
+
+    // Set max age
+    rep.addHeader("Access-Control-Max-Age", std::to_string(corsConfig_.maxAge));
+
+    if (corsConfig_.allowCredentials && !corsConfig_.isWildcardOrigin()) {
+        rep.addHeader("Access-Control-Allow-Credentials", "true");
+    }
+
+    rep.send(Reply::ok);
+    return true;
+}
+
+bool Router::isCorsSafelistedHeader(const std::string& header) {
+    // Convert to lowercase for case-insensitive comparison
+    std::string lowerHeader = header;
+    std::transform(lowerHeader.begin(), lowerHeader.end(), lowerHeader.begin(), ::tolower);
+
+    // CORS-safelisted request headers (don't need explicit permission)
+    static const std::set<std::string> safelistedHeaders = {
+        "accept",
+        "accept-language",
+        "content-language",
+        "content-type"  // Note: Only certain values are safelisted, but we'll be permissive here
+    };
+
+    return safelistedHeaders.find(lowerHeader) != safelistedHeaders.end();
+}
+
+void Router::addCorsHeaders(const Request& req, Reply& rep) {
+    std::string origin = req.getHeaderValue("Origin");
+
+    if (origin.empty())
+        return;  // Not a cross-origin request
+
+    if (!corsConfig_.isOriginAllowed(origin))
+        return;  // Origin not allowed
+
+    // Add basic CORS headers
+    rep.addHeader("Access-Control-Allow-Origin", corsConfig_.isWildcardOrigin() ? "*" : origin);
+
+    if (corsConfig_.allowCredentials && !corsConfig_.isWildcardOrigin()) {
+        rep.addHeader("Access-Control-Allow-Credentials", "true");
+    }
+
+    // Add exposed headers if any
+    if (!corsConfig_.exposedHeaders.empty()) {
+        std::ostringstream oss;
+        bool first = true;
+        for (const auto& header : corsConfig_.exposedHeaders) {
+            if (!first)
+                oss << ", ";
+            oss << header;
+            first = false;
+        }
+        rep.addHeader("Access-Control-Expose-Headers", oss.str());
+    }
 }
 
 }  // namespace beauty
