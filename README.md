@@ -407,7 +407,7 @@ rep.send(res.statusCode_, "text/csv");
 ```
 ## Router (optional)
 
-Beauty provides a lightweight, router implementation. It avoids heavy dependencies like `std::regex` and uses string operations for path matching.
+Beauty provides a lightweight, router implementation. It avoids heavy dependencies like `std::regex` and uses string operations for path matching. The router provides some key features listed below but is not required when implementing a Web API request handler.
 
 ### Features
 
@@ -415,7 +415,48 @@ Beauty provides a lightweight, router implementation. It avoids heavy dependenci
 - **Embedded-friendly**: Minimal memory footprint and predictable performance
 - **Path Parameters**: Supports parameterized paths like `/users/{userId}`
 - **Multiple HTTP Methods**: Support for GET, POST, PUT, DELETE, etc.
+- **HTTP/1.1 Compliant**: Full compliance with HTTP/1.1 specification
+- **CORS Support**: Complete Cross-Origin Resource Sharing implementation
+- **Automatic HEAD Support**: HEAD requests automatically supported for all GET routes
+- **OPTIONS Method**: Automatic method discovery and CORS preflight handling
+- **Proper Error Responses**: 405 Method Not Allowed with Allow header
 - **Easy Integration**: Designed to work seamlessly with Beauty's request handling
+
+### HTTP/1.1 Compliance & CORS
+
+The router provides comprehensive HTTP/1.1 compliance and CORS support:
+
+#### HTTP/1.1 Features
+- **HEAD Method**: Automatically supported for all GET routes
+- **OPTIONS Method**: Returns allowed methods for any resource
+- **405 Responses**: Method Not Allowed responses include proper Allow header
+- **Proper Status Codes**: Compliant with HTTP/1.1 specification
+
+#### CORS Support
+```cpp
+// Configure CORS for cross-origin requests
+beauty::CorsConfig corsConfig;
+corsConfig.allowedOrigins.insert("https://myapp.com");
+corsConfig.allowedOrigins.insert("http://localhost:3000");
+corsConfig.allowedHeaders.insert("Authorization");
+corsConfig.allowCredentials = true;
+corsConfig.maxAge = 3600; // 1 hour preflight cache
+
+router.configureCors(corsConfig);
+```
+
+**CORS Features:**
+- **Preflight Handling**: Automatic CORS preflight request processing
+- **Origin Validation**: Configurable allowed origins (including wildcards)
+- **Header Control**: Specify allowed and exposed headers
+- **Credentials Support**: Configurable cookie/auth header support
+- **Cache Control**: Configurable preflight response caching
+
+**What CORS Enables:**
+- Modern web applications with separate frontend/backend
+- Cross-domain API access from browsers
+- Integration with JavaScript frameworks (React, Vue, Angular)
+- Web based mobile apps (e.g. PWA)
 
 ### Basic Usage
 
@@ -446,7 +487,7 @@ router.addRoute("GET", "/users/{userId}",
 #### 3. Handle Requests
 
 ```cpp
-// Using the Router, a request handler is essentially implemented like this:
+// Using the Router, the request handler is implemented as:
 void handleRequest(const beauty::Request& req, beauty::Reply& rep) {
     if (router.handle(req, rep) == HandlerResult::Matched) {
         return; // Request was handled by router
@@ -483,14 +524,19 @@ See `my_router_api.cpp` for a complete working example that demonstrates:
 - Setting up multiple routes with different HTTP methods
 - Handling path parameters
 - Returning JSON responses
+- CORS configuration for cross-origin requests
+- HTTP/1.1 compliance features (HEAD, OPTIONS, 405 responses)
+- Cross-origin testing examples with curl commands
 - Integration with Beauty's HttpResult
 
 ### Performance Characteristics
 
-- **Memory**: Minimal overhead, stores only parsed route segments
+- **Memory**: Minimal overhead, stores only parsed route segments and CORS config
 - **CPU**: Simple string comparisons, no regex compilation or matching
 - **Predictable**: Linear time complexity O(n) where n is the number of route segments
 - **Embedded-friendly**: No dynamic regex compilation, fixed memory usage per route
+- **CORS Efficient**: CORS headers only added when needed (cross-origin requests)
+- **HTTP/1.1 Compliance**: HEAD and OPTIONS responses generated without handler execution
 
 ### Building and Testing
 
