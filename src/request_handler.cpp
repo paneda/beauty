@@ -4,16 +4,19 @@
 
 namespace beauty {
 
-namespace {
-
-void defaultFileNotFoundHandler(const Request &, Reply &rep) {
-    rep.stockReply(Reply::not_found);
-}
-
-}
-
 RequestHandler::RequestHandler(IFileIO *fileIO)
-    : fileIO_(fileIO), fileNotFoundCb_(defaultFileNotFoundHandler) {}
+    : fileIO_(fileIO),
+      fileNotFoundCb_(defaultFileNotFoundHandler),
+      expectContinueCb_(defaultExpectContinueHandler) {}
+
+void RequestHandler::defaultFileNotFoundHandler(const Request &req, Reply &rep) {
+    rep.stockReply(req, Reply::not_found);
+}
+
+void RequestHandler::defaultExpectContinueHandler(const Request &, Reply &rep) {
+    // Default: approve all 100-continue requests
+    rep.send(Reply::ok);
+}
 
 void RequestHandler::addRequestHandler(const handlerCallback &cb) {
     requestHandlers_.push_back(cb);
@@ -21,6 +24,14 @@ void RequestHandler::addRequestHandler(const handlerCallback &cb) {
 
 void RequestHandler::setFileNotFoundHandler(const handlerCallback &cb) {
     fileNotFoundCb_ = cb;
+}
+
+void RequestHandler::setExpectContinueHandler(const handlerCallback &cb) {
+    expectContinueCb_ = cb;
+}
+
+void RequestHandler::shouldContinueAfterHeaders(const Request &req, Reply &rep) {
+    expectContinueCb_(req, rep);
 }
 
 void RequestHandler::handleRequest(unsigned connectionId,
@@ -38,7 +49,8 @@ void RequestHandler::handleRequest(unsigned connectionId,
     }
 
     // if path ends in slash (i.e. is a directory) then add "index.html"
-    if (req.method_ == "GET" && rep.filePath_[rep.filePath_.size() - 1] == '/') {
+    if ((req.method_ == "GET" || req.method_ == "HEAD") &&
+        rep.filePath_[rep.filePath_.size() - 1] == '/') {
         rep.filePath_ += "index.html";
         rep.fileExtension_ = "html";
     }
@@ -46,36 +58,39 @@ void RequestHandler::handleRequest(unsigned connectionId,
     for (const auto &requestHandler_ : requestHandlers_) {
         requestHandler_(req, rep);
         if (rep.returnToClient_) {
+            if (req.method_ == "HEAD") {
+                rep.content_.clear();
+            }
             return;
         }
     }
 
     if (fileIO_ == nullptr) {
-        rep.stockReply(Reply::not_implemented);
+        rep.stockReply(req, Reply::not_implemented);
         return;
     }
 
     if (req.method_ == "POST") {
-        if (rep.multiPartParser_.parseHeader(req)) {
+        if (rep.isMultiPart_ || rep.multiPartParser_.parseHeader(req)) {
             rep.status_ = Reply::ok;
             rep.isMultiPart_ = true;
             handlePartialWrite(connectionId, req, content, rep);
             return;
         } else {
-            rep.stockReply(Reply::bad_request);
+            rep.stockReply(req, Reply::bad_request);
             return;
         }
-
-    } else if (req.method_ == "GET") {
+    } else if (req.method_ == "GET" || req.method_ == "HEAD") {
         if (openAndReadFile(connectionId, req, rep) > 0) {
             return;
         } else {
+            rep.headers_.clear();
             fileNotFoundCb_(req, rep);
             return;
         }
     }
 
-    rep.stockReply(Reply::not_implemented);
+    rep.stockReply(req, Reply::not_implemented);
 }
 
 void RequestHandler::handlePartialRead(unsigned connectionId, const Request &req, Reply &rep) {
@@ -91,15 +106,23 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
                                         const Request &req,
                                         std::vector<char> &content,
                                         Reply &rep) {
+    if (rep.finalPart_) {
+        return;
+    }
+
     std::deque<MultiPartParser::ContentPart> parts;
     MultiPartParser::result_type result = rep.multiPartParser_.parse(content, parts);
 
     if (result == MultiPartParser::result_type::bad) {
-        rep.stockReply(Reply::status_type::bad_request);
+        rep.stockReply(req, Reply::status_type::bad_request);
         return;
     }
 
     writeFileParts(connectionId, req, rep, parts);
+    if (!rep.isStatusOk() && rep.status_ != Reply::status_type::no_content) {
+        rep.addHeader("Content-Length", std::to_string(rep.content_.size()));
+        return;
+    }
 
     if (result == MultiPartParser::result_type::done) {
         rep.multiPartParser_.flush(content, parts);
@@ -108,8 +131,12 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
 
     // done with content unless there's 'bad' messages that should be return to
     // client
-    if (rep.status_ == Reply::status_type::ok) {
+    if (rep.isStatusOk()) {
         rep.content_.clear();
+    }
+    if (result == MultiPartParser::result_type::done &&
+        rep.status_ != Reply::status_type::no_content) {
+        rep.addHeader("Content-Length", std::to_string(rep.content_.size()));
     }
 }
 
@@ -122,14 +149,20 @@ void RequestHandler::closeFile(unsigned connectionId) {
 bool RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, Reply &rep) {
     // open the file to send back
     size_t contentSize = fileIO_->openFileForRead(std::to_string(connectionId), req, rep);
+
     if (contentSize > 0) {
-        // fill initial content
-        rep.replyPartial_ = contentSize > rep.maxContentSize_;
-        rep.status_ = Reply::ok;
-        readFromFile(connectionId, req, rep);
-        if (!rep.replyPartial_) {
-            // all data fits in initial content
+        if (req.method_ == "HEAD") {
+            // HEAD request, no content
+            rep.content_.clear();
             fileIO_->closeReadFile(std::to_string(connectionId));
+        } else {
+            // fill initial content
+            rep.replyPartial_ = contentSize > rep.maxContentSize_;
+            readFromFile(connectionId, req, rep);
+            if (!rep.replyPartial_) {
+                // all data fits in initial content
+                fileIO_->closeReadFile(std::to_string(connectionId));
+            }
         }
 
         // Content-Length is always set by server
@@ -172,10 +205,12 @@ void RequestHandler::writeFileParts(unsigned connectionId,
             std::string err;
             rep.status_ = fileIO_->openFileForWrite(
                 rep.filePath_ + std::to_string(connectionId), req, rep, err);
-            rep.multiPartCounter_++;
-            if (rep.status_ != Reply::status_type::ok &&
-                rep.status_ != Reply::status_type::created) {
-                rep.content_.insert(rep.content_.begin(), err.begin(), err.end());
+            if (!rep.isStatusOk()) {
+                // Use same json format as stockReply()
+                std::string jsonErr =
+                    "{\"status\":" + std::to_string(rep.status_) + ",\"message\":\"" + err + "\"}";
+                rep.content_.assign(jsonErr.begin(), jsonErr.end());
+                rep.addHeader("Content-Type", "application/json");
                 return;
             }
         }
@@ -196,24 +231,26 @@ void RequestHandler::writeFileParts(unsigned connectionId,
                 rep.filePath_ = req.requestPath_ + part.filename_;
                 rep.lastOpenFileForWriteId_ = rep.filePath_ + std::to_string(connectionId);
                 rep.status_ = fileIO_->openFileForWrite(rep.lastOpenFileForWriteId_, req, rep, err);
-                rep.multiPartCounter_++;
-                if (rep.status_ != Reply::status_type::ok &&
-                    rep.status_ != Reply::status_type::created) {
-                    rep.content_.insert(rep.content_.begin(), err.begin(), err.end());
+                if (!rep.isStatusOk()) {
+                    // Use same json format as stockReply()
+                    std::string jsonErr = "{\"status\":" + std::to_string(rep.status_) +
+                                          ",\"message\":\"" + err + "\"}";
+                    rep.content_.assign(jsonErr.begin(), jsonErr.end());
+                    rep.addHeader("Content-Type", "application/json");
                     return;
                 }
             }
             size_t size = part.end_ - part.start_;
             rep.status_ = fileIO_->writeFile(
                 rep.lastOpenFileForWriteId_, req, &(*part.start_), size, part.foundEnd_, err);
-            if (rep.status_ != Reply::status_type::ok &&
-                rep.status_ != Reply::status_type::created) {
+            if (!rep.isStatusOk()) {
                 rep.lastOpenFileForWriteId_.clear();
                 rep.content_.insert(rep.content_.begin(), err.begin(), err.end());
                 return;
             }
             if (part.foundEnd_) {
                 rep.lastOpenFileForWriteId_.clear();
+                rep.finalPart_ = true;
             }
         }
     }

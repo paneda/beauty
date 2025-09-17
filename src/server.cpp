@@ -82,6 +82,10 @@ void Server::setFileNotFoundHandler(const handlerCallback &cb) {
     requestHandler_.setFileNotFoundHandler(cb);
 }
 
+void Server::setExpectContinueHandler(const handlerCallback &cb) {
+    requestHandler_.setExpectContinueHandler(cb);
+}
+
 void Server::setDebugMsgHandler(const debugMsgCallback &cb) {
     connectionManager_.setDebugMsgHandler(cb);
     debugMsgCb_ = cb;

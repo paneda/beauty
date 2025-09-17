@@ -23,6 +23,7 @@ bool MultiPartParser::parseHeader(const Request &req) {
     if (it == std::string::npos) {
         return false;
     }
+
     const std::string key = "boundary=";
     std::size_t foundStart = contentTypeVal.find(key);
     std::size_t foundEnd = contentTypeVal.find(";", foundStart + key.size());
@@ -34,6 +35,15 @@ bool MultiPartParser::parseHeader(const Request &req) {
                 contentTypeVal.substr(foundStart + key.size(), foundEnd - foundStart - key.size());
         }
     } else {
+        return false;
+    }
+    return true;
+}
+
+bool MultiPartParser::isMultipartRequest(const Request &req) {
+    std::string contentTypeVal = req.getHeaderValue("Content-Type");
+    auto it = contentTypeVal.find("multipart");
+    if (it == std::string::npos) {
         return false;
     }
     return true;

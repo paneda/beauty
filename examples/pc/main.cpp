@@ -29,6 +29,24 @@ int main(int argc, char *argv[]) {
         HttpPersistence persistentOption(5s, 1000, 0);
         Server s(ioc, argv[1], argv[2], &fileIO, persistentOption, 1024);
 
+        s.setExpectContinueHandler([](const Request &req, Reply &rep) -> void {
+            std::cout << "Expect: 100-continue received for " << req.requestPath_ << std::endl;
+            auto authHeader = req.getHeaderValue("authorization");
+            if (authHeader.size() < 8 || authHeader.substr(0, 6) != "Bearer") {
+                rep.addHeader("WWW-Authenticate", "Basic realm=\"Access to the site\"");
+                rep.send(Reply::status_type::unauthorized);
+                return;
+            }
+            auto token = req.getHeaderValue("authorization").substr(7);
+            if (token != "valid_token") {
+                rep.addHeader("WWW-Authenticate", "Basic realm=\"Access to the site\"");
+                rep.send(Reply::status_type::unauthorized);
+                return;
+            }
+            printf("Authorized with token: %s\n", token.c_str());
+            rep.send(Reply::status_type::ok);  // Approve the request (will return 100 Continue)
+        });
+
         MyRouterApi routerApi;
         MyFileApi fileApi(argv[3]);
         s.addRequestHandler(std::bind(&MyRouterApi::handleRequest, &routerApi, _1, _2));

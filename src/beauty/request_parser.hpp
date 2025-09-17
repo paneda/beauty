@@ -1,6 +1,8 @@
 #pragma once
 
 #include <vector>
+#include <string>
+#include <limits>
 
 namespace beauty {
 
@@ -15,7 +17,17 @@ class RequestParser {
     void reset();
 
     // Result of parse.
-    enum result_type { good_complete, good_part, bad, indeterminate };
+    enum result_type {
+        good_complete,
+        good_part,
+        good_headers_expect_continue,
+        expect_continue_with_body,  // Protocol violation: Expect 100-continue with body data
+        bad,
+        not_implemented,
+        version_not_supported,
+        missing_content_length,
+        indeterminate
+    };
 
     // Parse some data. The enum return value is good when a complete request
     // has been parsed, bad if the data is invalid, good_part when more
@@ -25,6 +37,9 @@ class RequestParser {
    private:
     // Handle the next character of input.
     result_type consume(Request &req, std::vector<char> &content, char input);
+
+    void storeHeaderValueIfNeeded(Request &req);
+    result_type checkRequestAfterAllHeaders(Request &req);
 
     // The current state of the parser.
     enum state {
@@ -52,7 +67,7 @@ class RequestParser {
         post,
     } state_;
 
-    std::size_t contentLength_ = 0;
+    std::size_t contentLength_ = std::numeric_limits<size_t>::max();
 };
 
 }  // namespace beauty

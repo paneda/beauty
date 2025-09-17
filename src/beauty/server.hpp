@@ -39,6 +39,7 @@ class Server {
     // Handlers to be optionally implemented.
     void addRequestHandler(const handlerCallback &cb);
     void setFileNotFoundHandler(const handlerCallback &cb);
+    void setExpectContinueHandler(const handlerCallback &cb);
     void setDebugMsgHandler(const debugMsgCallback &cb);
 
    private:

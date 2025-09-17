@@ -13,6 +13,7 @@ class MyRouterApi {
     MyRouterApi();
     virtual ~MyRouterApi() = default;
 
+    void setupCorsConfiguration();
     void setupRoutes();
     void handleRequest(const beauty::Request& req, beauty::Reply& rep);
 
@@ -36,6 +37,9 @@ class MyRouterApi {
     void usersUserIdPostsPostIdGet(const beauty::Request& req,
                                    beauty::Reply& rep,
                                    const std::unordered_map<std::string, std::string>& params);
+    void apiInfoGet(const beauty::Request& req,
+                    beauty::Reply& rep,
+                    const std::unordered_map<std::string, std::string>& params);
 
     beauty::Router router_;
 };
