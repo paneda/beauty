@@ -78,10 +78,6 @@ void Server::addRequestHandler(const handlerCallback &cb) {
     requestHandler_.addRequestHandler(cb);
 }
 
-void Server::setFileNotFoundHandler(const handlerCallback &cb) {
-    requestHandler_.setFileNotFoundHandler(cb);
-}
-
 void Server::setExpectContinueHandler(const handlerCallback &cb) {
     requestHandler_.setExpectContinueHandler(cb);
 }

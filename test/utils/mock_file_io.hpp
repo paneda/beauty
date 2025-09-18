@@ -22,21 +22,21 @@ class MockFileIO : public beauty::IFileIO {
                  size_t maxSize) override;
     void closeReadFile(const std::string& id) override;
 
-    beauty::Reply::status_type openFileForWrite(const std::string& id,
-                                                const beauty::Request& request,
-                                                beauty::Reply& reply,
-                                                std::string& err) override;
-    beauty::Reply::status_type writeFile(const std::string& id,
-                                         const beauty::Request& request,
-                                         const char* buf,
-                                         size_t size,
-                                         bool lastData,
-                                         std::string& err) override;
+    void openFileForWrite(const std::string& id,
+                          const beauty::Request& request,
+                          beauty::Reply& reply) override;
+    void writeFile(const std::string& id,
+                   const beauty::Request& request,
+                   beauty::Reply& reply,
+                   const char* buf,
+                   size_t size,
+                   bool lastData) override;
 
     void createMockFile(uint32_t size);
     void setMockFailToOpenReadFile();
     void setMockFailToOpenWriteFile();
     std::vector<char> getMockWriteFile(const std::string& id);
+    void addHeader(const beauty::Header& header);
 
     int getOpenFileForReadCalls();
     int getOpenFileForWriteCalls();
@@ -63,4 +63,5 @@ class MockFileIO : public beauty::IFileIO {
     int countCloseReadFileCalls_ = 0;
     bool mockFailToOpenReadFile_ = false;
     bool mockFailToOpenWriteFile_ = false;
+    std::vector<beauty::Header> headers_;
 };

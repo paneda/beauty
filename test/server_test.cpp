@@ -184,6 +184,7 @@ TEST_CASE("server with file handler", "[server]") {
     SECTION("it should call fileIO openFileForRead but not close when no file exists") {
         openConnection(c, "127.0.0.1", port);
         auto fut = createFutureResult(c);
+        mockFileIO.setMockFailToOpenReadFile();
         c.sendRequest(GetIndexRequest);
 
         fut.get();
@@ -219,7 +220,7 @@ TEST_CASE("server with file handler", "[server]") {
         REQUIRE(res.headers_[2] == "Connection: close");
     }
 
-    SECTION("it should return correct headers") {
+    SECTION("it should return correct headers when no headers set in file handler") {
         openConnection(c, "127.0.0.1", port);
         mockFileIO.createMockFile(100);
         auto fut = createFutureResult(c);
@@ -231,6 +232,22 @@ TEST_CASE("server with file handler", "[server]") {
         REQUIRE(res.headers_[0] == "Content-Length: 100");
         REQUIRE(res.headers_[1] == "Content-Type: text/html");
         REQUIRE(res.headers_[2] == "Connection: close");
+    }
+
+    SECTION("it should return correct headers when headers set in file handler") {
+        openConnection(c, "127.0.0.1", port);
+        mockFileIO.createMockFile(100);
+        mockFileIO.addHeader({"X-Custom-Header", "MyValue"});
+        auto fut = createFutureResult(c);
+        c.sendRequest(GetIndexRequest);
+
+        auto res = fut.get();  // headers
+        REQUIRE(res.action_ == TestClient::TestResult::ReadContent);
+        REQUIRE(res.headers_.size() == 4);
+        REQUIRE(res.headers_[0] == "X-Custom-Header: MyValue");
+        REQUIRE(res.headers_[1] == "Content-Length: 100");
+        REQUIRE(res.headers_[2] == "Content-Type: text/html");
+        REQUIRE(res.headers_[3] == "Connection: close");
     }
 
     SECTION("it should return content less than chunk size") {
@@ -261,30 +278,6 @@ TEST_CASE("server with file handler", "[server]") {
         std::vector<uint32_t> expectedContent(fileSizeBytes / sizeof(uint32_t));
         std::iota(expectedContent.begin(), expectedContent.end(), 0);
         REQUIRE(res.content_ == convertToCharVec(expectedContent));
-    }
-    SECTION("it should return reply from fileNotFoundHandler") {
-        std::string mockedContent = "This is mocked content";
-        MockNotFoundHandler mockNotFoundHandler;
-        mockNotFoundHandler.setMockedContent(mockedContent);
-        mockFileIO.setMockFailToOpenReadFile();
-        dut.setFileNotFoundHandler(std::bind(&MockNotFoundHandler::handleNotFound,
-                                             &mockNotFoundHandler,
-                                             std::placeholders::_1,
-                                             std::placeholders::_2));
-        openConnection(c, "127.0.0.1", port);
-
-        auto fut = createFutureResult(c);
-        c.sendRequest(GetIndexRequest);
-
-        auto res = fut.get();
-        REQUIRE(res.action_ == TestClient::TestResult::ReadContent);
-        REQUIRE(mockNotFoundHandler.getNoCalls() == 1);
-        REQUIRE(res.statusCode_ == 200);
-        REQUIRE(res.headers_.size() == 3);
-        REQUIRE(res.headers_[0] == "Content-Length: 22");
-        REQUIRE(res.headers_[1] == "Content-Type: text/plain");
-        REQUIRE(res.headers_[2] == "Connection: close");
-        REQUIRE(res.content_ == convertToCharVec(mockedContent));
     }
     SECTION("it should return correct header for HEAD request") {
         openConnection(c, "127.0.0.1", port);
@@ -518,7 +511,7 @@ TEST_CASE("server with write fileIO", "[server]") {
         REQUIRE(res.headers_.size() == 3);
         REQUIRE(res.statusCode_ == 500);  // MockFileIO::openFileForWrite
         std::string expectedContent =
-            R"({"status":500,"message":"MockFileIO test error: simulated failure to open file for write"})";
+            "MockFileIO test error: simulated failure to open file for write";
         REQUIRE(res.content_ == convertToCharVec(expectedContent));
     }
     SECTION("it should handle multiple parts in a multipart request") {

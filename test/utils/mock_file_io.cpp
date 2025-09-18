@@ -6,7 +6,9 @@
 
 #include "file_io.hpp"
 
-size_t MockFileIO::openFileForRead(const std::string& id, const beauty::Request&, beauty::Reply&) {
+size_t MockFileIO::openFileForRead(const std::string& id,
+                                   const beauty::Request&,
+                                   beauty::Reply& reply) {
     OpenReadFile& openFile = openReadFiles_[id];
     countOpenFileForReadCalls_++;
     if (openFile.isOpen_) {
@@ -15,8 +17,16 @@ size_t MockFileIO::openFileForRead(const std::string& id, const beauty::Request&
 
     if (mockFailToOpenReadFile_) {
         openReadFiles_.erase(id);
+        std::string errMsg = "MockFileIO test error: simulated failure to open file for read";
+        reply.content_.insert(reply.content_.begin(), errMsg.begin(), errMsg.end());
+        reply.send(beauty::Reply::status_type::not_found, "text/plain");
         return 0;
     }
+
+    for (const auto& header : headers_) {
+        reply.addHeader(header.name_, header.value_);
+    }
+
     openFile.readIt_ = mockFileData_.begin();
     openFile.isOpen_ = true;
     return mockFileData_.size();
@@ -40,10 +50,9 @@ void MockFileIO::closeReadFile(const std::string& id) {
     openReadFiles_.erase(id);
 }
 
-beauty::Reply::status_type MockFileIO::openFileForWrite(const std::string& id,
-                                                        const beauty::Request&,
-                                                        beauty::Reply&,
-                                                        std::string& errMsg) {
+void MockFileIO::openFileForWrite(const std::string& id,
+                                  const beauty::Request&,
+                                  beauty::Reply& reply) {
     OpenWriteFile& openFile = openWriteFiles_[id];
     if (openFile.isOpen_) {
         throw std::runtime_error("MockFileIO test error: File already opened");
@@ -51,26 +60,34 @@ beauty::Reply::status_type MockFileIO::openFileForWrite(const std::string& id,
     countOpenFileForWriteCalls_++;
     if (mockFailToOpenWriteFile_) {
         openWriteFiles_.erase(id);
-        errMsg = "MockFileIO test error: simulated failure to open file for write";
-        return beauty::Reply::status_type::internal_server_error;
+        const std::string errMsg =
+            "MockFileIO test error: simulated failure to open file for write";
+        reply.content_.insert(reply.content_.begin(), errMsg.begin(), errMsg.end());
+        reply.send(beauty::Reply::status_type::internal_server_error, "text/plain");
     }
+
+    for (const auto& header : headers_) {
+        reply.addHeader(header.name_, header.value_);
+    }
+
     openFile.isOpen_ = true;
-    return beauty::Reply::status_type::created;
 }
 
-beauty::Reply::status_type MockFileIO::writeFile(const std::string& id,
-                                                 const beauty::Request&,
-                                                 const char* buf,
-                                                 size_t size,
-                                                 bool lastData,
-                                                 std::string&) {
+void MockFileIO::writeFile(const std::string& id,
+                           const beauty::Request&,
+                           beauty::Reply& reply,
+                           const char* buf,
+                           size_t size,
+                           bool lastData) {
     OpenWriteFile& openFile = openWriteFiles_[id];
     if (!openFile.isOpen_) {
         throw std::runtime_error("MockFileIO test error: writeFile() called on closed file");
     }
     openFile.file_.insert(openFile.file_.end(), buf, buf + size);
     openFile.lastData_ = lastData;
-    return beauty::Reply::status_type::created;
+    if (lastData) {
+        reply.send(beauty::Reply::status_type::created);
+    }
 }
 
 int MockFileIO::getOpenFileForWriteCalls() {
@@ -97,6 +114,10 @@ void MockFileIO::createMockFile(uint32_t size) {
 
 std::vector<char> MockFileIO::getMockWriteFile(const std::string& id) {
     return openWriteFiles_[id].file_;
+}
+
+void MockFileIO::addHeader(const beauty::Header& header) {
+    headers_.push_back(header);
 }
 
 void MockFileIO::setMockFailToOpenReadFile() {

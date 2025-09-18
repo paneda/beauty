@@ -141,51 +141,51 @@ TEST_CASE("Reading from MockFileIO", "[file_handler]") {
 
 TEST_CASE("Writing to MockFileIO", "[file_handler]") {
     MockFileIO fio;
-    std::string err;
     std::vector<char> body;
     Request req(body);  // not used in mock
     Reply rep(1024);
     rep.filePath_ = "testfile.bin";
 
     SECTION("should open file") {
-        REQUIRE(fio.openFileForWrite("0", req, rep, err));
+        fio.openFileForWrite("0", req, rep);
+        REQUIRE(fio.getOpenFileForWriteCalls() == 1);
     }
     SECTION("should throw if call open() when already opened for write") {
-        REQUIRE(fio.openFileForWrite("0", req, rep, err));
-        REQUIRE_THROWS_AS(fio.openFileForWrite("0", req, rep, err), std::runtime_error);
+        fio.openFileForWrite("0", req, rep);
+        REQUIRE_THROWS_AS(fio.openFileForWrite("0", req, rep), std::runtime_error);
     }
     SECTION("should throw if call write() before opened") {
         std::vector<uint32_t> writeData(10);
         std::string err;
         REQUIRE_THROWS_AS(
-            fio.writeFile("0", req, (char*)writeData.data(), writeData.size(), false, err),
+            fio.writeFile("0", req, rep, (char*)writeData.data(), writeData.size(), false),
             std::runtime_error);
     }
     SECTION("should write chunks") {
         std::string err;
-        fio.openFileForWrite("0", req, rep, err);
+        fio.openFileForWrite("0", req, rep);
         std::vector<char> writeData1 = {'a', 'b', 'c', 'd', 'e'};
 
-        fio.writeFile("0", req, writeData1.data(), writeData1.size(), false, err);
+        fio.writeFile("0", req, rep, writeData1.data(), writeData1.size(), false);
         std::vector<char> result = fio.getMockWriteFile("0");
         REQUIRE(result == writeData1);
 
         std::vector<char> writeData2 = {'f', 'g', 'h'};
-        fio.writeFile("0", req, writeData2.data(), writeData2.size(), true, err);
+        fio.writeFile("0", req, rep, writeData2.data(), writeData2.size(), true);
         result = fio.getMockWriteFile("0");
         writeData1.insert(writeData1.end(), writeData2.begin(), writeData2.end());
         REQUIRE(result == writeData1);
     }
     SECTION("should support parallel writes") {
         std::string err;
-        fio.openFileForWrite("0", req, rep, err);
-        fio.openFileForWrite("1", req, rep, err);
+        fio.openFileForWrite("0", req, rep);
+        fio.openFileForWrite("1", req, rep);
 
         std::vector<char> writeData1 = {'a', 'b', 'c', 'd', 'e'};
         std::vector<char> writeData2 = {'f', 'g', 'h'};
 
-        fio.writeFile("0", req, writeData1.data(), writeData1.size(), true, err);
-        fio.writeFile("1", req, writeData2.data(), writeData2.size(), true, err);
+        fio.writeFile("0", req, rep, writeData1.data(), writeData1.size(), true);
+        fio.writeFile("1", req, rep, writeData2.data(), writeData2.size(), true);
 
         std::vector<char> result = fio.getMockWriteFile("0");
         REQUIRE(result == writeData1);

@@ -50,11 +50,15 @@ void MyFileApi::handleRequest(const Request &req, Reply &rep) {
             rep.addHeader("Content-Type", "application/octet-stream");
             rep.addHeader("Content-Disposition", "attachment; filename=" + filename);
             // Set rep.filePath_ to filename so the FileIO finds it later
-            rep.filePath_ = "/" + filename;
+            rep.filePath_ = filename;
             // Just return and let FileIO read and return the file data
             // from disk.
             return;
         } else {
+            // Remove leading slash from filePath_ to make it relative
+            if (!rep.filePath_.empty() && rep.filePath_[0] == '/') {
+                rep.filePath_ = rep.filePath_.substr(1);
+            }
             // Here we can apply behaviour when file are served as part of
             // our web application.
             // In this example, all docRoot_ files are gzipped, add .gz to path

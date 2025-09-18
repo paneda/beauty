@@ -5,13 +5,7 @@
 namespace beauty {
 
 RequestHandler::RequestHandler(IFileIO *fileIO)
-    : fileIO_(fileIO),
-      fileNotFoundCb_(defaultFileNotFoundHandler),
-      expectContinueCb_(defaultExpectContinueHandler) {}
-
-void RequestHandler::defaultFileNotFoundHandler(const Request &req, Reply &rep) {
-    rep.stockReply(req, Reply::not_found);
-}
+    : fileIO_(fileIO), expectContinueCb_(defaultExpectContinueHandler) {}
 
 void RequestHandler::defaultExpectContinueHandler(const Request &, Reply &rep) {
     // Default: approve all 100-continue requests
@@ -20,10 +14,6 @@ void RequestHandler::defaultExpectContinueHandler(const Request &, Reply &rep) {
 
 void RequestHandler::addRequestHandler(const handlerCallback &cb) {
     requestHandlers_.push_back(cb);
-}
-
-void RequestHandler::setFileNotFoundHandler(const handlerCallback &cb) {
-    fileNotFoundCb_ = cb;
 }
 
 void RequestHandler::setExpectContinueHandler(const handlerCallback &cb) {
@@ -81,13 +71,8 @@ void RequestHandler::handleRequest(unsigned connectionId,
             return;
         }
     } else if (req.method_ == "GET" || req.method_ == "HEAD") {
-        if (openAndReadFile(connectionId, req, rep) > 0) {
-            return;
-        } else {
-            rep.headers_.clear();
-            fileNotFoundCb_(req, rep);
-            return;
-        }
+        openAndReadFile(connectionId, req, rep);
+        return;
     }
 
     rep.stockReply(req, Reply::not_implemented);
@@ -128,16 +113,6 @@ void RequestHandler::handlePartialWrite(unsigned connectionId,
         rep.multiPartParser_.flush(content, parts);
         writeFileParts(connectionId, req, rep, parts);
     }
-
-    // done with content unless there's 'bad' messages that should be return to
-    // client
-    if (rep.isStatusOk()) {
-        rep.content_.clear();
-    }
-    if (result == MultiPartParser::result_type::done &&
-        rep.status_ != Reply::status_type::no_content) {
-        rep.addHeader("Content-Length", std::to_string(rep.content_.size()));
-    }
 }
 
 void RequestHandler::closeFile(unsigned connectionId) {
@@ -146,11 +121,11 @@ void RequestHandler::closeFile(unsigned connectionId) {
     }
 }
 
-bool RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, Reply &rep) {
+void RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, Reply &rep) {
     // open the file to send back
     size_t contentSize = fileIO_->openFileForRead(std::to_string(connectionId), req, rep);
 
-    if (contentSize > 0) {
+    if (rep.isStatusOk()) {
         if (req.method_ == "HEAD") {
             // HEAD request, no content
             rep.content_.clear();
@@ -165,19 +140,27 @@ bool RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, 
             }
         }
 
-        // Content-Length is always set by server
-        if (rep.headers_.empty()) {
-            rep.headers_.resize(2);
-            rep.headers_[0].name_ = "Content-Length";
-            rep.headers_[0].value_ = std::to_string(contentSize);
-            rep.headers_[1].name_ = "Content-Type";
-            rep.headers_[1].value_ = mime_types::extensionToType(rep.fileExtension_);
-        } else {
-            rep.addHeader("Content-Length", std::to_string(contentSize));
+        // Make sure Content-Length and Content-Type headers are Set
+        bool hasContentLength = false;
+        bool hasContentType = false;
+        for (const auto &header : rep.headers_) {
+            if (header.name_ == "Content-Length") {
+                hasContentLength = true;
+            } else if (header.name_ == "Content-Type") {
+                hasContentType = true;
+            }
         }
-        return true;
+
+        if (!hasContentLength) {
+            rep.headers_.push_back({"Content-Length", std::to_string(contentSize)});
+        }
+        if (!hasContentType) {
+            rep.headers_.push_back(
+                {"Content-Type", mime_types::extensionToType(rep.fileExtension_)});
+        }
+    } else if (rep.status_ == Reply::not_modified) {
+        // 304 Not Modified response, no content
     }
-    return false;
 }
 
 size_t RequestHandler::readFromFile(unsigned connectionId, const Request &req, Reply &rep) {
@@ -202,15 +185,8 @@ void RequestHandler::writeFileParts(unsigned connectionId,
     for (auto &part : peakParts) {
         if (part.headerOnly_ && !part.filename_.empty()) {
             rep.filePath_ = req.requestPath_ + part.filename_;
-            std::string err;
-            rep.status_ = fileIO_->openFileForWrite(
-                rep.filePath_ + std::to_string(connectionId), req, rep, err);
+            fileIO_->openFileForWrite(rep.filePath_ + std::to_string(connectionId), req, rep);
             if (!rep.isStatusOk()) {
-                // Use same json format as stockReply()
-                std::string jsonErr =
-                    "{\"status\":" + std::to_string(rep.status_) + ",\"message\":\"" + err + "\"}";
-                rep.content_.assign(jsonErr.begin(), jsonErr.end());
-                rep.addHeader("Content-Type", "application/json");
                 return;
             }
         }
@@ -218,7 +194,6 @@ void RequestHandler::writeFileParts(unsigned connectionId,
 
     // This loop do the actual writing of data to files in sucessive order.
     for (auto &part : parts) {
-        std::string err;
         // if 'headerOnly' it as already been handled above
         if (part.headerOnly_ && !part.filename_.empty()) {
             std::string filePath = req.requestPath_ + part.filename_;
@@ -230,22 +205,16 @@ void RequestHandler::writeFileParts(unsigned connectionId,
                 // late, the response will be late too.
                 rep.filePath_ = req.requestPath_ + part.filename_;
                 rep.lastOpenFileForWriteId_ = rep.filePath_ + std::to_string(connectionId);
-                rep.status_ = fileIO_->openFileForWrite(rep.lastOpenFileForWriteId_, req, rep, err);
+                fileIO_->openFileForWrite(rep.lastOpenFileForWriteId_, req, rep);
                 if (!rep.isStatusOk()) {
-                    // Use same json format as stockReply()
-                    std::string jsonErr = "{\"status\":" + std::to_string(rep.status_) +
-                                          ",\"message\":\"" + err + "\"}";
-                    rep.content_.assign(jsonErr.begin(), jsonErr.end());
-                    rep.addHeader("Content-Type", "application/json");
                     return;
                 }
             }
             size_t size = part.end_ - part.start_;
-            rep.status_ = fileIO_->writeFile(
-                rep.lastOpenFileForWriteId_, req, &(*part.start_), size, part.foundEnd_, err);
+            fileIO_->writeFile(
+                rep.lastOpenFileForWriteId_, req, rep, &(*part.start_), size, part.foundEnd_);
             if (!rep.isStatusOk()) {
                 rep.lastOpenFileForWriteId_.clear();
-                rep.content_.insert(rep.content_.begin(), err.begin(), err.end());
                 return;
             }
             if (part.foundEnd_) {

@@ -50,10 +50,8 @@ int main(int argc, char *argv[]) {
         MyRouterApi routerApi;
         MyFileApi fileApi(argv[3]);
         s.addRequestHandler(std::bind(&MyRouterApi::handleRequest, &routerApi, _1, _2));
-        // Must be placed last, after other middleware, as it (in this example)
-        // prepares filePath_ and and reply headers for FileIO.
         s.addRequestHandler(std::bind(&MyFileApi::handleRequest, &fileApi, _1, _2));
-        s.setDebugMsgHandler([](const std::string &msg) { std::cout << msg << std::endl; });
+        // s.setDebugMsgHandler([](const std::string &msg) { std::cout << msg << std::endl; });
 
         // Run the server until stopped with Ctrl-C.
         ioc.run();

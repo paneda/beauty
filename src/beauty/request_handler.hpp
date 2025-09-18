@@ -21,7 +21,6 @@ class RequestHandler {
 
     // Handlers to be optionally implemented.
     void addRequestHandler(const handlerCallback &cb);
-    void setFileNotFoundHandler(const handlerCallback &cb);
     void setExpectContinueHandler(const handlerCallback &cb);
 
     void shouldContinueAfterHeaders(const Request &req, Reply &rep);
@@ -38,14 +37,13 @@ class RequestHandler {
     void closeFile(unsigned connectionId);
 
    private:
-    bool openAndReadFile(unsigned connectionId, const Request &req, Reply &rep);
+    void openAndReadFile(unsigned connectionId, const Request &req, Reply &rep);
     size_t readFromFile(unsigned connectionId, const Request &req, Reply &rep);
     void writeFileParts(unsigned connectionId,
                         const Request &req,
                         Reply &rep,
                         std::deque<MultiPartParser::ContentPart> &parts);
 
-    static void defaultFileNotFoundHandler(const Request &, Reply &rep);
     static void defaultExpectContinueHandler(const Request &, Reply &rep);
 
     // Provided FileIO to be implemented by each specific projects.
