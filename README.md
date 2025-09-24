@@ -73,7 +73,8 @@ void httpServerThread(void*) {
     asio::io_context ioc;
 
     // must use an alternative constructor compared to PC example
-    beauty::Server server(ioc, 80, &fio, persistentOption, 1024);
+    beauty::Server server(ioc, 80, persistentOption, 1024);
+    server.setFileIO(&fio);
 
     // middlewares (just one in this example), see examples folder
     MyFileApi fileApiHandler;
@@ -105,9 +106,7 @@ For an incomming http request, Beauty first invokes the middleware stack in
 added order. If no middleware respond to the request, Beauty will call the file
 io handler (if defined).
 
-If the file io handler fails to open the requested file, Beauty will respond
-with 404. It is possible to "addFileNotFoundHandler" to provide custom 404
-logic and response.
+The file io handler should typically return 404 if it fails to open the requested file, Beauty will respond with 501 not implemented if no FileIO handler is set.
 
 # Server
 The Server is what runs on top of the Asio::io_context. It has two constructors,
@@ -123,14 +122,14 @@ one for PC and one for ESP32.
 |ioContext |The asio::io_context |
 |address |Address of the network interface to use, PC constructor only |
 |port |The port that the server binds and responds too.<br>**Note.** For the PC constructor this can be set to 0 in which case the operating system will assign a free port.|
-|fileIO| The implementation class for IFileIO, see examples. May be set to nullptr of no file access is needed. |
 |options| See HTTP persistence options below|
 |maxContentSize| The max size in bytes of request/response buffers. Each connection will allocate one buffer for each direction. The minimum buffer size is 1024.|
 
 |Methods |Description |
 |--|--|
+|`void setFileIO(IFileIO *fileIO)` | Sets the implemented FileIO for the target environment. See examples.|
 |`void addRequestHandler(const handlerCallback &cb)` | Adds custom middleware (web api) handlers. See examples.|
-|`void setFileNotFoundHandler(const handlerCallback &cb)` | Adds a custom file not find handler. If not set, Beauty will provide a stock reply. |
+|`void setExpect100ContinueHandler(const handlerCallback &cb)` | Adds a custom handler. If not set, Beauty will return status 200 upon request. |
 |`void setDebugMsgHandler(const debugMsgCallback &cb)` | Adds a custom "printf" handler to get debug messages from Beauty. |
 
 The definitions of `handlerCallback` and `debugMsgCallback` can be found in src/beauty/beauty_common.hpp.
