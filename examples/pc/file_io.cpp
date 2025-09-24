@@ -80,10 +80,6 @@ size_t FileIO::openFileForRead(const std::string &id, const Request &req, Reply 
         reply.filePath_ = reply.filePath_.substr(1);
     }
 
-    if (reply.filePath_ == "index.html") {
-        reply.addHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
-    }
-
     fs::path fullPath = fs::path(docRoot_) / reply.filePath_;
 
     // Check if file exists and is a regular file
@@ -91,6 +87,13 @@ size_t FileIO::openFileForRead(const std::string &id, const Request &req, Reply 
         res.jsonError(Reply::not_found, "Could not read file: " + reply.filePath_);
         reply.send(res.statusCode_, "application/json");
         return 0;
+    }
+
+    // Set appropriate Cache-Control header
+    if (reply.filePath_ == "index.html") {
+        reply.addHeader("Cache-Control", "no-cache");
+    } else {
+        reply.addHeader("Cache-Control", "public, max-age=3600, immutable");
     }
 
     // Check for If-None-Match header (ETag matching)

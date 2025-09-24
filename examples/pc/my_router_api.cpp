@@ -188,6 +188,9 @@ void MyRouterApi::usersGet(const Request& /*req*/,
 
         return usersArray;
     });
+
+    rep.addHeader("Cache-Control", "no-store");  // No caching for dynamic API
+
     rep.send(Reply::status_type::ok, "application/json");
 }
 
@@ -204,6 +207,9 @@ void MyRouterApi::usersUserIdGet(const Request& /*req*/,
         cJSON_AddStringToObject(user, "email", ("user" + userId + "@example.com").c_str());
         return user;
     });
+
+    rep.addHeader("Cache-Control", "no-store");  // No caching for dynamic API
+                                                 //
     rep.send(Reply::status_type::ok, "application/json");
 }
 
