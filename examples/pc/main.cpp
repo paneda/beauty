@@ -27,7 +27,8 @@ int main(int argc, char *argv[]) {
         // Initialise the server.
         FileIO fileIO(argv[3]);
         HttpPersistence persistentOption(5s, 1000, 0);
-        Server s(ioc, argv[1], argv[2], &fileIO, persistentOption, 1024);
+        Server s(ioc, argv[1], argv[2], persistentOption, 1024);
+        s.setFileIO(&fileIO);
 
         s.setExpectContinueHandler([](const Request &req, Reply &rep) -> void {
             std::cout << "Expect: 100-continue received for " << req.requestPath_ << std::endl;

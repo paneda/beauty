@@ -28,6 +28,7 @@ class Connection : public std::enable_shared_from_this<Connection> {
                         RequestHandler &handler,
                         unsigned connectionId,
                         size_t maxContentSize);
+    ~Connection() = default;
 
     // Start the first asynchronous operation for the connection.
     void start(bool useKeepAlive, std::chrono::seconds keepAliveTimeout, size_t keepAliveMax);

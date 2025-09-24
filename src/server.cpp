@@ -12,12 +12,10 @@ namespace beauty {
 
 Server::Server(asio::io_context &ioContext,
                uint16_t port,
-               IFileIO *fileIO,
                HttpPersistence options,
                size_t maxContentSize)
     : acceptor_(ioContext, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)),
       connectionManager_(options),
-      requestHandler_(fileIO),
       timer_(ioContext),
       maxContentSize_(maxContentSize),
       debugMsgCb_(defaultDebugMsgHandler) {
@@ -32,12 +30,10 @@ Server::Server(asio::io_context &ioContext,
 Server::Server(asio::io_context &ioContext,
                const std::string &address,
                const std::string &port,
-               IFileIO *fileIO,
                HttpPersistence options,
                size_t maxContentSize)
     : acceptor_(ioContext),
       connectionManager_(options),
-      requestHandler_(fileIO),
       timer_(ioContext),
       maxContentSize_(maxContentSize),
       debugMsgCb_(defaultDebugMsgHandler) {
@@ -72,6 +68,10 @@ Server::Server(asio::io_context &ioContext,
 
 uint16_t Server::getBindedPort() const {
     return acceptor_.local_endpoint().port();
+}
+
+void Server::setFileIO(IFileIO *fileIO) {
+    requestHandler_.setFileIO(fileIO);
 }
 
 void Server::addRequestHandler(const handlerCallback &cb) {

@@ -16,6 +16,7 @@ class ConnectionManager {
 
     // Construct a connection manager.
     ConnectionManager(HttpPersistence options);
+    ~ConnectionManager() = default;
 
     // Add the specified connection to the manager and start it.
     void start(std::shared_ptr<Connection> c);

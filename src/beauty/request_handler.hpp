@@ -17,9 +17,11 @@ class RequestHandler {
     RequestHandler(const RequestHandler &) = delete;
     RequestHandler &operator=(const RequestHandler &) = delete;
 
-    explicit RequestHandler(IFileIO *fileIO);
+    RequestHandler();
+    ~RequestHandler() = default;
 
     // Handlers to be optionally implemented.
+    void setFileIO(IFileIO *fileIO);
     void addRequestHandler(const handlerCallback &cb);
     void setExpectContinueHandler(const handlerCallback &cb);
 

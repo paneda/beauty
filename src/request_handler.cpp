@@ -4,12 +4,15 @@
 
 namespace beauty {
 
-RequestHandler::RequestHandler(IFileIO *fileIO)
-    : fileIO_(fileIO), expectContinueCb_(defaultExpectContinueHandler) {}
+RequestHandler::RequestHandler() : expectContinueCb_(defaultExpectContinueHandler) {}
 
 void RequestHandler::defaultExpectContinueHandler(const Request &, Reply &rep) {
     // Default: approve all 100-continue requests
     rep.send(Reply::ok);
+}
+
+void RequestHandler::setFileIO(IFileIO *fileIO) {
+    fileIO_ = fileIO;
 }
 
 void RequestHandler::addRequestHandler(const handlerCallback &cb) {
