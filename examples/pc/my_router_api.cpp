@@ -209,7 +209,7 @@ void MyRouterApi::usersUserIdGet(const Request& /*req*/,
     });
 
     rep.addHeader("Cache-Control", "no-store");  // No caching for dynamic API
-                                                 //
+
     rep.send(Reply::status_type::ok, "application/json");
 }
 

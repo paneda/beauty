@@ -112,7 +112,7 @@ size_t FileIO::openFileForRead(const std::string &id, const Request &req, Reply 
     std::error_code ec;
     size_t fileSize = fs::file_size(fullPath, ec);
     if (ec) {
-        res.jsonError(Reply::internal_server_error, "Unexpected error occured: " + ec.message());
+        res.jsonError(Reply::internal_server_error, "Unexpected error occurred: " + ec.message());
         reply.send(res.statusCode_, "application/json");
         return 0;  // Error getting file size
     }
