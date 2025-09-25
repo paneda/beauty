@@ -120,16 +120,25 @@ class Reply {
     // Helper to provide standard server replies.
     void stockReply(const Request& req, status_type status);
 
+    // Check if the status code is in the 200 range.
     bool isStatusOk() const {
         return status_ == ok || status_ == created || status_ == accepted || status_ == no_content;
     }
 
-    // Headers to be included in the reply.
+    // The status code of the reply.
     status_type status_;
+
+    // Headers to be included in the reply.
     std::vector<Header> headers_;
 
+    // Set to true when the reply is ready to be sent to the client.
     bool returnToClient_ = false;
+
+    // Pointer to content data to be sent in the reply. If this pointer is
+    // not null, the content_ vector is ignored.
     const char* contentPtr_ = nullptr;
+
+    // Size of the content data pointed to by contentPtr_.
     size_t contentSize_;
 
     // The max buffer size when writing socket.
