@@ -22,7 +22,6 @@ class Server {
     // Simple constructor, use for ESP32.
     explicit Server(asio::io_context &ioContext,
                     uint16_t port,
-                    IFileIO *fileIO,
                     HttpPersistence options,
                     size_t maxContentSize = 1024);
 
@@ -30,15 +29,15 @@ class Server {
     explicit Server(asio::io_context &ioContext,
                     const std::string &address,
                     const std::string &port,
-                    IFileIO *fileIO,
                     HttpPersistence options,
                     size_t maxContentSize = 1024);
+    ~Server() = default;
 
     uint16_t getBindedPort() const;
 
     // Handlers to be optionally implemented.
+    void setFileIO(IFileIO *fileIO);
     void addRequestHandler(const handlerCallback &cb);
-    void setFileNotFoundHandler(const handlerCallback &cb);
     void setExpectContinueHandler(const handlerCallback &cb);
     void setDebugMsgHandler(const debugMsgCallback &cb);
 

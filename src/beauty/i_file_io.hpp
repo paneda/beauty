@@ -19,16 +19,13 @@ class IFileIO {
                          size_t maxSize) = 0;
     virtual void closeReadFile(const std::string& id) = 0;
 
-    virtual Reply::status_type openFileForWrite(const std::string& id,
-                                                const Request& request,
-                                                Reply& reply,
-                                                std::string& err) = 0;
-    virtual Reply::status_type writeFile(const std::string& id,
-                                         const Request& request,
-                                         const char* buf,
-                                         size_t size,
-                                         bool lastData,
-                                         std::string& err) = 0;
+    virtual void openFileForWrite(const std::string& id, const Request& request, Reply& reply) = 0;
+    virtual void writeFile(const std::string& id,
+                           const Request& request,
+                           Reply& reply,
+                           const char* buf,
+                           size_t size,
+                           bool lastData) = 0;
 };
 
 }  // namespace beauty

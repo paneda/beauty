@@ -86,7 +86,7 @@ TEST_CASE("HttpResult parse JSON request", "[http_result]") {
         REQUIRE(result.requestBody_.isEmpty());
         REQUIRE(result.statusCode_ == beauty::Reply::status_type::bad_request);
         REQUIRE(std::string(replyBuf.begin(), replyBuf.end()) ==
-                "{\"error\":\"JSON parsing failed at position 1\"}");
+                "{\"status\":400,\"message\":\"JSON parsing failed at position 1\"}");
     }
     SECTION("should handle invalid empty body") {
         requestBuf.clear();
@@ -182,13 +182,13 @@ TEST_CASE("HttpResult error handling", "[http_result]") {
 
     SECTION("should set error response") {
         result.jsonError(404, "Not Found");
-        std::string expected = "{\"error\":\"Not Found\"}";
+        std::string expected = "{\"status\":404,\"message\":\"Not Found\"}";
         REQUIRE(std::string(replyBuf.begin(), replyBuf.end()) == expected);
         REQUIRE(result.statusCode_ == beauty::Reply::status_type::not_found);
     }
     SECTION("should handle empty error message") {
         result.jsonError(500, "");
-        std::string expected = "{\"error\":\"\"}";
+        std::string expected = "{\"status\":500,\"message\":\"\"}";
         REQUIRE(std::string(replyBuf.begin(), replyBuf.end()) == expected);
         REQUIRE(result.statusCode_ == beauty::Reply::status_type::internal_server_error);
     }

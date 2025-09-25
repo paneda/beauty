@@ -17,18 +17,17 @@ class FileIO : public beauty::IFileIO {
                  char *buf,
                  size_t maxSize) override;
 
-    beauty::Reply::status_type openFileForWrite(const std::string &id,
-                                                const beauty::Request &request,
-                                                beauty::Reply &reply,
-                                                std::string &err) override;
+    void openFileForWrite(const std::string &id,
+                          const beauty::Request &request,
+                          beauty::Reply &reply) override;
     void closeReadFile(const std::string &id) override;
 
-    beauty::Reply::status_type writeFile(const std::string &id,
-                                         const beauty::Request &request,
-                                         const char *buf,
-                                         size_t size,
-                                         bool lastData,
-                                         std::string &err) override;
+    void writeFile(const std::string &id,
+                   const beauty::Request &request,
+                   beauty::Reply &reply,
+                   const char *buf,
+                   size_t size,
+                   bool lastData) override;
 
    private:
     const std::string docRoot_;
@@ -38,4 +37,7 @@ class FileIO : public beauty::IFileIO {
     // Key is the id of each file, provided by Beauty.
     std::unordered_map<std::string, std::ifstream> openReadFiles_;
     std::unordered_map<std::string, std::ofstream> openWriteFiles_;
+
+    // Map of ETags for files already read, to support If-None-Match
+    std::unordered_map<std::string, std::string> eTags_;
 };

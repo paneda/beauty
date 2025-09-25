@@ -27,7 +27,8 @@ int main(int argc, char *argv[]) {
         // Initialise the server.
         FileIO fileIO(argv[3]);
         HttpPersistence persistentOption(5s, 1000, 0);
-        Server s(ioc, argv[1], argv[2], &fileIO, persistentOption, 1024);
+        Server s(ioc, argv[1], argv[2], persistentOption, 1024);
+        s.setFileIO(&fileIO);
 
         s.setExpectContinueHandler([](const Request &req, Reply &rep) -> void {
             std::cout << "Expect: 100-continue received for " << req.requestPath_ << std::endl;
@@ -50,10 +51,8 @@ int main(int argc, char *argv[]) {
         MyRouterApi routerApi;
         MyFileApi fileApi(argv[3]);
         s.addRequestHandler(std::bind(&MyRouterApi::handleRequest, &routerApi, _1, _2));
-        // Must be placed last, after other middleware, as it (in this example)
-        // prepares filePath_ and and reply headers for FileIO.
         s.addRequestHandler(std::bind(&MyFileApi::handleRequest, &fileApi, _1, _2));
-        s.setDebugMsgHandler([](const std::string &msg) { std::cout << msg << std::endl; });
+        // s.setDebugMsgHandler([](const std::string &msg) { std::cout << msg << std::endl; });
 
         // Run the server until stopped with Ctrl-C.
         ioc.run();

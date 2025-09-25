@@ -1,4 +1,3 @@
-#include <iostream>
 #include "beauty/multipart_parser.hpp"
 #include "beauty/connection_manager.hpp"
 #include "beauty/connection.hpp"
@@ -100,29 +99,27 @@ void Connection::doRead() {
                     reply_.stockReply(request_, Reply::expectation_failed);
                     doWriteHeaders();
                 } else if (result == RequestParser::good_part) {
-                    // If we haven't received any body bytes yet, but expect some,
-                    // we need to wait for more data
-                    if (request_.contentLength_ > 0 &&
-                        request_.getNoInitialBodyBytesReceived() == 0) {
-                        doRead();
-                        return;
-                    }
-
-                    if (requestDecoder_.decodeRequest(request_, buffer_)) {
-                        reply_.noBodyBytesReceived_ = request_.getNoInitialBodyBytesReceived();
-
-                        // Determine if this is multipart without processing the request yet
-                        // (since we have incomplete body data)
-                        bool isMultipart = MultiPartParser::isMultipartRequest(request_);
-
-                        if (!isMultipart) {
+                    // Determine if this is multipart without processing the request yet
+                    // (since we have incomplete body data)
+                    bool isMultipart = MultiPartParser::isMultipartRequest(request_);
+                    if (!isMultipart) {
+                        if (request_.contentLength_ > maxContentSize_) {
                             // By design Beauty only supports large body data
                             // uploads using multipart/form-data. It will not
                             // allocate buffer > maxContentSize_ for non-multipart data
                             reply_.stockReply(request_, Reply::payload_too_large);
                             doWriteHeaders();
                             return;
+                        } else if (request_.contentLength_ > 0) {
+                            // If we haven't received all body bytes yet, but expect some,
+                            // we need to wait for more data
+                            doRead();
+                            return;
                         }
+                    }
+
+                    if (requestDecoder_.decodeRequest(request_, buffer_)) {
+                        reply_.noBodyBytesReceived_ = request_.getNoInitialBodyBytesReceived();
 
                         // Call handleRequest normally - it will set up multipart state and process
                         // initial chunk

@@ -214,7 +214,12 @@ class HttpResult {
     // Create an error response
     void jsonError(int statusCode, const std::string& message) {
         statusCode_ = static_cast<beauty::Reply::status_type>(statusCode);
-        singleJsonKeyValue("error", message);
+        buildJsonResponse([&]() -> cJSON* {
+            cJSON* errorObj = cJSON_CreateObject();
+            cJSON_AddNumberToObject(errorObj, "status", statusCode);
+            cJSON_AddStringToObject(errorObj, "message", message.c_str());
+            return errorObj;
+        });
     }
 
     // Generate a JSON response using a builder function

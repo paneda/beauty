@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Beauty Examples</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Beauty Examples</h1>
+    
+    <div class="container">
+        <h2>File Management</h2>
+        <p>This example demonstrates the Beauty HTTP server file API using the
+        routes defined in <code>examples/pc/my_file_api.cpp</code></p>
+        
+        <button id="listFilesBtn" onclick="listFiles()">Refresh File List</button>
+        
+        <div id="fileStats" class="stats" style="display: none;">
+            <strong>Files found:</strong> <span id="fileCount">0</span> | 
+            <strong>Total size:</strong> <span id="totalSize">0 bytes</span>
+        </div>
+        
+        <div id="loadingMessage" class="loading" style="display: none;">
+            Loading files...
+        </div>
+        
+        <div id="errorMessage" class="error" style="display: none;"></div>
+        
+        <div id="fileList" class="file-list"></div>
+    </div>
+
+    <div class="container">
+        <h2>Direct Download</h2>
+        <p>Enter a filename to download directly:</p>
+        <input type="text" id="downloadInput" placeholder="Enter filename (e.g., file1.bin)" style="width: 200px; padding: 8px; margin-right: 10px;">
+        <button onclick="downloadFile(document.getElementById('downloadInput').value)">Download</button>
+    </div>
+
+    <div class="container">
+        <h2>File Upload</h2>
+        <p>Upload files to the server using multipart POST. This feature is
+        built into Beauty and will work as long as an implementation of the
+        IFileIO interface is provided</p>
+        
+        <div id="uploadArea" class="upload-area" onclick="document.getElementById('fileInput').click()">
+            <div class="upload-icon">&#8593;</div>
+            <div class="upload-text">Click to select files or drag and drop</div>
+            <div class="upload-subtext">Supports all file types</div>
+            <input type="file" id="fileInput" class="file-input" multiple>
+        </div>
+        
+        <div id="selectedFile" class="selected-file">
+            <div id="selectedFileName" class="selected-file-name"></div>
+            <div id="selectedFileSize" class="selected-file-size"></div>
+            <button id="uploadBtn" class="upload-btn" type="button">Upload File</button>
+            <button class="clear-btn" type="button" onclick="clearSelection()">Clear</button>
+        </div>
+        
+        <div id="progressContainer" class="progress-container">
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <div id="progressText" class="progress-text">Uploading... 0%</div>
+        </div>
+        
+        <div id="uploadSuccess" class="upload-success">
+            File uploaded successfully!
+        </div>
+    </div>
+
+    <script>
+        // Global variables to store file data
+        let filesData = [];
+        let selectedFile = null;
+
+        // Function to format file size in human readable format
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Function to show/hide elements
+        function showElement(id) {
+            document.getElementById(id).style.display = 'block';
+        }
+
+        function hideElement(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        // Function to show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = 'Error: ' + message;
+            showElement('errorMessage');
+        }
+
+        // Function to hide error message
+        function hideError() {
+            hideElement('errorMessage');
+        }
+
+        // Function to list files using the /list-files endpoint
+        async function listFiles() {
+            hideError();
+            showElement('loadingMessage');
+            hideElement('fileStats');
+            
+            // Disable the refresh button during loading
+            const button = document.getElementById('listFilesBtn');
+            button.disabled = true;
+                button.textContent = 'Loading...';
+
+            try {
+              const response = await fetch('/list-files');
+              if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    throw new Error('Expected JSON response, got: ' + contentType);
+                }
+
+                filesData = await response.json();
+                
+                displayFiles(filesData);
+                updateStats(filesData);
+                
+            } catch (error) {
+                console.error('Error listing files:', error);
+                showError('Failed to load file list: ' + error.message);
+                document.getElementById('fileList').innerHTML = '';
+            } finally {
+                hideElement('loadingMessage');
+                button.disabled = false;
+                button.textContent = 'Refresh File List';
+            }
+        }
+
+        // Function to display files in the UI
+        function displayFiles(files) {
+            const fileListDiv = document.getElementById('fileList');
+            
+            if (!files || files.length === 0) {
+                fileListDiv.innerHTML = '<p style="color: #666; font-style: italic;">No files found in the directory.</p>';
+                return;
+            }
+
+            let html = '';
+            files.forEach(file => {
+                html += `
+                    <div class="file-item">
+                        <div class="file-info">
+                            <div class="file-name">${escapeHtml(file.name)}</div>
+                            <div class="file-size">${formatFileSize(file.size)}</div>
+                        </div>
+                        <button class="download-btn" onclick="downloadFile('${escapeHtml(file.name)}')">
+                            Download
+                        </button>
+                    </div>
+                `;
+            });
+            
+            fileListDiv.innerHTML = html;
+        }
+
+        // Function to update file statistics
+        function updateStats(files) {
+            const fileCount = files.length;
+            const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+            
+            document.getElementById('fileCount').textContent = fileCount;
+            document.getElementById('totalSize').textContent = formatFileSize(totalSize);
+            showElement('fileStats');
+        }
+
+        // Function to escape HTML to prevent XSS
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Function to download a file using the /download-file endpoint
+        async function downloadFile(filename) {
+            if (!filename || filename.trim() === '') {
+                showError('Please enter a filename to download');
+                return;
+            }
+
+            filename = filename.trim();
+            hideError();
+
+            try {
+                const url = `/download-file?name=${encodeURIComponent(filename)}`;
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    if (response.headers.get('content-type')?.includes('application/json')) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+                    } else {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                }
+
+                // Get the filename from the Content-Disposition header if available
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let downloadFilename = filename;
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename=(.+)/);
+                    if (filenameMatch) {
+                        downloadFilename = filenameMatch[1].replace(/['"]/g, '');
+                    }
+                }
+
+                // Create blob and download
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = downloadUrl;
+                a.download = downloadFilename;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Clean up
+                window.URL.revokeObjectURL(downloadUrl);
+                document.body.removeChild(a);
+                
+                // Clear the input field if download was successful
+                document.getElementById('downloadInput').value = '';
+                
+            } catch (error) {
+                console.error('Error downloading file:', error);
+                showError('Failed to download file "' + filename + '": ' + error.message);
+            }
+        }
+
+        // File upload functionality
+        function setupUploadArea() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            const uploadBtn = document.getElementById('uploadBtn');
+
+            // Handle file input change
+            fileInput.addEventListener('change', function(e) {
+                if (e.target.files.length > 0) {
+                    handleFileSelection(e.target.files[0]);
+                }
+            });
+
+            // Add upload button click handler
+            uploadBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                uploadFile();
+            });
+
+            // Drag and drop functionality
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                
+                if (e.dataTransfer.files.length > 0) {
+                    handleFileSelection(e.dataTransfer.files[0]);
+                }
+            });
+        }
+
+        function handleFileSelection(file) {
+            selectedFile = file;
+            
+            // Show selected file info
+            document.getElementById('selectedFileName').textContent = file.name;
+            document.getElementById('selectedFileSize').textContent = formatFileSize(file.size);
+            showElement('selectedFile');
+            
+            // Hide any previous messages
+            hideElement('uploadSuccess');
+            hideElement('progressContainer');
+            hideError();
+        }
+
+        function clearSelection() {
+            selectedFile = null;
+            document.getElementById('fileInput').value = '';
+            hideElement('selectedFile');
+            hideElement('progressContainer');
+            hideElement('uploadSuccess');
+            hideError();
+        }
+
+        async function uploadFile() {
+            if (!selectedFile) {
+                showError('Please select a file to upload');
+                return;
+            }
+
+            // Prevent multiple simultaneous uploads
+            const uploadBtn = document.getElementById('uploadBtn');
+            if (uploadBtn.disabled) {
+                return;
+            }
+
+            hideError();
+            hideElement('uploadSuccess');
+            
+            // Show progress container
+            showElement('progressContainer');
+            updateProgress(0);
+            
+            // Disable upload button and area
+            const uploadArea = document.getElementById('uploadArea');
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+            uploadArea.classList.add('uploading');
+
+            try {
+                // Create FormData for multipart upload
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+
+                // Create XMLHttpRequest for upload progress tracking
+                const xhr = new XMLHttpRequest();
+
+                // Track upload progress
+                xhr.upload.addEventListener('progress', function(e) {
+                    if (e.lengthComputable) {
+                        const percentComplete = Math.round((e.loaded / e.total) * 100);
+                        updateProgress(percentComplete);
+                    }
+                });
+
+                // Handle upload completion
+                xhr.addEventListener('load', function() {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        updateProgress(100);
+                        showElement('uploadSuccess');
+                        
+                        // Refresh file list to show the new file
+                        setTimeout(() => {
+                            listFiles();
+                            clearSelection();
+                        }, 1000);
+                    } else {
+                        throw new Error(`HTTP ${xhr.status}: ${xhr.statusText}`);
+                    }
+                    
+                    // Re-enable upload button
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = 'Upload File';
+                    uploadArea.classList.remove('uploading');
+                });
+
+                // Handle upload errors
+                xhr.addEventListener('error', function() {
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = 'Upload File';
+                    uploadArea.classList.remove('uploading');
+                    throw new Error('Network error during upload');
+                });
+
+                // Start the upload
+                xhr.open('POST', '/upload', true);
+                xhr.send(formData);
+
+            } catch (error) {
+                console.error('Error uploading file:', error);
+                showError('Failed to upload file: ' + error.message);
+                hideElement('progressContainer');
+                
+                // Re-enable upload button on error
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload File';
+                uploadArea.classList.remove('uploading');
+            }
+        }
+
+        function updateProgress(percent) {
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            
+            progressFill.style.width = percent + '%';
+            progressText.textContent = `Uploading... ${percent}%`;
+            
+            if (percent === 100) {
+                progressText.textContent = 'Upload complete!';
+                progressFill.style.backgroundColor = '#28a745';
+            }
+        }
+
+        // Load files when the page loads
+        window.addEventListener('load', function() {
+            listFiles();
+            setupUploadArea();
+        });
+
+        // Add keyboard support for the download input
+        document.addEventListener('DOMContentLoaded', function() {
+            const downloadInput = document.getElementById('downloadInput');
+            if (downloadInput) {
+                downloadInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        downloadFile(this.value);
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -12,6 +12,7 @@ struct Request;
 class RequestParser {
    public:
     RequestParser();
+    ~RequestParser() = default;
 
     // Reset to initial parser state.
     void reset();
