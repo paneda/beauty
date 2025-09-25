@@ -114,8 +114,8 @@ one for PC and one for ESP32.
 
 |Contructor |Description |
 |--|--|
-|`Server(asio::io_context &ioContext, uint16_t port, IFileIO *fileIO, HttpPersistence options, size_t maxContentSize = 1024)`| Use with ESP32|
-|`Server(asio::io_context &ioContext, const std::string &address, const std::string &port, IFileIO *fileIO, HttpPersistence options, size_t maxContentSize = 1024)`| Use on PC|
+|`Server(asio::io_context &ioContext, uint16_t port, HttpPersistence options, size_t maxContentSize = 1024)`| Use with ESP32|
+|`Server(asio::io_context &ioContext, const std::string &address, const std::string &port, HttpPersistence options, size_t maxContentSize = 1024)`| Use on PC|
 
 |Constructor argument |Description |
 |--|--|
