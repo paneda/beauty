@@ -61,7 +61,8 @@ const std::unordered_map<std::string, std::string> mime_map = {
 
 std::string extensionToType(const std::string &extension) {
     std::string ext = extension;
-    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c){ return std::tolower(c); });
+    std::transform(
+        ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
 
     auto it = mime_map.find(ext);
     if (it != mime_map.end()) {
