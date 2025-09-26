@@ -4,6 +4,25 @@
 
 namespace beauty {
 
+namespace {
+std::string combineUploadPaths(const std::string &dir, const std::string &filename) {
+    // Handle cases where slashes may be missing or duplicated.
+    if (dir.empty()) {
+        return filename;
+    }
+    if (filename.empty()) {
+        return dir;
+    }
+    if (dir.back() == '/' && filename.front() == '/') {
+        return dir + filename.substr(1);
+    } else if (dir.back() != '/' && filename.front() != '/') {
+        return dir + "/" + filename;
+    } else {
+        return dir + filename;
+    }
+}
+}  // namespace
+
 RequestHandler::RequestHandler() : expectContinueCb_(defaultExpectContinueHandler) {}
 
 void RequestHandler::defaultExpectContinueHandler(const Request &, Reply &rep) {
@@ -187,7 +206,7 @@ void RequestHandler::writeFileParts(unsigned connectionId,
     const std::deque<MultiPartParser::ContentPart> &peakParts = rep.multiPartParser_.peakLastPart();
     for (auto &part : peakParts) {
         if (part.headerOnly_ && !part.filename_.empty()) {
-            rep.filePath_ = req.requestPath_ + part.filename_;
+            rep.filePath_ = combineUploadPaths(req.requestPath_, part.filename_);
             fileIO_->openFileForWrite(rep.filePath_ + std::to_string(connectionId), req, rep);
             if (!rep.isStatusOk()) {
                 return;
@@ -199,14 +218,14 @@ void RequestHandler::writeFileParts(unsigned connectionId,
     for (auto &part : parts) {
         // if 'headerOnly' it as already been handled above
         if (part.headerOnly_ && !part.filename_.empty()) {
-            std::string filePath = req.requestPath_ + part.filename_;
+            const std::string filePath = combineUploadPaths(req.requestPath_, part.filename_);
             rep.lastOpenFileForWriteId_ = filePath + std::to_string(connectionId);
         } else {
             if (!part.filename_.empty()) {
                 // In case client did not issue "headerOnly", its OK, we open
                 // the file for writing here. However as we are one request too
                 // late, the response will be late too.
-                rep.filePath_ = req.requestPath_ + part.filename_;
+                rep.filePath_ = combineUploadPaths(req.requestPath_, part.filename_);
                 rep.lastOpenFileForWriteId_ = rep.filePath_ + std::to_string(connectionId);
                 fileIO_->openFileForWrite(rep.lastOpenFileForWriteId_, req, rep);
                 if (!rep.isStatusOk()) {
