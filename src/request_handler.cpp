@@ -197,12 +197,10 @@ void RequestHandler::writeFileParts(unsigned connectionId,
                                     const Request &req,
                                     Reply &rep,
                                     std::deque<MultiPartParser::ContentPart> &parts) {
-    // It seems that most clients first deliver a "headerOnly" part of the multipart
-    // asking for confirmation and then in successive request deliver the part
-    // data. If so, we handle this nicely here by giving the client an
-    // headerOnly response of the openFileForWrite() response. However this
-    // requires "peaking" the last part as the MultiPartParser delivers parts
-    // one request too late.
+    // It seems that some clients first deliver a "headerOnly" part of the
+    // multipart (assumably checking for non successful response) and then in
+    // successive request deliver the part data. If so, we handle this nicely
+    // here by giving the client an early non-successful reply. However this
     const std::deque<MultiPartParser::ContentPart> &peakParts = rep.multiPartParser_.peakLastPart();
     for (auto &part : peakParts) {
         if (part.headerOnly_ && !part.filename_.empty()) {
