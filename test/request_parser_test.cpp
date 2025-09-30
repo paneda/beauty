@@ -113,6 +113,30 @@ TEST_CASE("parse GET request", "[request_parser]") {
         REQUIRE(fixture.request.method_ == "GET");
         REQUIRE(fixture.request.uri_ == "/uri?arg1=test&arg1=%20%21&arg3=test");
     }
+    SECTION("should return upgrade for GET HTTP/1.1 with Upgrade header") {
+        const std::string request =
+            "GET /uri HTTP/1.1\r\n"
+            "Connection: Upgrade\r\n"
+            "Upgrade: websocket\r\n"
+            "Host: www.example.com\r\n"
+            "\r\n";
+
+        auto result = fixture.parse_complete(request);
+
+        REQUIRE(result == RequestParser::upgrade_to_websocket);
+    }
+    SECTION("should return bad for GET HTTP/1.1 with invalid Upgrade header") {
+        const std::string request =
+            "GET /uri HTTP/1.1\r\n"
+            "Connection: Upgrade\r\n"
+            "Upgrade: invalid\r\n"
+            "Host: www.example.com\r\n"
+            "\r\n";
+
+        auto result = fixture.parse_complete(request);
+
+        REQUIRE(result == RequestParser::bad);
+    }
 }
 
 TEST_CASE("version handling", "[request_parser]") {

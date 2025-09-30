@@ -4,13 +4,13 @@
 #include <vector>
 #include <stdint.h>
 
-#include "ws_receive.hpp"
+#include "ws_message.hpp"
 
 namespace beauty {
 
 class WsParser {
    public:
-    WsParser(WsReceive &wsRecv);
+    WsParser(WsMessage &wsRecv);
     WsParser(const WsParser &) = delete;
     WsParser &operator=(const WsParser &) = delete;
 
@@ -70,7 +70,7 @@ class WsParser {
     int extLenBytes_;
     std::array<uint8_t, 4> mask_;
     size_t maskCounter_;
-    WsReceive &wsRecv_;
+    WsMessage &wsMessage_;
 };
 
 }  // namespace beauty

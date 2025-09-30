@@ -2,7 +2,7 @@
 #include <string>
 #include <iostream>
 
-#include "beauty/ws_receive.hpp"
+#include "beauty/ws_message.hpp"
 #include "beauty/ws_parser.hpp"
 
 using namespace beauty;
@@ -46,8 +46,8 @@ namespace {
 
 TEST_CASE("parse ws protocol short len", "[ws_parser]") {
     std::vector<char> content = maskedContentShortLen;
-    WsReceive wsRecv(content);
-    WsParser dut(wsRecv);
+    WsMessage wsMessage(content);
+    WsParser dut(wsMessage);
 
     SECTION("should return indeterminate for empty content") {
         content.clear();
@@ -57,130 +57,131 @@ TEST_CASE("parse ws protocol short len", "[ws_parser]") {
         REQUIRE(dut.parse() == WsParser::data_frame);
         std::string res(content.begin(), content.end());
         REQUIRE(res == contentShortLen);
-        REQUIRE(wsRecv.isFinal_ == true);
+        REQUIRE(wsMessage.isFinal_ == true);
     }
     SECTION("should parse multiple receive") {
         REQUIRE(dut.parse() == WsParser::data_frame);
         // restore content_ as parse() inplaces result
-        wsRecv.content_ = maskedContentShortLen;
-        wsRecv.reset();
+        wsMessage.content_ = maskedContentShortLen;
+        wsMessage.reset();
         REQUIRE(dut.parse() == WsParser::data_frame);
         std::string res(content.begin(), content.end());
         REQUIRE(res == contentShortLen);
-        REQUIRE(wsRecv.isFinal_ == true);
+        REQUIRE(wsMessage.isFinal_ == true);
     }
 }
 
 TEST_CASE("parse ws protocol ext len", "[ws_parser]") {
     std::vector<char> content = maskedContentExtLen;
-    WsReceive wsRecv(content);
-    WsParser dut(wsRecv);
+    WsMessage wsMessage(content);
+    WsParser dut(wsMessage);
 
     SECTION("should parse masked content ext len") {
         REQUIRE(dut.parse() == WsParser::data_frame);
         std::string res(content.begin(), content.end());
         REQUIRE(res == contentExtLen);
-        REQUIRE(wsRecv.isFinal_ == true);
+        REQUIRE(wsMessage.isFinal_ == true);
     }
 }
 
 TEST_CASE("parse ws protocol in consecutive buffers", "[ws_parser]") {
     // max buffer size = 50 simulates that content spans several buffers
     std::vector<char> content(maskedContentExtLen.begin(), maskedContentExtLen.begin() + 50);
-    WsReceive wsRecv(content);
-    WsParser dut(wsRecv);
+    WsMessage wsMessage(content);
+    WsParser dut(wsMessage);
 
     SECTION("should parse masked content in consecutive buffers") {
         REQUIRE(dut.parse() == WsParser::indeterminate);
         std::string expectedContent = alphapet + alphapet.substr(0, 16);
         std::string res(content.begin(), content.end());
         REQUIRE(res == expectedContent);
-        REQUIRE(wsRecv.isFinal_ == false);
+        REQUIRE(wsMessage.isFinal_ == false);
 
-        wsRecv.reset();
-        wsRecv.content_.assign(maskedContentExtLen.begin() + 50, maskedContentExtLen.begin() + 100);
+        wsMessage.reset();
+        wsMessage.content_.assign(maskedContentExtLen.begin() + 50,
+                                  maskedContentExtLen.begin() + 100);
         REQUIRE(dut.parse() == WsParser::indeterminate);
         expectedContent = alphapet.substr(16) + alphapet + alphapet.substr(0, 14);
         res.assign(content.begin(), content.end());
         REQUIRE(res == expectedContent);
-        REQUIRE(wsRecv.isFinal_ == false);
+        REQUIRE(wsMessage.isFinal_ == false);
 
-        wsRecv.reset();
-        wsRecv.content_.assign(maskedContentExtLen.begin() + 100, maskedContentExtLen.end());
+        wsMessage.reset();
+        wsMessage.content_.assign(maskedContentExtLen.begin() + 100, maskedContentExtLen.end());
         REQUIRE(dut.parse() == WsParser::data_frame);
         expectedContent = alphapet.substr(14) + alphapet;
         res.assign(content.begin(), content.end());
         REQUIRE(res == expectedContent);
-        REQUIRE(wsRecv.isFinal_ == true);
+        REQUIRE(wsMessage.isFinal_ == true);
     }
 }
 
 TEST_CASE("parse op codes", "[ws_parser]") {
     std::vector<char> closeFrame = {
         (char)0x88, (char)0x80, (char)0xdc, (char)0xd9, 0x62, (char)0xfa};
-    WsReceive wsRecv(closeFrame);
-    WsParser dut(wsRecv);
+    WsMessage wsMessage(closeFrame);
+    WsParser dut(wsMessage);
     SECTION("should parse close") {
         REQUIRE(dut.parse() == WsParser::close_frame);
         std::string res(closeFrame.begin(), closeFrame.end());
         REQUIRE(res == "");  // Close frame with zero payload should result in empty string
-        REQUIRE(wsRecv.isFinal_ == true);
+        REQUIRE(wsMessage.isFinal_ == true);
     }
 }
 
 TEST_CASE("parse ping frames", "[ws_parser]") {
     SECTION("should parse empty ping frame") {
         std::vector<char> content = pingFrameEmpty;
-        WsReceive wsRecv(content);
-        WsParser dut(wsRecv);
+        WsMessage wsMessage(content);
+        WsParser dut(wsMessage);
 
         REQUIRE(dut.parse() == WsParser::ping_frame);
         std::string res(content.begin(), content.end());
         REQUIRE(res == "");  // Empty ping frame should result in empty string
-        REQUIRE(wsRecv.isFinal_ == true);
+        REQUIRE(wsMessage.isFinal_ == true);
     }
 
     SECTION("should parse ping frame with payload") {
         std::vector<char> content = pingFrameWithPayload;
-        WsReceive wsRecv(content);
-        WsParser dut(wsRecv);
+        WsMessage wsMessage(content);
+        WsParser dut(wsMessage);
 
         REQUIRE(dut.parse() == WsParser::ping_frame);
         std::string res(content.begin(), content.end());
         REQUIRE(res == pingPayload);  // Should unmask and return "ping"
-        REQUIRE(wsRecv.isFinal_ == true);
+        REQUIRE(wsMessage.isFinal_ == true);
     }
 }
 
 TEST_CASE("parse pong frames", "[ws_parser]") {
     SECTION("should parse empty pong frame") {
         std::vector<char> content = pongFrameEmpty;
-        WsReceive wsRecv(content);
-        WsParser dut(wsRecv);
+        WsMessage wsMessage(content);
+        WsParser dut(wsMessage);
 
         REQUIRE(dut.parse() == WsParser::pong_frame);
         std::string res(content.begin(), content.end());
         REQUIRE(res == "");  // Empty pong frame should result in empty string
-        REQUIRE(wsRecv.isFinal_ == true);
+        REQUIRE(wsMessage.isFinal_ == true);
     }
 
     SECTION("should parse pong frame with payload") {
         std::vector<char> content = pongFrameWithPayload;
-        WsReceive wsRecv(content);
-        WsParser dut(wsRecv);
+        WsMessage wsMessage(content);
+        WsParser dut(wsMessage);
 
         REQUIRE(dut.parse() == WsParser::pong_frame);
         std::string res(content.begin(), content.end());
         REQUIRE(res == pongPayload);  // Should unmask and return "pong"
-        REQUIRE(wsRecv.isFinal_ == true);
+        REQUIRE(wsMessage.isFinal_ == true);
     }
 }
 
 TEST_CASE("fragmentation rejection", "[ws_parser]") {
     SECTION("should reject non-final text frame") {
         std::vector<char> content = fragmentedTextStart;
-        WsReceive wsRecv(content);
-        WsParser dut(wsRecv);
+        WsMessage wsMessage(content);
+        WsParser dut(wsMessage);
 
         REQUIRE(dut.parse() == WsParser::fragmentation_error);
         // Parser should detect fragmentation early and reject
@@ -188,8 +189,8 @@ TEST_CASE("fragmentation rejection", "[ws_parser]") {
 
     SECTION("should reject continuation frame") {
         std::vector<char> content = continuationFrame;
-        WsReceive wsRecv(content);
-        WsParser dut(wsRecv);
+        WsMessage wsMessage(content);
+        WsParser dut(wsMessage);
 
         REQUIRE(dut.parse() == WsParser::fragmentation_error);
         // Parser should reject continuation frames immediately
@@ -198,12 +199,12 @@ TEST_CASE("fragmentation rejection", "[ws_parser]") {
     SECTION("should accept final text frame") {
         // Ensure we don't break normal text frames (FIN=1, opcode=1)
         std::vector<char> content = maskedContentShortLen;
-        WsReceive wsRecv(content);
-        WsParser dut(wsRecv);
+        WsMessage wsMessage(content);
+        WsParser dut(wsMessage);
 
         REQUIRE(dut.parse() == WsParser::data_frame);
         std::string res(content.begin(), content.end());
         REQUIRE(res == contentShortLen);
-        REQUIRE(wsRecv.isFinal_ == true);
+        REQUIRE(wsMessage.isFinal_ == true);
     }
 }
