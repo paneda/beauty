@@ -13,17 +13,17 @@ const uint8_t MaskMask = 0x80;
 const uint8_t LengthMask = 0x7f;
 }
 
-WsParser::WsParser(WsReceive &wsRecv) : wsRecv_(wsRecv) {}
+WsParser::WsParser(WsMessage &wsMessage) : wsMessage_(wsMessage) {}
 
 WsParser::result_type WsParser::parse() {
     result_type result = indeterminate;
 
-    if (wsRecv_.content_.empty()) {
+    if (wsMessage_.content_.empty()) {
         return result;
     }
 
-    auto begin = wsRecv_.content_.begin();
-    auto end = wsRecv_.content_.end();
+    auto begin = wsMessage_.content_.begin();
+    auto end = wsMessage_.content_.end();
     while (begin != end) {
         result = consume(begin++);
         if (result != indeterminate) {
@@ -31,7 +31,7 @@ WsParser::result_type WsParser::parse() {
         }
     }
 
-    wsRecv_.content_.resize(wsRecv_.outCounter_);
+    wsMessage_.content_.resize(wsMessage_.outCounter_);
     return result;
 }
 
@@ -52,8 +52,8 @@ WsParser::result_type WsParser::consume(std::vector<char>::iterator inPtr) {
             }
 
             maskCounter_ = 0;
-            wsRecv_.payLoadCounter_ = 0;
-            wsRecv_.isFinal_ = false;
+            wsMessage_.payLoadCounter_ = 0;
+            wsMessage_.isFinal_ = false;
             state_ = s_mask_and_len;
             return indeterminate;
         case s_mask_and_len:
@@ -115,38 +115,38 @@ WsParser::result_type WsParser::consume(std::vector<char>::iterator inPtr) {
             }
             return indeterminate;
         case s_payload:
-            wsRecv_.content_[wsRecv_.outCounter_++] = input ^ mask_[maskCounter_++ % 4];
-            if (++wsRecv_.payLoadCounter_ >= payloadLen_) {
+            wsMessage_.content_[wsMessage_.outCounter_++] = input ^ mask_[maskCounter_++ % 4];
+            if (++wsMessage_.payLoadCounter_ >= payloadLen_) {
                 state_ = s_start;
-                wsRecv_.isFinal_ = true;
-                wsRecv_.payLoadCounter_ = 0;
+                wsMessage_.isFinal_ = true;
+                wsMessage_.payLoadCounter_ = 0;
                 return data_frame;
             }
             return indeterminate;
         case s_close:
-            wsRecv_.content_[wsRecv_.outCounter_++] = input ^ mask_[maskCounter_++ % 4];
-            if (++wsRecv_.payLoadCounter_ >= payloadLen_) {
+            wsMessage_.content_[wsMessage_.outCounter_++] = input ^ mask_[maskCounter_++ % 4];
+            if (++wsMessage_.payLoadCounter_ >= payloadLen_) {
                 state_ = s_start;
-                wsRecv_.isFinal_ = true;
-                wsRecv_.payLoadCounter_ = 0;
+                wsMessage_.isFinal_ = true;
+                wsMessage_.payLoadCounter_ = 0;
                 return close_frame;
             }
             return indeterminate;
         case s_ping:
-            wsRecv_.content_[wsRecv_.outCounter_++] = input ^ mask_[maskCounter_++ % 4];
-            if (++wsRecv_.payLoadCounter_ >= payloadLen_) {
+            wsMessage_.content_[wsMessage_.outCounter_++] = input ^ mask_[maskCounter_++ % 4];
+            if (++wsMessage_.payLoadCounter_ >= payloadLen_) {
                 state_ = s_start;
-                wsRecv_.isFinal_ = true;
-                wsRecv_.payLoadCounter_ = 0;
+                wsMessage_.isFinal_ = true;
+                wsMessage_.payLoadCounter_ = 0;
                 return ping_frame;
             }
             return indeterminate;
         case s_pong:
-            wsRecv_.content_[wsRecv_.outCounter_++] = input ^ mask_[maskCounter_++ % 4];
-            if (++wsRecv_.payLoadCounter_ >= payloadLen_) {
+            wsMessage_.content_[wsMessage_.outCounter_++] = input ^ mask_[maskCounter_++ % 4];
+            if (++wsMessage_.payLoadCounter_ >= payloadLen_) {
                 state_ = s_start;
-                wsRecv_.isFinal_ = true;
-                wsRecv_.payLoadCounter_ = 0;
+                wsMessage_.isFinal_ = true;
+                wsMessage_.payLoadCounter_ = 0;
                 return pong_frame;
             }
             return indeterminate;
@@ -198,8 +198,8 @@ WsParser::result_type WsParser::getResultType() {
 
 WsParser::result_type WsParser::handleZeroLengthPayload() {
     state_ = s_start;
-    wsRecv_.isFinal_ = true;
-    wsRecv_.payLoadCounter_ = 0;
+    wsMessage_.isFinal_ = true;
+    wsMessage_.payLoadCounter_ = 0;
     return getResultType();
 }
 

@@ -5,10 +5,10 @@
 namespace beauty {
 
 // Received data over web socket.
-struct WsReceive {
+struct WsMessage {
     friend class WsParser;
 
-    WsReceive(std::vector<char> &content) : content_(content) {}
+    WsMessage(std::vector<char> &content) : content_(content) {}
 
     void reset() {
         outCounter_ = 0;
