@@ -11,6 +11,7 @@ add_executable(${PROJECT_NAME}
 	router_test.cpp
 	base64_test.cpp
 	ws_sec_accept_test.cpp
+	ws_parser_test.cpp
 	${CMAKE_SOURCE_DIR}/examples/pc/file_io.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/utils/mock_file_io.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/utils/mock_request_handler.cpp
