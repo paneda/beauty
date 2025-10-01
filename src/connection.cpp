@@ -21,7 +21,7 @@ Connection::Connection(asio::ip::tcp::socket socket,
 void Connection::start(bool useKeepAlive,
                        std::chrono::seconds keepAliveTimeout,
                        size_t keepAliveMax) {
-    lastReceivedTime_ = std::chrono::steady_clock::now();
+    lastActivityTime_ = std::chrono::steady_clock::now();
     useKeepAlive_ = useKeepAlive;
     keepAliveTimeout_ = keepAliveTimeout;
     keepAliveMax_ = keepAliveMax;
@@ -32,8 +32,8 @@ void Connection::stop() {
     socket_.close();
 }
 
-std::chrono::steady_clock::time_point Connection::getLastReceivedTime() const {
-    return lastReceivedTime_;
+std::chrono::steady_clock::time_point Connection::getLastActivityTime() const {
+    return lastActivityTime_;
 }
 
 size_t Connection::getNrOfRequests() const {
@@ -53,7 +53,7 @@ void Connection::doRead() {
     socket_.async_read_some(
         asio::buffer(buffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
             if (!ec) {
-                lastReceivedTime_ = std::chrono::steady_clock::now();
+                lastActivityTime_ = std::chrono::steady_clock::now();
                 buffer_.resize(bytesTransferred);
                 RequestParser::result_type result = requestParser_.parse(request_, buffer_);
 
@@ -162,7 +162,7 @@ void Connection::doReadBody() {
     socket_.async_read_some(
         asio::buffer(buffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
             if (!ec) {
-                lastReceivedTime_ = std::chrono::steady_clock::now();
+                lastActivityTime_ = std::chrono::steady_clock::now();
                 buffer_.resize(bytesTransferred);
                 reply_.noBodyBytesReceived_ += bytesTransferred;
 
@@ -197,6 +197,8 @@ void Connection::doWriteHeaders() {
     asio::async_write(
         socket_, reply_.headerToBuffers(), [this, self](std::error_code ec, std::size_t) {
             if (!ec) {
+                lastActivityTime_ = std::chrono::steady_clock::now();
+
                 if (!reply_.content_.empty() || reply_.contentPtr_ != nullptr) {
                     doWriteContent();
                 } else {
@@ -215,6 +217,8 @@ void Connection::doWriteContent() {
     asio::async_write(
         socket_, reply_.contentToBuffers(), [this, self](std::error_code ec, std::size_t) {
             if (!ec) {
+                lastActivityTime_ = std::chrono::steady_clock::now();
+
                 if (reply_.replyPartial_) {
                     if (reply_.finalPart_) {
                         handleWriteCompleted();
@@ -311,7 +315,7 @@ void Connection::doReadBodyAfter100Continue() {
     socket_.async_read_some(
         asio::buffer(buffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
             if (!ec) {
-                lastReceivedTime_ = std::chrono::steady_clock::now();
+                lastActivityTime_ = std::chrono::steady_clock::now();
                 buffer_.resize(bytesTransferred);
                 reply_.noBodyBytesReceived_ += bytesTransferred;
 

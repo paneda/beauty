@@ -44,7 +44,7 @@ void ConnectionManager::tick() {
     while (it != connections_.end()) {
         if ((*it)->useKeepAlive()) {
             bool erase = false;
-            if (((*it)->getLastReceivedTime() + httpPersistence_.keepAliveTimeout_ < now)) {
+            if (((*it)->getLastActivityTime() + httpPersistence_.keepAliveTimeout_ < now)) {
                 debugMsgCb_("Removing connection due to inactivity");
                 erase = true;
             }
