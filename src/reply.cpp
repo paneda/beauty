@@ -6,6 +6,7 @@ namespace beauty {
 
 namespace status_strings {
 
+const std::string switching_protocols = "HTTP/1.1 101 Switching Protocols\r\n";
 const std::string ok = "HTTP/1.1 200 OK\r\n";
 const std::string created = "HTTP/1.1 201 Created\r\n";
 const std::string accepted = "HTTP/1.1 202 Accepted\r\n";
@@ -33,6 +34,8 @@ const std::string version_not_supported = "HTTP/1.1 505 Version Not Supported\r\
 
 asio::const_buffer toBuffer(Reply::status_type status) {
     switch (status) {
+        case Reply::switching_protocols:
+            return asio::buffer(switching_protocols);
         case Reply::ok:
             return asio::buffer(ok);
         case Reply::created:
@@ -95,9 +98,8 @@ const char crlf[] = {'\r', '\n'};
 
 }  // namespace misc_strings
 
-Reply::Reply(size_t maxContentSize)
-    : status_(status_type::ok), maxContentSize_(maxContentSize), multiPartParser_(content_) {
-    content_.reserve(maxContentSize);
+Reply::Reply(std::vector<char>& content)
+    : content_(content), status_(status_type::ok), multiPartParser_(content_) {
     headers_.reserve(2);
 }
 

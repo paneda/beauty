@@ -4,13 +4,16 @@
 
 #include <asio.hpp>
 #include <memory>
+#include <set>
 #include <string>
 
 #include "beauty/beauty_common.hpp"
 #include "beauty/connection.hpp"
 #include "beauty/connection_manager.hpp"
 #include "beauty/i_file_io.hpp"
+#include "beauty/i_ws_receiver.hpp"
 #include "beauty/request_handler.hpp"
+#include "beauty/ws_endpoint.hpp"
 
 namespace beauty {
 
@@ -22,14 +25,14 @@ class Server {
     // Simple constructor, use for ESP32.
     explicit Server(asio::io_context &ioContext,
                     uint16_t port,
-                    HttpPersistence options,
+                    const Settings &settings,
                     size_t maxContentSize = 1024);
 
     // Advanced constructor use for OS:s supporting signal_set.
     explicit Server(asio::io_context &ioContext,
                     const std::string &address,
                     const std::string &port,
-                    HttpPersistence options,
+                    const Settings &settings,
                     size_t maxContentSize = 1024);
     ~Server() = default;
 
@@ -40,6 +43,7 @@ class Server {
     void addRequestHandler(const handlerCallback &cb);
     void setExpectContinueHandler(const handlerCallback &cb);
     void setDebugMsgHandler(const debugMsgCallback &cb);
+    void setWsEndpoints(std::set<std::shared_ptr<WsEndpoint>> endpoints);
 
    private:
     void doAccept();

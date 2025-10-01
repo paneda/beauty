@@ -3,7 +3,7 @@
 namespace beauty {
 
 MockRequestHandler::MockRequestHandler(std::vector<char>& body)
-    : receivedRequest_(body), receivedReply_(1024) {}
+    : sendBuffer_(1024), receivedRequest_(body), receivedReply_(sendBuffer_) {}
 
 void MockRequestHandler::handleRequest(const Request& req, Reply& rep) {
     noCalls_++;

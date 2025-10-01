@@ -3,6 +3,7 @@
 #include <utility>
 
 #include "beauty/server.hpp"
+#include "beauty/ws_endpoint.hpp"
 
 namespace {
 void defaultDebugMsgHandler(const std::string &) {}
@@ -12,10 +13,11 @@ namespace beauty {
 
 Server::Server(asio::io_context &ioContext,
                uint16_t port,
-               HttpPersistence options,
+               const Settings &settings,
                size_t maxContentSize)
     : acceptor_(ioContext, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)),
-      connectionManager_(options),
+      connectionManager_(settings),
+      requestHandler_(maxContentSize),
       timer_(ioContext),
       maxContentSize_(maxContentSize),
       debugMsgCb_(defaultDebugMsgHandler) {
@@ -30,10 +32,11 @@ Server::Server(asio::io_context &ioContext,
 Server::Server(asio::io_context &ioContext,
                const std::string &address,
                const std::string &port,
-               HttpPersistence options,
+               const Settings &settings,
                size_t maxContentSize)
     : acceptor_(ioContext),
-      connectionManager_(options),
+      connectionManager_(settings),
+      requestHandler_(maxContentSize),
       timer_(ioContext),
       maxContentSize_(maxContentSize),
       debugMsgCb_(defaultDebugMsgHandler) {
@@ -80,6 +83,10 @@ void Server::addRequestHandler(const handlerCallback &cb) {
 
 void Server::setExpectContinueHandler(const handlerCallback &cb) {
     requestHandler_.setExpectContinueHandler(cb);
+}
+
+void Server::setWsEndpoints(std::set<std::shared_ptr<WsEndpoint>> endpoints) {
+    connectionManager_.setWsEndpoints(endpoints);
 }
 
 void Server::setDebugMsgHandler(const debugMsgCallback &cb) {

@@ -40,7 +40,6 @@ namespace {
     // Continuation frame: FIN=1, opcode=0, masked, length=5, payload="world"  
     const std::vector<char> continuationFrame = {(char)0x80, (char)0x85, (char)0x12, (char)0x34, (char)0x56, (char)0x78, 0x65, 0x57, 0x32, 0x1A, 0x1B};
 // clang-format on
-// clang-format on
 
 }  // namespace
 

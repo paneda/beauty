@@ -22,7 +22,8 @@ TEST_CASE("file_io.cpp", "[file_io]") {
     FileIO fio("./");
     std::vector<char> body;  // not used in tests
     Request req(body);       // not used in mock
-    Reply rep(1024);
+    std::vector<char> sendBuffer(1024);
+    Reply rep(sendBuffer);
     rep.filePath_ = "testfile.bin";
 
     SECTION("should open file") {
@@ -83,7 +84,8 @@ TEST_CASE("Reading from MockFileIO", "[file_handler]") {
     fio.createMockFile(100 * typeSize);
     std::vector<char> body;
     Request req(body);  // not used in mock
-    Reply rep(1024);
+    std::vector<char> sendBuffer(1024);
+    Reply rep(sendBuffer);
     rep.filePath_ = "testfile.bin";
 
     SECTION("should open file") {
@@ -143,7 +145,8 @@ TEST_CASE("Writing to MockFileIO", "[file_handler]") {
     MockFileIO fio;
     std::vector<char> body;
     Request req(body);  // not used in mock
-    Reply rep(1024);
+    std::vector<char> sendBuffer(1024);
+    Reply rep(sendBuffer);
     rep.filePath_ = "testfile.bin";
 
     SECTION("should open file") {

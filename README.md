@@ -1,48 +1,79 @@
 # Beauty
-Beauty is a web server designed for constrained environments. In particular it
-was developed to run on ESP32 that provide Asio support.
-However it will run in any environment that supports Asio (non-boost).
+> **A lightweight, powerful web server designed for constrained environments**
 
-It is insipired by Express.js in that it executes a stack of middlewares that
-are executed in added order. See examples.
+Beauty was born with the realization that Asio is supported on ESP32 microcontrollers, however Beauty runs anywhere Asio is supported, from tiny IoT devices to high-performance servers.
 
-Its main properties:
-* Supports HTTP/1.1 (configurable support for persistent connections)
-* Multi-part file upload
-* 100-continue support
-* Adaptable to any file system (e.g. LittleFs on ESP32 or std::fstream)
-* Fast, asynchronous and lock-free implementation
-* Low and predictable heap memory requirement (configurable support of buffer sizes)
-* No ESP-IDF/Arduino dependencies, i.e. the web application can be mocked and
-  tested on PC during development
+**Inspired by Express.js** - Familiar middleware pattern with predictable execution order  
+**Born for Embedded** - Developed specifically for ESP32 but scales to any platform  
+**Production Ready** - Used in real-world IoT deployments and web applications
 
-# Dependencies
-* Asio (non-boost)
-* c++11
+## ✨ Key Features
 
-# Usage
+| Feature | Description |
+|---------|-------------|
+| **HTTP/1.1 Support** | Full HTTP/1.1 with configurable persistent connections |
+| **Multi-part Upload** | Handle large file uploads with customizable validation |
+| **WebSocket Protocol** | RFC 6455 compliant real-time communication |
+| **Flexible File System** | Adapt to any storage (LittleFS, SPIFFS, std::fstream) |
+| **High Performance** | Asynchronous, lock-free, predictable memory usage |
+| **Development Friendly** | Mock, develop and test on PC, deploy to embedded |
 
-## PC (e.g. Linux/Windows)
-See examples/pc/main.cpp
-This example can be build and run as:
+## 📋 Table of Contents
+
+- [🌟 Beauty](#-beauty)
+  - [✨ Key Features](#-key-features)
+  - [📋 Table of Contents](#-table-of-contents)
+  - [📦 Dependencies](#-dependencies)
+  - [🚀 Quick Start](#-quick-start)
+    - [💻 PC Development (Linux/Windows/macOS)](#-pc-development-linuxwindowsmacos)
+    - [🔧 ESP32 Integration](#-esp32-integration)
+  - [🏗️ Architecture](#️-architecture)
+  - [⚙️ Server Configuration](#️-server-configuration)
+    - [Constructor Options](#constructor-options)
+    - [Server Methods](#server-methods)
+    - [Settings & Limits](#settings--limits)
+  - [🔧 Middleware Development](#-middleware-development)
+    - [The Request Object](#the-request-object)
+    - [The Reply Object](#the-reply-object)
+  - [🚦 HTTP/1.1 100-continue Support](#-http11-100-continue-support)
+  - [📊 HttpResult - JSON Made Easy](#-httpresult---json-made-easy)
+  - [🛣️ Router - REST API Simplified](#️-router---rest-api-simplified)
+  - [🔌 WebSocket Support](#-websocket-support)
+
+## 📦 Dependencies
+- **Asio (non-boost)** - Async I/O operations
+- **>=C++11** - The core library is kept compatible with C++11 for maximum portability
+
+## 🚀 Quick Start
+
+### 💻 PC Development (Linux/Windows/macOS)
+
+Get up and running in under 30 seconds:
+
+```bash
+# Clone and build
+mkdir build && cd build
+cmake --build . ..
+
+# Launch with built-in demos
+./build/examples/beauty_example 127.0.0.1 8080 www
+
+# Open http://127.0.0.1:8080 and explore:
+#   • Static file serving
+#   • Low-level Web API
+#   • Full JSON REST API
+#   • Multi-part file uploads  
+#   • WebSocket chat & data streaming
+#   • Flow control demonstrations
 ```
-mkdir build
-cmake --build build ..
-# run with
-build/examples/beauty_example 127.0.0.1 8080 www
-# visit 127.0.0.1:8080 and test the routes provided by examples/pc/my_file_api.cpp
-# upload this README.md with:
-# curl --location '127.0.0.1:8080' --form 'file1=@"README.md"' 
-```
 
-## ESP32
-Beauty can be used in both PlatformIO/Arduino and ESP-IDF development frameworks.
-Check documentation in respective framework how to add external libraries.
+> **Tip**: The the test_scripts folder can be used to  explore more advanced features like 100-continue.
 
-As asio::io_context::run() is blocking, the code below uses a RTOS thread as
-this is probably the best fit for most applications. However if nothing else
-needs to run in loop(), the RTOS thread can be omitted and the code below can
-be simplified to the "standard" Arduino setup() and loop() concept.
+### 🔧 ESP32 Integration
+
+Beauty seamlessly integrates with both **PlatformIO/Arduino** and **ESP-IDF** frameworks. Since Asio's `io_context::run()` is blocking, we recommend using an RTOS thread for most applications:
+
+> 🔧 **Framework Support**: Add Beauty as an external library following your framework's documentation
 
 ```
 // included for this example
@@ -67,13 +98,13 @@ void httpServerThread(void*) {
     MyFileIO fio; // see examples folder for LittleFs
 
     // configurable keep-alive support
-    beauty::HttpPersistence persistentOption(std::chrono::seconds(5), 1000, 20);
+    beauty::Settings settings(std::chrono::seconds(5), 1000, 20);
 
     // the asio::context
     asio::io_context ioc;
 
     // must use an alternative constructor compared to PC example
-    beauty::Server server(ioc, 80, persistentOption, 1024);
+    beauty::Server server(ioc, 80, settings, 1024);
     server.setFileIO(&fio);
 
     // middlewares (just one in this example), see examples folder
@@ -101,109 +132,175 @@ void httpServerThread(void*) {
                 NULL                // Task handle
 
 ```
-# Execution order
-For an incomming http request, Beauty first invokes the middleware stack in
-added order. If no middleware respond to the request, Beauty will call the file
-io handler (if defined).
+## 🏗️ Architecture
 
-The file io handler should typically return 404 if it fails to open the requested file, Beauty will respond with 501 not implemented if no FileIO handler is set.
+Beauty follows a **middleware-first architecture** inspired by Express.js:
 
-# Server
-The Server is what runs on top of the Asio::io_context. It has two constructors,
-one for PC and one for ESP32.
-
-|Contructor |Description |
-|--|--|
-|`Server(asio::io_context &ioContext, uint16_t port, HttpPersistence options, size_t maxContentSize = 1024)`| Use with ESP32|
-|`Server(asio::io_context &ioContext, const std::string &address, const std::string &port, HttpPersistence options, size_t maxContentSize = 1024)`| Use on PC|
-
-|Constructor argument |Description |
-|--|--|
-|ioContext |The asio::io_context |
-|address |Address of the network interface to use, PC constructor only |
-|port |The port that the server binds and responds too.<br>**Note.** For the PC constructor this can be set to 0 in which case the operating system will assign a free port.|
-|options| See HTTP persistence options below|
-|maxContentSize| The max size in bytes of request/response buffers. Each connection will allocate one buffer for each direction. The minimum buffer size is 1024.|
-
-|Methods |Description |
-|--|--|
-|`void setFileIO(IFileIO *fileIO)` | Sets the implemented FileIO for the target environment. See examples.|
-|`void addRequestHandler(const handlerCallback &cb)` | Adds custom middleware (web api) handlers. See examples.|
-|`void setExpect100ContinueHandler(const handlerCallback &cb)` | Adds a custom handler. If not set, Beauty will return status 200 upon request. |
-|`void setDebugMsgHandler(const debugMsgCallback &cb)` | Adds a custom "printf" handler to get debug messages from Beauty. |
-
-The definitions of `handlerCallback` and `debugMsgCallback` can be found in src/beauty/beauty_common.hpp.
-
-## HTTP persistence options
-Beauty support HTTP/1.1 using Keep-Alive connections.
-The advantage of Keep-Alive connections is faster response time and avoid
-unnecessary re-allocation of buffers for repeated request/response cycles from
-the same clients.
-The drawback is of coarse that memory may be used up more rapidly when serving
-many clients. The `connectionLimit` may serve as a trade-off to achieve both
-advantages for constrained environments.
-
-The behaviour is controlled with HttpPersistence, defined in src/beauty/beauty_common.hpp.
-It is required by both Server constructors and includes the following members:
-
-|Variable |Description |
-|--|--|
-|`std::chrono::seconds keepAliveTimeout_`| Keep-Alive timeout for inactive connections. Sent in Keep-Alive response header.  0s = Keep-Alive disabled.<br>When disabled, Beauty acts as a HTTP/1.0 server, sending Connection=close in all responses. |
-|`size_t keepAliveMax_` |Max number of request that can be processed on the connection before it is closed. Sent in Keep-Alive response header.<br>**Note.** Only relevant if keepAliveTimeout_ > 0s|
-|`size_t connectionLimit_` |Internal limitation of the number of persistent http connections that are allowed. If this limit is exceeded, Connection=close will be sent in the response for new connections.<br>0 = no limit.<br>**Note.** Only relevant if keepAliveTimeout_ > 0s. |
-
-# Middleware design
-A middleware is defined by implementing the `handlerCallback` function. E.g. as:
 ```
-void handleRequest(const Request &req, Reply &rep);
+HTTP Request → Middleware Stack → File Handler → HTTP Response
+               (in order added)     (fallback)
 ```
-The example directory contains examples.
 
-## The Request object
-The Request object contains the parsed http request including parsed headers
-and body data. It represents what the request looked like upon reception and
-must never be modfied.
+**Request Flow:**
+1. 🔍 **Middleware Stack**: Executed in the order you add them
+2. 📁 **File Handler**: Automatic fallback for static files (if configured)
+3. ❌ **404/501**: Proper error responses if no handler matches
 
-The following member variables provides the request information:
-|Variable |Description |
-|---|---|
-|`std::string method_` |"GET"/"POST" etc.   |
-|`std::string uri_` |e.g "/file.bin?myKey=my%20value"   |
-|`int httpVersionMajor_` |e.g. 1  |
-|`int httpVersionMinor_` |e.g. 1   |
-|`std::vector<Header> headers_`  |Headers provided in request.  |
-|`bool keepAlive_`  |Keep-alive status of the connection.  |
-|`std::string requestPath_` |e.g. /file.bin |
-|`std::vector<char> body_` |Body data of the request.   |
+> 💡 **Tip**: Put your most frequently accessed routes first in the middleware stack for better performance!
 
-The following helper methods are provided:
-|Method |Description |
-|---|---|
-|`Param getQueryParam(const std::string &key)` |Returns struct Param{bool exists_; std::string value;) }|
-|`Param getFormParam(const std::string &key)` |Returns struct Param{bool exists_; std::string value;) }|
-|`bool startsWith(const std::sting &sw)` |Return true if the requestPath_ starts with provided string.|
+## ⚙️ Server Configuration
+Beauty's `Server` class runs on top of Asio's `io_context` and provides platform-optimized constructors:
 
-## The Reply object
-The Reply object is what should be modified when a middleware acts on a request.
+### Constructor Options
 
-The following member variables can be modified in the reply.
-|Variable | Description |
-|---|---|
-|`std::vector<char> content_`| The content data of the response (i.e. typically the response body). Only used with selected `send` method, see below. |
-|`std::string filePath_`  |Intialized with Request::requestPath_. Can be modified by middleware before files io handler reads the file. See examples. |
-|`std::string fileExtension_` |Beauty parses the file extension provided in the `Request::requestPath_` and stores it here for convenient access. |
+| Platform | Constructor | Use Case |
+|----------|-------------|----------|
+| 🔧 **ESP32** | `Server(io_context, port, settings, maxContentSize)` | Embedded systems |
+| 💻 **PC/Server** | `Server(io_context, address, port, settings, maxContentSize)` | Development & production |
 
-The following methods are provided:
-|Metod |Description |
-|---|---|
-|`void addHeader(const string &name, const string &value)`|Beauty always adds the `Content-Length` header automatically. So this header must never be added through addHeader().<br>Typically Beauty will also automatically add the `Content-Type` header. However if this method is used, Beauty will not add the `Content-Type` header.<br>So when using this method, all response headers (except for `Content-Length`), must be added.<br>This scheme allows to control the `Content-Type` header from a middleware in special cases.  See examples/pc/my_file_api.cpp. |
-|`void send(status_type)` | Use when replying without a response body.|
-|`void send(status_type, string contentType)` |Use with `Reply::content_`. `Reply::content_` must be loaded with the response body data before the send method is called.<br>**Note.** If combined with `addHeader()`, the contentType argument do add the `Content-Type` header.|
-|`void send(status_type, string contentType, char* data, size_t size)`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  |Use when pointing to memory holding the response body data.<br>**Note.** If combined with `addHeader()`, the contentType argument do add the `Content-Type` header. |
-|`void stockReply(status_code)`|Replies with a stock body for the status_code. |
+### Constructor Parameters
+
+| Parameter | Description | 💡 Tips |
+|-----------|-------------|---------|
+| `ioContext` | Asio's event loop engine | Shared across all async operations |
+| `address` | Network interface (PC only) | Use `"0.0.0.0"` for all interfaces |
+| `port` | TCP port to bind | Set to `0` for OS-assigned port |
+| `settings` | HTTP persistence & timeouts | Configure for your use case |
+| `maxContentSize` | Buffer size per connection | Min 1024 bytes, scale with needs |
+
+> 🚀 **Performance Tip**: Each connection allocates 2 buffers (read/write) of `maxContentSize`. Plan your memory accordingly!
+
+### Server Methods
+
+| Method | Purpose | 💡 When to Use |
+|--------|---------|----------------|
+| `addRequestHandler(callback)` | Add middleware/API handlers | REST APIs, custom routing logic |
+| `setFileIO(IFileIO*)` | Configure file system adapter | Static files, uploads, embedded storage |
+| `setExpect100ContinueHandler(callback)` | Handle large upload validation | Auth checks and file size limitations before accepting big files |
+| `setWsEndpoints(vector<shared_ptr<WsEndpoint>>)` | Register WebSocket endpoints | Real-time communication |
+| `setDebugMsgHandler(callback)` | Custom debug message handler | Development debugging, production logging |
+
+> 📚 **Reference**: Find callback definitions in `src/beauty/beauty_common.hpp`
+
+### Settings & Limits
+
+Beauty's `Settings` class gives you fine-grained control over resource usage and connection behavior - perfect for **constrained environments**:
+
+```cpp
+beauty::Settings settings(
+    std::chrono::seconds(30),  // keepAliveTimeout
+    100,                       // keepAliveMax  
+    50                         // connectionLimit
+);
+```
+
+| Setting | Purpose | 🎯 Optimization |
+|---------|---------|-----------------|
+| `keepAliveTimeout_` | HTTP Keep-Alive timeout | `0s` = HTTP/1.0 mode, `>0s` = HTTP/1.1 |
+| `keepAliveMax_` | Max requests per connection | Balance connection reuse vs memory |
+| `connectionLimit_` | Max concurrent connections | **Critical for embedded**: prevents OOM |
+| `wsReceiveTimeout_` | WebSocket message timeout | Detect dead clients |
+| `wsPingInterval_` | WebSocket ping frequency | Keep connections alive through NAT |
+| `wsPongTimeout_` | WebSocket pong response timeout | Clean up unresponsive clients |
+
+> 💾 **Memory Management**: `connectionLimit_` is your best friend on ESP32 - set it based on available RAM!  
+> ⚡ **Performance**: Keep-Alive reduces connection overhead but uses more memory per client
+
+## 🔧 Middleware Development
+
+Middleware in Beauty is **beautifully simple** - just implement the `handlerCallback` function:
+
+```cpp
+void handleRequest(const beauty::Request& req, beauty::Reply& rep) {
+    // Your magic happens here! ✨
+    if (req.requestPath_ == "/api/hello") {
+        rep.send(beauty::Reply::ok, "application/json", R"({"message": "Hello World!"})");
+    }
+}
+```
+
+> 🎯 **Design Philosophy**: One function, total control. Check out our examples for inspiration!
+
+### The Request Object
+
+The `Request` object is your **read-only window** into what the client sent. It's fully parsed and ready to use:
+
+#### 📋 Core Properties
+
+| Property | Example | Purpose |
+|----------|---------|---------|
+| `method_` | `"GET"`, `"POST"` | HTTP method |
+| `uri_` | `"/api/users?page=1"` | Full URI with query string |
+| `requestPath_` | `"/api/users"` | Clean path without query |
+| `body_` | `std::vector<char>` | Request body data |
+| `headers_` | `std::vector<Header>` | All HTTP headers |
+| `keepAlive_` | `true`/`false` | Connection persistence |
+
+#### 🛠️ Helper Methods
+
+```cpp
+// Parse query parameters: /api/users?page=1&limit=10
+auto page = req.getQueryParam("page");    // page.exists_, page.value_
+auto limit = req.getQueryParam("limit");
+
+// Parse form data: Content-Type: application/x-www-form-urlencoded
+auto username = req.getFormParam("username");
+
+// Path matching: for simple routing
+if (req.startsWith("/api/")) {
+    // Handle API requests
+}
+```
+
+> 🔒 **Immutable by Design**: Request objects are read-only to prevent accidental modifications
+
+### The Reply Object
+
+The `Reply` object is your **canvas for crafting responses**. Modify it to send exactly what your clients need:
+
+#### 🎨 Response Building
+
+| Method | Use Case | Example |
+|--------|----------|---------|
+| `send(status)` | Status-only responses | `rep.send(beauty::Reply::not_found)` |
+| `send(status, contentType)` | With `content_` buffer | JSON, HTML, custom data |
+| `send(status, contentType, data, size)` | Direct memory pointer | Large files |
+
+#### 🔧 Advanced Control
+
+```cpp
+// Custom headers (takes full control)
+rep.addHeader("Cache-Control", "no-cache");
+rep.addHeader("Content-Type", "application/json");
+// Note: When using addHeader(), you control ALL headers except Content-Length and Connection
+
+// File handling magic
+rep.filePath_ = "/custom/path.html";        // Redirect file requests
+rep.fileExtension_ = ".json";               // Override detected extension
+```
+
+#### 💡 Real-World Examples
+
+```cpp
+// JSON API Response
+rep.content_ = R"({"users": [], "total": 0})";
+rep.send(beauty::Reply::ok, "application/json");
+
+// Custom Error with CORS
+rep.addHeader("Access-Control-Allow-Origin", "*");
+rep.addHeader("Content-Type", "text/plain");
+rep.content_ = "API key required";
+rep.send(beauty::Reply::unauthorized);
+
+// File Download
+rep.addHeader("Content-Disposition", "attachment; filename=data.csv");
+rep.send(beauty::Reply::ok, "text/csv", csvData.data(), csvData.size());
+```
+
+> ⚡ **Tip**: Use `content_` for dynamic data, direct pointers for static/large files
 
 
-## HTTP/1.1 100-continue Support
+## 🚦 HTTP/1.1 100-continue Support
 The 100-continue mechanism allows HTTP clients to send request headers first,
 wait for server approval (100 Continue response), and only then send the
 potentially large request body. This is particularly useful for:
@@ -243,7 +340,7 @@ server.setExpectContinueHandler([](const beauty::Request& req, beauty::Reply& re
 });
 ```
 
-## HttpResult (optional)
+## 📊 HttpResult - JSON Made Easy
 As the request and reply classes store data in `std::vector<char>` it becomes
 a bit hard to manipulate their data as e.g. JSON documents. Therefore, the
 HttpResult class provides a convenient way to do so.
@@ -404,7 +501,7 @@ res << "Name,Age,City\n"
 
 rep.send(res.statusCode_, "text/csv");
 ```
-## Router (optional)
+## 🛣️ Router - REST API Simplified
 
 Beauty provides a lightweight, router implementation. It avoids heavy dependencies like `std::regex` and uses string operations for path matching. The router provides some key features listed below but is not required when implementing a Web API request handler.
 
@@ -552,3 +649,236 @@ Start the example server and test the '/api/users' paths:
 ```bash
 ./build/examples/beauty_example 127.0.0.1 8080 www/
 ```
+
+## 🔌 WebSocket Support
+
+Beauty provides WebSocket support in compliance with RFC 6455.
+The API provides the primitives to build custom queue and application-controlled back-pressure handling.
+The WebSocket connections reuse the existing HTTP connection buffers, making the memory overhead minimal:
+
+## Key Features
+
+- **RFC 6455 Compliant**: Full WebSocket protocol implementation
+- **Path-based Endpoints**: Support for multiple WebSocket endpoints on different paths
+- **Customizable Flow Control**: Allows for advanced back-pressure handling
+- **Thread-safe**: Built on Asio's single-threaded event loop model
+- **Connection Management**: Automatic connection lifecycle management
+- **Ping/Pong Handling**: Built-in connection health monitoring
+
+## Basic WebSocket Setup
+
+### 1. Create WebSocket Endpoints
+
+WebSocket functionality is implemented through endpoint classes that inherit from `WsEndpoint`:
+
+```cpp
+#include "beauty/ws_endpoint.hpp"
+
+class MyChatEndpoint : public beauty::WsEndpoint {
+public:
+    MyChatEndpoint() : WsEndpoint("/ws/chat") {}
+
+    void onWsOpen(const std::string& connectionId) override {
+        sendText(connectionId, "Welcome to the chat!");
+    }
+
+    void onWsMessage(const std::string& connectionId, const beauty::WsMessage& message) override {
+        // Echo message to all connected clients
+        std::string msg(message.content_.begin(), message.content_.end());
+        for (const auto& connId : getActiveConnections()) {
+            sendText(connId, "User " + connectionId + ": " + msg);
+        }
+    }
+
+    void onWsClose(const std::string& connectionId) override {
+        for (const auto& connId : getActiveConnections()) {
+            sendText(connId, "User " + connectionId + " has left the chat.");
+        }
+    }
+
+    void onWsError(const std::string& connectionId, const std::string& error) override {
+        // Handle connection errors
+    }
+};
+```
+
+### 2. Register Endpoints with Server
+
+```cpp
+// Create endpoints
+auto chatEndpoint = std::make_shared<MyChatEndpoint>();
+auto dataEndpoint = std::make_shared<MyDataEndpoint>();
+
+// Register with server
+server.setWsEndpoints({chatEndpoint, dataEndpoint});
+```
+
+### 3. Client Connection
+
+Clients connect to specific WebSocket endpoints using their configured paths:
+
+```javascript
+// Connect to chat endpoint
+const chatSocket = new WebSocket('ws://localhost:8080/ws/chat');
+
+// Connect to data endpoint  
+const dataSocket = new WebSocket('ws://localhost:8080/ws/data');
+```
+
+## WebSocket Endpoint API
+
+### Core Methods (Override These)
+
+```cpp
+class MyEndpoint : public beauty::WsEndpoint {
+public:
+    // Called when a client connects
+    void onWsOpen(const std::string& connectionId) override;
+    
+    // Called when a message is received
+    void onWsMessage(const std::string& connectionId, const beauty::WsMessage& message) override;
+    
+    // Called when a client disconnects
+    void onWsClose(const std::string& connectionId) override;
+    
+    // Called on connection errors
+    void onWsError(const std::string& connectionId, const std::string& error) override;
+};
+```
+
+### Sending Messages (Use These)
+
+```cpp
+// Send to specific connection
+bool sendText(const std::string& connectionId, const std::string& message);
+bool sendBinary(const std::string& connectionId, const std::vector<char>& data);
+bool sendClose(const std::string& connectionId, uint16_t statusCode = 1000, const std::string& reason = "");
+
+// Broadcast to all connections on this endpoint
+void broadcastText(const std::string& message);
+void broadcastBinary(const std::vector<char>& data);
+void broadcastClose(uint16_t statusCode = 1000, const std::string& reason = "");
+
+// Get connection information
+std::vector<std::string> getActiveConnections() const;
+```
+
+## Advanced Flow Control
+
+For production applications that need to handle varying client performance or bursty data producers,
+Beauty allows writing advanced flow control managment to prevent memory buildup and maintain system responsiveness.
+
+### Write State Tracking
+
+```cpp
+// Check if connection can send (not in middle of write operation)
+bool canSendTo(const std::string& connectionId) const;
+
+// Send with optional callbacks for flow control
+WriteResult sendText(const std::string& connectionId, 
+                     const std::string& message, 
+                     WriteCompleteCallback callback);
+
+WriteResult sendBinary(const std::string& connectionId, 
+                       const std::vector<char>& data, 
+                       WriteCompleteCallback callback);
+```
+
+### Flow Control Strategies (Examples)
+
+Beauty provides building blocks for flow control rather than making policy decisions. Here are common strategies:
+See examples/pc/my_data_streaming_endpoint.cpp for a complete working example.
+
+#### 1. Drop-on-Busy (Real-time Data)
+```cpp
+void broadcastData(const std::string& data) {
+    for (const auto& connId : getActiveConnections()) {
+        if (canSendTo(connId)) {
+            sendText(connId, data);
+        } else {
+            // Drop message for slow clients
+            statisticsDropped_[connId]++;
+        }
+    }
+}
+```
+
+#### 2. Queue with Limits (Important Messages)
+```cpp
+void sendImportantMessage(const std::string& connId, const std::string& msg) {
+    if (canSendTo(connId)) {
+        sendText(connId, msg);
+    } else if (messageQueue_[connId].size() < MAX_QUEUE_SIZE) {
+        messageQueue_[connId].push(msg);
+    } else {
+        // Queue full, handle accordingly
+        handleQueueFull(connId);
+    }
+}
+```
+
+#### 3. Adaptive Rate Limiting
+```cpp
+void adaptiveSend(const std::string& connId, const std::string& data) {
+    auto& stats = connectionStats_[connId];
+    
+    if (canSendTo(connId) || stats.getDropRate() < 0.1) {  // Less than 10% drop rate
+        auto result = sendText(connId, data, 
+            [&stats](const std::error_code& ec, std::size_t bytes) {
+                if (!ec) stats.messagesSent++;
+            });
+        
+        if (result == WriteResult::WRITE_IN_PROGRESS) {
+            stats.messagesDropped++;
+        }
+    } else {
+        stats.messagesDropped++;
+    }
+}
+```
+
+### Write Result Codes
+
+```cpp
+enum class WriteResult {
+    SUCCESS,           // Message queued for sending
+    WRITE_IN_PROGRESS, // Connection is busy with another write
+    CONNECTION_CLOSED  // Connection is closed or invalid
+};
+```
+
+## Protocol Details
+
+### WebSocket Handshake
+Beauty automatically handles the WebSocket handshake process:
+1. Client sends HTTP Upgrade request with WebSocket headers
+2. Beauty validates the request and generates proper Sec-WebSocket-Accept header
+3. HTTP 101 Switching Protocols response is sent
+4. Connection is upgraded to WebSocket protocol
+
+### Frame Types Supported
+- **Text frames**: UTF-8 encoded text messages
+- **Binary frames**: Raw binary data
+- **Close frames**: Connection termination with status codes
+- **Ping/Pong frames**: Automatic connection health monitoring
+
+### Connection Management
+- Automatic ping/pong handling for connection health
+- Configurable timeouts and limits
+- Graceful connection shutdown
+- Error handling and recovery
+
+## Memory Usage
+
+WebSocket connections reuse the existing HTTP connection buffers, making the memory overhead minimal:
+- Each WebSocket connection uses the same `maxContentSize` buffer as HTTP
+- No additional per-connection memory allocation for WebSocket protocol
+- Efficient buffer reuse for frame parsing and encoding
+
+## Testing
+Beauty includes a comprehensive WebSocket test interface at `/ws/chat` and `/ws/data` that allows:
+- Testing multiple endpoint connections simultaneously
+- Flow control simulation with bursty data
+- Real-time statistics monitoring
+- Interactive message sending and broadcasting
+
