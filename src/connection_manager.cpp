@@ -7,19 +7,18 @@ void defaultDebugMsgHandler(const std::string &) {}
 
 namespace beauty {
 
-ConnectionManager::ConnectionManager(HttpPersistence options)
-    : httpPersistence_(options), debugMsgCb_(defaultDebugMsgHandler) {}
+ConnectionManager::ConnectionManager(const Settings &settings)
+    : settings_(settings), debugMsgCb_(defaultDebugMsgHandler) {}
 
 void ConnectionManager::start(std::shared_ptr<Connection> c) {
     connections_.insert(c);
     bool useKeepAlive = false;
-    if (httpPersistence_.keepAliveTimeout_ != std::chrono::seconds(0) &&
-        (httpPersistence_.connectionLimit_ == 0 ||  // 0 = unlimited
-         (httpPersistence_.connectionLimit_ > 0 &&
-          connections_.size() <= httpPersistence_.connectionLimit_))) {
+    if (settings_.keepAliveTimeout_ != std::chrono::seconds(0) &&
+        (settings_.connectionLimit_ == 0 ||  // 0 = unlimited
+         (settings_.connectionLimit_ > 0 && connections_.size() <= settings_.connectionLimit_))) {
         useKeepAlive = true;
     }
-    c->start(useKeepAlive, httpPersistence_.keepAliveTimeout_, httpPersistence_.keepAliveMax_);
+    c->start(useKeepAlive, settings_.keepAliveTimeout_, settings_.keepAliveMax_);
 }
 
 void ConnectionManager::stop(std::shared_ptr<Connection> c) {
@@ -34,21 +33,17 @@ void ConnectionManager::stopAll() {
     connections_.clear();
 }
 
-void ConnectionManager::setHttpPersistence(HttpPersistence options) {
-    httpPersistence_ = options;
-}
-
 void ConnectionManager::tick() {
     auto now = std::chrono::steady_clock::now();
     auto it = connections_.begin();
     while (it != connections_.end()) {
         if ((*it)->useKeepAlive()) {
             bool erase = false;
-            if (((*it)->getLastActivityTime() + httpPersistence_.keepAliveTimeout_ < now)) {
+            if (((*it)->getLastActivityTime() + settings_.keepAliveTimeout_ < now)) {
                 debugMsgCb_("Removing connection due to inactivity");
                 erase = true;
             }
-            if ((*it)->getNrOfRequests() >= httpPersistence_.keepAliveMax_) {
+            if ((*it)->getNrOfRequests() >= settings_.keepAliveMax_) {
                 debugMsgCb_("Removing connection due max request limit");
                 erase = true;
             }

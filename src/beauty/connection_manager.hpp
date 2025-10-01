@@ -15,7 +15,7 @@ class ConnectionManager {
     ConnectionManager &operator=(const ConnectionManager &) = delete;
 
     // Construct a connection manager.
-    ConnectionManager(HttpPersistence options);
+    ConnectionManager(const Settings &settings);
     ~ConnectionManager() = default;
 
     // Add the specified connection to the manager and start it.
@@ -27,13 +27,10 @@ class ConnectionManager {
     // Stop all connections.
     void stopAll();
 
-    // Set connection options.
-    void setHttpPersistence(HttpPersistence options);
-
     // Handle connections periodically.
     void tick();
 
-    // Handler for debug messages
+    // Handler for debug messages.
     void setDebugMsgHandler(const debugMsgCallback &cb);
 
     // Connections may use the debug message handler.
@@ -43,8 +40,8 @@ class ConnectionManager {
     // The managed connections.
     std::set<std::shared_ptr<Connection>> connections_;
 
-    // Http persistence options.
-    HttpPersistence httpPersistence_;
+    // Settings for connections.
+    const Settings &settings_;
 
     // Callback to handle debug messages.
     debugMsgCallback debugMsgCb_;

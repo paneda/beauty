@@ -10,6 +10,7 @@
 #include "beauty/connection.hpp"
 #include "beauty/connection_manager.hpp"
 #include "beauty/i_file_io.hpp"
+#include "beauty/i_ws_receiver.hpp"
 #include "beauty/request_handler.hpp"
 
 namespace beauty {
@@ -22,14 +23,14 @@ class Server {
     // Simple constructor, use for ESP32.
     explicit Server(asio::io_context &ioContext,
                     uint16_t port,
-                    HttpPersistence options,
+                    const Settings &settings,
                     size_t maxContentSize = 1024);
 
     // Advanced constructor use for OS:s supporting signal_set.
     explicit Server(asio::io_context &ioContext,
                     const std::string &address,
                     const std::string &port,
-                    HttpPersistence options,
+                    const Settings &settings,
                     size_t maxContentSize = 1024);
     ~Server() = default;
 
@@ -39,6 +40,7 @@ class Server {
     void setFileIO(IFileIO *fileIO);
     void addRequestHandler(const handlerCallback &cb);
     void setExpectContinueHandler(const handlerCallback &cb);
+    void setWsReceiver(IWsReceiver *wsReceiver);
     void setDebugMsgHandler(const debugMsgCallback &cb);
 
    private:
@@ -50,6 +52,7 @@ class Server {
     asio::ip::tcp::acceptor acceptor_;
     ConnectionManager connectionManager_;
     RequestHandler requestHandler_;
+    IWsReceiver *wsReceiver_ = nullptr;
 
     // Unique Id for each connection.
     unsigned connectionId_ = 0;

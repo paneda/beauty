@@ -25,6 +25,7 @@ class Reply {
     virtual ~Reply() = default;
 
     enum status_type {
+        switching_protocols = 101,
         ok = 200,
         created = 201,
         accepted = 202,
