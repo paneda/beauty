@@ -1,4 +1,5 @@
 #include "beauty/multipart_parser.hpp"
+#include "beauty/ws_sec_accept.hpp"
 #include "beauty/connection_manager.hpp"
 #include "beauty/connection.hpp"
 
@@ -7,6 +8,7 @@ namespace beauty {
 Connection::Connection(asio::ip::tcp::socket socket,
                        ConnectionManager &manager,
                        RequestHandler &handler,
+                       IWsReceiver *wsReceiver,
                        unsigned connectionId,
                        size_t maxContentSize)
     : socket_(std::move(socket)),
@@ -16,12 +18,16 @@ Connection::Connection(asio::ip::tcp::socket socket,
       maxContentSize_(maxContentSize),
       buffer_(maxContentSize),
       request_(buffer_),
-      reply_(maxContentSize) {}
+      reply_(maxContentSize),
+      wsReceiver_(wsReceiver),
+      wsMessage_(buffer_),
+      wsParser_(wsMessage_) {}
 
 void Connection::start(bool useKeepAlive,
                        std::chrono::seconds keepAliveTimeout,
                        size_t keepAliveMax) {
     lastActivityTime_ = std::chrono::steady_clock::now();
+    lastReceivedTime_ = lastActivityTime_;
     useKeepAlive_ = useKeepAlive;
     keepAliveTimeout_ = keepAliveTimeout;
     keepAliveMax_ = keepAliveMax;
@@ -34,6 +40,10 @@ void Connection::stop() {
 
 std::chrono::steady_clock::time_point Connection::getLastActivityTime() const {
     return lastActivityTime_;
+}
+
+std::chrono::steady_clock::time_point Connection::getLastReceivedTime() const {
+    return lastReceivedTime_;
 }
 
 size_t Connection::getNrOfRequests() const {
@@ -54,99 +64,110 @@ void Connection::doRead() {
         asio::buffer(buffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
             if (!ec) {
                 lastActivityTime_ = std::chrono::steady_clock::now();
+                lastReceivedTime_ = lastActivityTime_;
                 buffer_.resize(bytesTransferred);
-                RequestParser::result_type result = requestParser_.parse(request_, buffer_);
+                if (isWebSocket_) {
+                    wsMessage_.reset();
+                    WsParser::result_type result = wsParser_.parse();
+                    // TODO: do something with the data
+                    wsReceiver_->onWsMessage(std::to_string(connectionId_), wsMessage_);
+                    doRead();
+                } else {
+                    RequestParser::result_type result = requestParser_.parse(request_, buffer_);
 
-                if (result == RequestParser::good_complete) {
-                    if (requestDecoder_.decodeRequest(request_, buffer_)) {
-                        requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
-                        doWriteHeaders();
-                    } else {
-                        reply_.stockReply(request_, Reply::bad_request);
-                        doWriteHeaders();
-                    }
-                } else if (result == RequestParser::good_headers_expect_continue) {
-                    if (requestDecoder_.decodeRequest(request_, buffer_)) {
-                        if (request_.contentLength_ > maxContentSize_) {
-                            bool isMultipart = MultiPartParser::isMultipartRequest(request_);
+                    if (result == RequestParser::good_complete) {
+                        if (requestDecoder_.decodeRequest(request_, buffer_)) {
+                            requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
+                            doWriteHeaders();
+                        } else {
+                            reply_.stockReply(request_, Reply::bad_request);
+                            doWriteHeaders();
+                        }
+                    } else if (result == RequestParser::good_headers_expect_continue) {
+                        if (requestDecoder_.decodeRequest(request_, buffer_)) {
+                            if (request_.contentLength_ > maxContentSize_) {
+                                bool isMultipart = MultiPartParser::isMultipartRequest(request_);
 
-                            if (!isMultipart) {
+                                if (!isMultipart) {
+                                    // By design Beauty only supports large body data
+                                    // uploads using multipart/form-data. It will not
+                                    // allocate buffer > maxContentSize_ for non-multipart data
+                                    reply_.stockReply(request_, Reply::payload_too_large);
+                                    doWriteHeaders();
+                                    return;
+                                }
+                            }
+
+                            // Check if the application wants to continue with this request
+                            requestHandler_.shouldContinueAfterHeaders(request_, reply_);
+                            if (reply_.isStatusOk()) {
+                                doWrite100Continue();
+                            } else {
+                                // Application rejected the request, send its reply
+                                reply_.addHeader("Connection", "close");
+                                doWriteHeaders();
+                            }
+                        } else {
+                            reply_.stockReply(request_, Reply::bad_request);
+                            doWriteHeaders();
+                        }
+                    } else if (result == RequestParser::expect_continue_with_body) {
+                        // Parser detected 100-continue protocol violation: client sent Expect
+                        // header with body data without waiting for 100 Continue response
+                        reply_.stockReply(request_, Reply::expectation_failed);
+                        doWriteHeaders();
+                    } else if (result == RequestParser::good_part) {
+                        // Determine if this is multipart without processing the request yet
+                        // (since we have incomplete body data)
+                        bool isMultipart = MultiPartParser::isMultipartRequest(request_);
+                        if (!isMultipart) {
+                            if (request_.contentLength_ > maxContentSize_) {
                                 // By design Beauty only supports large body data
                                 // uploads using multipart/form-data. It will not
                                 // allocate buffer > maxContentSize_ for non-multipart data
                                 reply_.stockReply(request_, Reply::payload_too_large);
                                 doWriteHeaders();
                                 return;
+                            } else if (request_.contentLength_ > 0) {
+                                // If we haven't received all body bytes yet, but expect some,
+                                // we need to wait for more data
+                                doRead();
+                                return;
                             }
                         }
 
-                        // Check if the application wants to continue with this request
-                        requestHandler_.shouldContinueAfterHeaders(request_, reply_);
-                        if (reply_.isStatusOk()) {
-                            doWrite100Continue();
+                        if (requestDecoder_.decodeRequest(request_, buffer_)) {
+                            reply_.noBodyBytesReceived_ = request_.getNoInitialBodyBytesReceived();
+
+                            // Call handleRequest normally - it will set up multipart state and
+                            // process initial chunk
+                            requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
+                            // Provide an early response to client if an error occurred
+                            if (!reply_.isStatusOk()) {
+                                reply_.addHeader("Connection", "close");
+                                doWriteHeaders();
+                                return;
+                            }
+
+                            doReadBody();
                         } else {
-                            // Application rejected the request, send its reply
-                            reply_.addHeader("Connection", "close");
+                            reply_.stockReply(request_, Reply::bad_request);
                             doWriteHeaders();
                         }
-                    } else {
+                    } else if (result == RequestParser::upgrade_to_websocket) {
+                        handleUpgradeToWebSocket();
+                    } else if (result == RequestParser::missing_content_length) {
+                        reply_.stockReply(request_, Reply::length_required);
+                        doWriteHeaders();
+                    } else if (result == RequestParser::version_not_supported) {
+                        reply_.stockReply(request_, Reply::status_type::version_not_supported);
+                        doWriteHeaders();
+                    } else if (result == RequestParser::bad) {
                         reply_.stockReply(request_, Reply::bad_request);
                         doWriteHeaders();
-                    }
-                } else if (result == RequestParser::expect_continue_with_body) {
-                    // Parser detected 100-continue protocol violation: client sent Expect header
-                    // with body data without waiting for 100 Continue response
-                    reply_.stockReply(request_, Reply::expectation_failed);
-                    doWriteHeaders();
-                } else if (result == RequestParser::good_part) {
-                    // Determine if this is multipart without processing the request yet
-                    // (since we have incomplete body data)
-                    bool isMultipart = MultiPartParser::isMultipartRequest(request_);
-                    if (!isMultipart) {
-                        if (request_.contentLength_ > maxContentSize_) {
-                            // By design Beauty only supports large body data
-                            // uploads using multipart/form-data. It will not
-                            // allocate buffer > maxContentSize_ for non-multipart data
-                            reply_.stockReply(request_, Reply::payload_too_large);
-                            doWriteHeaders();
-                            return;
-                        } else if (request_.contentLength_ > 0) {
-                            // If we haven't received all body bytes yet, but expect some,
-                            // we need to wait for more data
-                            doRead();
-                            return;
-                        }
-                    }
-
-                    if (requestDecoder_.decodeRequest(request_, buffer_)) {
-                        reply_.noBodyBytesReceived_ = request_.getNoInitialBodyBytesReceived();
-
-                        // Call handleRequest normally - it will set up multipart state and process
-                        // initial chunk
-                        requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
-                        // Provide an early response to client if an error occurred
-                        if (!reply_.isStatusOk()) {
-                            reply_.addHeader("Connection", "close");
-                            doWriteHeaders();
-                            return;
-                        }
-
-                        doReadBody();
                     } else {
-                        reply_.stockReply(request_, Reply::bad_request);
-                        doWriteHeaders();
+                        doRead();
                     }
-                } else if (result == RequestParser::missing_content_length) {
-                    reply_.stockReply(request_, Reply::length_required);
-                    doWriteHeaders();
-                } else if (result == RequestParser::version_not_supported) {
-                    reply_.stockReply(request_, Reply::status_type::version_not_supported);
-                    doWriteHeaders();
-                } else if (result == RequestParser::bad) {
-                    reply_.stockReply(request_, Reply::bad_request);
-                    doWriteHeaders();
-                } else {
-                    doRead();
                 }
             } else if (ec != asio::error::operation_aborted) {
                 connectionManager_.debugMsg("doRead: " + ec.message() + ':' +
@@ -163,6 +184,7 @@ void Connection::doReadBody() {
         asio::buffer(buffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
             if (!ec) {
                 lastActivityTime_ = std::chrono::steady_clock::now();
+                lastReceivedTime_ = lastActivityTime_;
                 buffer_.resize(bytesTransferred);
                 reply_.noBodyBytesReceived_ += bytesTransferred;
 
@@ -316,6 +338,7 @@ void Connection::doReadBodyAfter100Continue() {
         asio::buffer(buffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
             if (!ec) {
                 lastActivityTime_ = std::chrono::steady_clock::now();
+                lastReceivedTime_ = lastActivityTime_;
                 buffer_.resize(bytesTransferred);
                 reply_.noBodyBytesReceived_ += bytesTransferred;
 
@@ -361,6 +384,44 @@ void Connection::doReadBodyAfter100Continue() {
                 connectionManager_.debugMsg("doReadBodyAfter100Continue: " + ec.message() + ':' +
                                             std::to_string(ec.value()));
                 connectionManager_.stop(shared_from_this());
+            }
+        });
+}
+
+void Connection::handleUpgradeToWebSocket() {
+    reply_.addHeader("Connection", "Upgrade");
+    reply_.addHeader("Upgrade", "websocket");
+    std::string key = request_.getHeaderValue("Sec-WebSocket-Key");
+    if (key.empty()) {
+        reply_.stockReply(request_, Reply::bad_request);
+        reply_.addHeader("Connection", "close");
+        doWriteHeaders();
+        return;
+    }
+    reply_.addHeader("Sec-Websocket-Accept", computeWsSecAccept(key.data()));
+    // At the moment no extensions are supported.
+    // reply_.addHeader("Sec-WebSocket-Extensions", "permessage-deflate");
+    reply_.send(Reply::switching_protocols);
+
+    doAckWsUpgrade();
+}
+
+void Connection::doAckWsUpgrade() {
+    auto self(shared_from_this());
+    asio::async_write(
+        socket_, reply_.headerToBuffers(), [this, self](std::error_code ec, std::size_t) {
+            if (!ec) {
+                requestParser_.reset();
+                request_.reset();
+                reply_.reset();
+                isWebSocket_ = true;
+                // TODO: inform application about new WebSocket connection
+                // wsHandler_.handleOnOpen(connectionId_);
+                doRead();
+            } else {
+                connectionManager_.debugMsg("doAckWsUpgrade: " + ec.message() + ':' +
+                                            std::to_string(ec.value()));
+                shutdown();
             }
         });
 }

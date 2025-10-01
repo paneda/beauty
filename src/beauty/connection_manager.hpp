@@ -33,7 +33,7 @@ class ConnectionManager {
     // Handle connections periodically.
     void tick();
 
-    // Handler for debug messages
+    // Handler for debug messages.
     void setDebugMsgHandler(const debugMsgCallback &cb);
 
     // Connections may use the debug message handler.

@@ -82,6 +82,10 @@ void Server::setExpectContinueHandler(const handlerCallback &cb) {
     requestHandler_.setExpectContinueHandler(cb);
 }
 
+void Server::setWsReceiver(IWsReceiver *wsReceiver) {
+    wsReceiver_ = wsReceiver;
+}
+
 void Server::setDebugMsgHandler(const debugMsgCallback &cb) {
     connectionManager_.setDebugMsgHandler(cb);
     debugMsgCb_ = cb;
@@ -99,6 +103,7 @@ void Server::doAccept() {
             connectionManager_.start(std::make_shared<Connection>(std::move(socket),
                                                                   connectionManager_,
                                                                   requestHandler_,
+                                                                  wsReceiver_,
                                                                   connectionId_++,
                                                                   maxContentSize_));
         } else {

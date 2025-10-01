@@ -11,6 +11,9 @@
 #include "beauty/request_decoder.hpp"
 #include "beauty/request_handler.hpp"
 #include "beauty/request_parser.hpp"
+#include "beauty/ws_message.hpp"
+#include "beauty/ws_parser.hpp"
+#include "beauty/i_ws_receiver.hpp"
 
 namespace beauty {
 
@@ -26,6 +29,7 @@ class Connection : public std::enable_shared_from_this<Connection> {
     explicit Connection(asio::ip::tcp::socket socket,
                         ConnectionManager &manager,
                         RequestHandler &handler,
+                        IWsReceiver *wsReceiver,
                         unsigned connectionId,
                         size_t maxContentSize);
     ~Connection() = default;
@@ -37,6 +41,8 @@ class Connection : public std::enable_shared_from_this<Connection> {
     void stop();
 
     std::chrono::steady_clock::time_point getLastActivityTime() const;
+    std::chrono::steady_clock::time_point getLastReceivedTime() const;
+
     size_t getNrOfRequests() const;
     bool useKeepAlive() const;
 
@@ -50,9 +56,12 @@ class Connection : public std::enable_shared_from_this<Connection> {
     void doWriteHeaders();
     void doWriteContent();
     void doWrite100Continue();
+    void doAckWsUpgrade();
 
     void handleConnection();
     void handleWriteCompleted();
+
+    void handleUpgradeToWebSocket();
 
     void shutdown();
 
@@ -89,6 +98,18 @@ class Connection : public std::enable_shared_from_this<Connection> {
     // Last connection activity timestamp.
     std::chrono::steady_clock::time_point lastActivityTime_;
 
+    // Last received data timestamp.
+    std::chrono::steady_clock::time_point lastReceivedTime_;
+
+    // The interface to deliver received WebSocket data to application.
+    IWsReceiver *wsReceiver_ = nullptr;
+
+    // The received message over WebSocket.
+    WsMessage wsMessage_;
+
+    // The parser for the incoming web socket data.
+    WsParser wsParser_;
+
     // Number of seconds to keep connection open during inactivity.
     std::chrono::seconds keepAliveTimeout_;
 
@@ -104,6 +125,8 @@ class Connection : public std::enable_shared_from_this<Connection> {
     bool closeConnection_ = false;
 
     bool firstBodyReadAfter100Continue_ = true;
+
+    bool isWebSocket_ = false;
 };
 
 }  // namespace beauty
