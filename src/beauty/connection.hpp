@@ -36,7 +36,7 @@ class Connection : public std::enable_shared_from_this<Connection> {
     // Stop all asynchronous operations associated with the connection.
     void stop();
 
-    std::chrono::steady_clock::time_point getLastReceivedTime() const;
+    std::chrono::steady_clock::time_point getLastActivityTime() const;
     size_t getNrOfRequests() const;
     bool useKeepAlive() const;
 
@@ -86,8 +86,8 @@ class Connection : public std::enable_shared_from_this<Connection> {
     // The reply to be sent back to the client.
     Reply reply_;
 
-    // Last received data timestamp.
-    std::chrono::steady_clock::time_point lastReceivedTime_;
+    // Last connection activity timestamp.
+    std::chrono::steady_clock::time_point lastActivityTime_;
 
     // Number of seconds to keep connection open during inactivity.
     std::chrono::seconds keepAliveTimeout_;
