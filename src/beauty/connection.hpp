@@ -45,7 +45,7 @@ class Connection : public std::enable_shared_from_this<Connection> {
 
     size_t getNrOfRequests() const;
     bool useKeepAlive() const;
-    bool isWebSocket() const ;
+    bool isWebSocket() const;
 
    private:
     // Perform an asynchronous read operation.
@@ -81,8 +81,11 @@ class Connection : public std::enable_shared_from_this<Connection> {
     // The max buffer size when reading/writing socket.
     size_t maxContentSize_;
 
-    // Buffer for incoming data.
-    std::vector<char> buffer_;
+    // Buffer for incoming data. HTTP requests + WebSocket incoming frames
+    std::vector<char> recvBuffer_;
+
+    // Buffer for outgoing data. HTTP responses + WebSocket outgoing frames
+    std::vector<char> sendBuffer_;
 
     // The incoming request.
     Request request_;

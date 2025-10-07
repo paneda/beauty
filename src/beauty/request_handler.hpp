@@ -17,7 +17,7 @@ class RequestHandler {
     RequestHandler(const RequestHandler &) = delete;
     RequestHandler &operator=(const RequestHandler &) = delete;
 
-    RequestHandler();
+    RequestHandler(size_t maxContentSize);
     ~RequestHandler() = default;
 
     // Handlers to be optionally implemented.
@@ -47,6 +47,9 @@ class RequestHandler {
                         std::deque<MultiPartParser::ContentPart> &parts);
 
     static void defaultExpectContinueHandler(const Request &, Reply &rep);
+
+    // The max buffer size when writing socket.
+    const size_t maxContentSize_;
 
     // Provided FileIO to be implemented by each specific projects.
     IFileIO *fileIO_ = nullptr;

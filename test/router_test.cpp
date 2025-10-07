@@ -44,7 +44,8 @@ TEST_CASE("router functionality", "[router]") {
         req.method_ = "GET";
         req.requestPath_ = "/users/123";
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
 
         HandlerResult handled = router.handle(req, rep);
 
@@ -77,7 +78,8 @@ TEST_CASE("router functionality", "[router]") {
         req.httpVersionMajor_ = 1;
         req.httpVersionMinor_ = 1;
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
 
         HandlerResult handled = router.handle(req, rep);
 
@@ -112,7 +114,8 @@ TEST_CASE("router functionality", "[router]") {
         req.httpVersionMajor_ = 1;
         req.httpVersionMinor_ = 0;
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
 
         HandlerResult handled = router.handle(req, rep);
 
@@ -131,7 +134,8 @@ TEST_CASE("router functionality", "[router]") {
         req.method_ = "GET";
         req.requestPath_ = "/unknown/path";
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
 
         HandlerResult handled = router.handle(req, rep);
 
@@ -153,7 +157,8 @@ TEST_CASE("router functionality", "[router]") {
         req.method_ = "GET";
         req.requestPath_ = "/status";
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
 
         HandlerResult handled = router.handle(req, rep);
 
@@ -175,7 +180,8 @@ TEST_CASE("router functionality", "[router]") {
         req.method_ = "GET";
         req.requestPath_ = "/users/123/posts";  // Missing postId
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
 
         HandlerResult handled = router.handle(req, rep);
 
@@ -199,7 +205,8 @@ TEST_CASE("router functionality", "[router]") {
         req.method_ = "GET";
         req.requestPath_ = "/users/456/posts/789";
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
 
         HandlerResult handled = router.handle(req, rep);
 
@@ -224,7 +231,8 @@ TEST_CASE("router functionality", "[router]") {
         req.method_ = "GET";
         req.requestPath_ = "";
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
 
         HandlerResult handled = router.handle(req, rep);
 
@@ -246,7 +254,8 @@ TEST_CASE("router functionality", "[router]") {
         req.method_ = "GET";
         req.requestPath_ = "/";
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
 
         HandlerResult handled = router.handle(req, rep);
 
@@ -268,7 +277,8 @@ TEST_CASE("router functionality", "[router]") {
         req.method_ = "GET";
         req.requestPath_ = "/api/resource/";
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
 
         HandlerResult handled = router.handle(req, rep);
 
@@ -290,7 +300,8 @@ TEST_CASE("router functionality", "[router]") {
         req.method_ = "GET";
         req.requestPath_ = "/api/resource";
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
 
         HandlerResult handled = router.handle(req, rep);
 
@@ -326,7 +337,8 @@ TEST_CASE("router functionality", "[router]") {
         req.method_ = "GET";
         req.requestPath_ = "/items/42";
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
 
         HandlerResult handled = router.handle(req, rep);
 
@@ -360,7 +372,8 @@ TEST_CASE("router functionality", "[router]") {
         req.method_ = "GET";
         req.requestPath_ = "/files/special";
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
 
         HandlerResult handled = router.handle(req, rep);
 
@@ -390,7 +403,8 @@ TEST_CASE("router functionality", "[router]") {
         Request req(body);
         req.method_ = "GET";
         req.requestPath_ = "/api/v1/resource/99";
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
         HandlerResult handled = router.handle(req, rep);
         REQUIRE(handled == HandlerResult::Matched);
         REQUIRE(handlerCalled == true);
@@ -418,7 +432,8 @@ TEST_CASE("router functionality", "[router]") {
         req.requestPath_ = "/options/test";
         req.httpVersionMajor_ = 1;
         req.httpVersionMinor_ = 1;
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
         HandlerResult handled = router.handle(req, rep);
         REQUIRE(handled == HandlerResult::Matched);
         REQUIRE(handlerCalled == false);  // Handler should not be called for OPTIONS
@@ -453,7 +468,8 @@ TEST_CASE("router CORS functionality", "[router][cors]") {
         req.requestPath_ = "/api/users";
         req.headers_.push_back({"Origin", "https://example.com"});
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
         HandlerResult handled = router.handle(req, rep);
 
         REQUIRE(handled == HandlerResult::Matched);
@@ -480,7 +496,8 @@ TEST_CASE("router CORS functionality", "[router][cors]") {
         req.requestPath_ = "/api/users";
         req.headers_.push_back({"Origin", "https://example.com"});
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
         HandlerResult handled = router.handle(req, rep);
 
         REQUIRE(handled == HandlerResult::Matched);
@@ -503,7 +520,8 @@ TEST_CASE("router CORS functionality", "[router][cors]") {
         req.requestPath_ = "/api/users";
         req.headers_.push_back({"Origin", "https://anywhere.com"});
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
         HandlerResult handled = router.handle(req, rep);
 
         REQUIRE(handled == HandlerResult::Matched);
@@ -524,7 +542,8 @@ TEST_CASE("router CORS functionality", "[router][cors]") {
         req.requestPath_ = "/api/users";
         req.headers_.push_back({"Origin", "https://forbidden.com"});
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
         HandlerResult handled = router.handle(req, rep);
 
         REQUIRE(handled == HandlerResult::Matched);
@@ -545,7 +564,8 @@ TEST_CASE("router CORS functionality", "[router][cors]") {
         req.requestPath_ = "/api/users";
         // No Origin header = same-origin request
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
         HandlerResult handled = router.handle(req, rep);
 
         REQUIRE(handled == HandlerResult::Matched);
@@ -572,7 +592,8 @@ TEST_CASE("router CORS functionality", "[router][cors]") {
         req.headers_.push_back({"Access-Control-Request-Method", "POST"});
         req.headers_.push_back({"Access-Control-Request-Headers", "Content-Type, Authorization"});
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
         HandlerResult handled = router.handle(req, rep);
 
         REQUIRE(handled == HandlerResult::Matched);
@@ -607,7 +628,8 @@ TEST_CASE("router CORS functionality", "[router][cors]") {
         req.headers_.push_back({"Origin", "https://forbidden.com"});
         req.headers_.push_back({"Access-Control-Request-Method", "POST"});
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
         HandlerResult handled = router.handle(req, rep);
 
         REQUIRE(handled == HandlerResult::NoMatch);
@@ -627,7 +649,8 @@ TEST_CASE("router CORS functionality", "[router][cors]") {
         req.headers_.push_back({"Origin", "https://example.com"});
         req.headers_.push_back({"Access-Control-Request-Method", "PATCH"});  // Not supported
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
         HandlerResult handled = router.handle(req, rep);
 
         REQUIRE(handled == HandlerResult::NoMatch);
@@ -647,7 +670,8 @@ TEST_CASE("router CORS functionality", "[router][cors]") {
         req.headers_.push_back({"Origin", "https://example.com"});
         req.headers_.push_back({"Access-Control-Request-Method", "GET"});
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
         HandlerResult handled = router.handle(req, rep);
 
         REQUIRE(handled == HandlerResult::NoMatch);
@@ -670,7 +694,8 @@ TEST_CASE("router CORS functionality", "[router][cors]") {
         req.headers_.push_back({"Access-Control-Request-Method", "POST"});
         req.headers_.push_back({"Access-Control-Request-Headers", "Content-Type"});
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
         HandlerResult handled = router.handle(req, rep);
 
         REQUIRE(handled == HandlerResult::Matched);
@@ -695,7 +720,8 @@ TEST_CASE("router CORS functionality", "[router][cors]") {
         req.requestPath_ = "/api/users";
         // No Origin or Access-Control-Request-Method headers
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
         HandlerResult handled = router.handle(req, rep);
 
         REQUIRE(handled == HandlerResult::Matched);
@@ -721,7 +747,8 @@ TEST_CASE("router CORS functionality", "[router][cors]") {
         req.headers_.push_back({"Access-Control-Request-Method", "GET"});
         // No Access-Control-Request-Headers
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
         HandlerResult handled = router.handle(req, rep);
 
         REQUIRE(handled == HandlerResult::Matched);
@@ -750,7 +777,8 @@ TEST_CASE("router CORS functionality", "[router][cors]") {
         req.headers_.push_back({"Access-Control-Request-Headers",
                                 "Content-Type, X-Custom-Header, Authorization, X-Evil-Header"});
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
         HandlerResult handled = router.handle(req, rep);
 
         REQUIRE(handled == HandlerResult::Matched);
@@ -783,7 +811,8 @@ TEST_CASE("router CORS functionality", "[router][cors]") {
         req.headers_.push_back(
             {"Access-Control-Request-Headers", "X-Custom-Header, X-Another-Header"});
 
-        Reply rep(1024);
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
         HandlerResult handled = router.handle(req, rep);
 
         REQUIRE(handled == HandlerResult::Matched);

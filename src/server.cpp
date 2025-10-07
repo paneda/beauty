@@ -16,6 +16,7 @@ Server::Server(asio::io_context &ioContext,
                size_t maxContentSize)
     : acceptor_(ioContext, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)),
       connectionManager_(settings),
+      requestHandler_(maxContentSize),
       timer_(ioContext),
       maxContentSize_(maxContentSize),
       debugMsgCb_(defaultDebugMsgHandler) {
@@ -34,6 +35,7 @@ Server::Server(asio::io_context &ioContext,
                size_t maxContentSize)
     : acceptor_(ioContext),
       connectionManager_(settings),
+      requestHandler_(maxContentSize),
       timer_(ioContext),
       maxContentSize_(maxContentSize),
       debugMsgCb_(defaultDebugMsgHandler) {

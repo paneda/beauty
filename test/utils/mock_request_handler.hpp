@@ -26,6 +26,7 @@ class MockRequestHandler {
     bool returnToClient_ = false;
     Reply::status_type status_ = Reply::status_type::internal_server_error;
     std::string mockedContent_;
+    std::vector<char> sendBuffer_;
     Request receivedRequest_;
     Reply receivedReply_;
 };

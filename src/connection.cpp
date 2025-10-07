@@ -16,11 +16,12 @@ Connection::Connection(asio::ip::tcp::socket socket,
       requestHandler_(handler),
       connectionId_(connectionId),
       maxContentSize_(maxContentSize),
-      buffer_(maxContentSize),
-      request_(buffer_),
-      reply_(maxContentSize),
+      recvBuffer_(maxContentSize),
+      sendBuffer_(maxContentSize),
+      request_(recvBuffer_),
+      reply_(sendBuffer_),
       wsReceiver_(wsReceiver),
-      wsMessage_(buffer_),
+      wsMessage_(recvBuffer_),
       wsParser_(wsMessage_) {}
 
 void Connection::start(bool useKeepAlive,
@@ -60,15 +61,15 @@ bool Connection::isWebSocket() const {
 
 void Connection::doRead() {
     auto self(shared_from_this());
-    // Asio uses buffer_.size() to limit amount of read data so must restore
+    // Asio uses recvBuffer_.size() to limit amount of read data so must restore
     // size before reading. Note: operation is "cheap" as maxContentSize is
     // already reserved.
-    buffer_.resize(maxContentSize_);
+    recvBuffer_.resize(maxContentSize_);
     socket_.async_read_some(
-        asio::buffer(buffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
+        asio::buffer(recvBuffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
             if (!ec) {
                 lastActivityTime_ = std::chrono::steady_clock::now();
-                buffer_.resize(bytesTransferred);
+                recvBuffer_.resize(bytesTransferred);
                 if (isWebSocket_) {
                     wsMessage_.reset();
                     WsParser::result_type result = wsParser_.parse();
@@ -95,18 +96,19 @@ void Connection::doRead() {
                         // connectionManager_.stop(shared_from_this());
                     }
                 } else {
-                    RequestParser::result_type result = requestParser_.parse(request_, buffer_);
+                    RequestParser::result_type result = requestParser_.parse(request_, recvBuffer_);
 
                     if (result == RequestParser::good_complete) {
-                        if (requestDecoder_.decodeRequest(request_, buffer_)) {
-                            requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
+                        if (requestDecoder_.decodeRequest(request_, recvBuffer_)) {
+                            requestHandler_.handleRequest(
+                                connectionId_, request_, recvBuffer_, reply_);
                             doWriteHeaders();
                         } else {
                             reply_.stockReply(request_, Reply::bad_request);
                             doWriteHeaders();
                         }
                     } else if (result == RequestParser::good_headers_expect_continue) {
-                        if (requestDecoder_.decodeRequest(request_, buffer_)) {
+                        if (requestDecoder_.decodeRequest(request_, recvBuffer_)) {
                             if (request_.contentLength_ > maxContentSize_) {
                                 bool isMultipart = MultiPartParser::isMultipartRequest(request_);
 
@@ -158,12 +160,13 @@ void Connection::doRead() {
                             }
                         }
 
-                        if (requestDecoder_.decodeRequest(request_, buffer_)) {
+                        if (requestDecoder_.decodeRequest(request_, recvBuffer_)) {
                             reply_.noBodyBytesReceived_ = request_.getNoInitialBodyBytesReceived();
 
                             // Call handleRequest normally - it will set up multipart state and
                             // process initial chunk
-                            requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
+                            requestHandler_.handleRequest(
+                                connectionId_, request_, recvBuffer_, reply_);
                             // Provide an early response to client if an error occurred
                             if (!reply_.isStatusOk()) {
                                 reply_.addHeader("Connection", "close");
@@ -206,20 +209,20 @@ void Connection::doRead() {
 }
 
 void Connection::doReadBody() {
-    buffer_.resize(maxContentSize_);
+    recvBuffer_.resize(maxContentSize_);
     auto self(shared_from_this());
     socket_.async_read_some(
-        asio::buffer(buffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
+        asio::buffer(recvBuffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
             if (!ec) {
                 lastActivityTime_ = std::chrono::steady_clock::now();
                 lastReceivedTime_ = lastActivityTime_;
-                buffer_.resize(bytesTransferred);
+                recvBuffer_.resize(bytesTransferred);
                 reply_.noBodyBytesReceived_ += bytesTransferred;
 
                 // Process more body data using handlePartialWrite as this is the only
                 // supported mode to handle additional body data after initial
                 // request processing.
-                requestHandler_.handlePartialWrite(connectionId_, request_, buffer_, reply_);
+                requestHandler_.handlePartialWrite(connectionId_, request_, recvBuffer_, reply_);
 
                 if (reply_.noBodyBytesReceived_ < request_.contentLength_) {
                     // Provide an early response to client if an error occurred
@@ -360,14 +363,14 @@ void Connection::doWrite100Continue() {
 }
 
 void Connection::doReadBodyAfter100Continue() {
-    buffer_.resize(maxContentSize_);
+    recvBuffer_.resize(maxContentSize_);
     auto self(shared_from_this());
     socket_.async_read_some(
-        asio::buffer(buffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
+        asio::buffer(recvBuffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
             if (!ec) {
                 lastActivityTime_ = std::chrono::steady_clock::now();
                 lastReceivedTime_ = lastActivityTime_;
-                buffer_.resize(bytesTransferred);
+                recvBuffer_.resize(bytesTransferred);
                 reply_.noBodyBytesReceived_ += bytesTransferred;
 
                 if (firstBodyReadAfter100Continue_) {
@@ -383,7 +386,7 @@ void Connection::doReadBodyAfter100Continue() {
 
                     // handleRequest needs to be called first time to handle
                     // either "single part" or multi-part body processing
-                    requestHandler_.handleRequest(connectionId_, request_, buffer_, reply_);
+                    requestHandler_.handleRequest(connectionId_, request_, recvBuffer_, reply_);
                     if (!reply_.isMultiPart_) {
                         if (!reply_.isStatusOk()) {
                             reply_.addHeader("Connection", "close");
@@ -397,7 +400,8 @@ void Connection::doReadBodyAfter100Continue() {
                     // Body is incomplete, continue reading
                     // Always use handlePartialWrite for body processing (multipart state already
                     // set up)
-                    requestHandler_.handlePartialWrite(connectionId_, request_, buffer_, reply_);
+                    requestHandler_.handlePartialWrite(
+                        connectionId_, request_, recvBuffer_, reply_);
                     if (!reply_.isStatusOk()) {
                         reply_.addHeader("Connection", "close");
                         doWriteHeaders();
@@ -405,7 +409,8 @@ void Connection::doReadBodyAfter100Continue() {
                     }
                     doReadBodyAfter100Continue();
                 } else {
-                    requestHandler_.handlePartialWrite(connectionId_, request_, buffer_, reply_);
+                    requestHandler_.handlePartialWrite(
+                        connectionId_, request_, recvBuffer_, reply_);
                     doWriteHeaders();
                 }
             } else if (ec != asio::error::operation_aborted) {

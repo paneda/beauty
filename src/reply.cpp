@@ -98,9 +98,8 @@ const char crlf[] = {'\r', '\n'};
 
 }  // namespace misc_strings
 
-Reply::Reply(size_t maxContentSize)
-    : status_(status_type::ok), maxContentSize_(maxContentSize), multiPartParser_(content_) {
-    content_.reserve(maxContentSize);
+Reply::Reply(std::vector<char>& content)
+    : content_(content), status_(status_type::ok), multiPartParser_(content_) {
     headers_.reserve(2);
 }
 
