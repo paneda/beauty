@@ -14,6 +14,7 @@
 #include "beauty/ws_message.hpp"
 #include "beauty/ws_parser.hpp"
 #include "beauty/i_ws_receiver.hpp"
+#include "beauty/ws_encoder.hpp"
 
 namespace beauty {
 
@@ -42,10 +43,13 @@ class Connection : public std::enable_shared_from_this<Connection> {
 
     std::chrono::steady_clock::time_point getLastActivityTime() const;
     std::chrono::steady_clock::time_point getLastReceivedTime() const;
+    std::chrono::steady_clock::time_point getLastPingTime() const;
+    std::chrono::steady_clock::time_point getLastPongTime() const;
 
     size_t getNrOfRequests() const;
     bool useKeepAlive() const;
     bool isWebSocket() const;
+    void sendWsPing();
 
    private:
     // Perform an asynchronous read operation.
@@ -55,14 +59,15 @@ class Connection : public std::enable_shared_from_this<Connection> {
 
     // Perform an asynchronous write operation.
     void doWriteHeaders();
-    void doWriteContent();
+    void doWriteReplyContent();
     void doWrite100Continue();
-    void doAckWsUpgrade();
 
     void handleConnection();
     void handleWriteCompleted();
 
     void handleUpgradeToWebSocket();
+    void doAckWsUpgrade();
+    void doWriteWsFrame(bool continueReading = false);
 
     void shutdown();
 
@@ -99,11 +104,20 @@ class Connection : public std::enable_shared_from_this<Connection> {
     // The reply to be sent back to the client.
     Reply reply_;
 
+    // The encoder for the outgoing WebSocket frames.
+    WsEncoder wsEncoder_;
+
     // Last connection activity timestamp.
     std::chrono::steady_clock::time_point lastActivityTime_;
 
     // Last received data timestamp.
     std::chrono::steady_clock::time_point lastReceivedTime_;
+
+    // Last sent ping timestamp.
+    std::chrono::steady_clock::time_point lastPingTime_;
+
+    // Last received pong timestamp.
+    std::chrono::steady_clock::time_point lastPongTime_;
 
     // The interface to deliver received WebSocket data to application.
     IWsReceiver *wsReceiver_ = nullptr;

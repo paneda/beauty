@@ -20,6 +20,7 @@ Connection::Connection(asio::ip::tcp::socket socket,
       sendBuffer_(maxContentSize),
       request_(recvBuffer_),
       reply_(sendBuffer_),
+      wsEncoder_(sendBuffer_),
       wsReceiver_(wsReceiver),
       wsMessage_(recvBuffer_),
       wsParser_(wsMessage_) {}
@@ -47,6 +48,14 @@ std::chrono::steady_clock::time_point Connection::getLastReceivedTime() const {
     return lastReceivedTime_;
 }
 
+std::chrono::steady_clock::time_point Connection::getLastPingTime() const {
+    return lastPingTime_;
+}
+
+std::chrono::steady_clock::time_point Connection::getLastPongTime() const {
+    return lastPongTime_;
+}
+
 size_t Connection::getNrOfRequests() const {
     return nrOfRequest_;
 }
@@ -57,6 +66,15 @@ bool Connection::useKeepAlive() const {
 
 bool Connection::isWebSocket() const {
     return isWebSocket_;
+}
+
+void Connection::sendWsPing() {
+    if (!isWebSocket_) {
+        return;
+    }
+    wsEncoder_.encodePingFrame();
+    lastPingTime_ = std::chrono::steady_clock::now();
+    doWriteWsFrame();
 }
 
 void Connection::doRead() {
@@ -73,7 +91,6 @@ void Connection::doRead() {
                 if (isWebSocket_) {
                     wsMessage_.reset();
                     WsParser::result_type result = wsParser_.parse();
-                    // TODO: do something with the data
                     if (result == WsParser::indeterminate || result == WsParser::data_frame) {
                         lastReceivedTime_ = lastActivityTime_;
                         wsReceiver_->onWsMessage(std::to_string(connectionId_), wsMessage_);
@@ -85,10 +102,10 @@ void Connection::doRead() {
                     } else if (result == WsParser::ping_frame) {
                         // Respond with pong
                         lastReceivedTime_ = lastActivityTime_;
-                        // sendWsPong(wsMessage_.content_);
-                        // doWriteContent();
+                        wsEncoder_.encodePongFrame(wsMessage_.content_);
+                        doWriteWsFrame(true);  // Continue reading after pong is sent
                     } else if (result == WsParser::pong_frame) {
-                        // Pong received - can update ping status
+                        lastPongTime_ = lastActivityTime_;
                         doRead();
                     } else if (result == WsParser::fragmentation_error) {
                         // Fragmented messages are not supported
@@ -253,7 +270,7 @@ void Connection::doWriteHeaders() {
                 lastActivityTime_ = std::chrono::steady_clock::now();
 
                 if (!reply_.content_.empty() || reply_.contentPtr_ != nullptr) {
-                    doWriteContent();
+                    doWriteReplyContent();
                 } else {
                     handleWriteCompleted();
                 }
@@ -265,7 +282,7 @@ void Connection::doWriteHeaders() {
         });
 }
 
-void Connection::doWriteContent() {
+void Connection::doWriteReplyContent() {
     auto self(shared_from_this());
     asio::async_write(
         socket_, reply_.contentToBuffers(), [this, self](std::error_code ec, std::size_t) {
@@ -277,13 +294,13 @@ void Connection::doWriteContent() {
                         handleWriteCompleted();
                     } else {
                         requestHandler_.handlePartialRead(connectionId_, request_, reply_);
-                        doWriteContent();
+                        doWriteReplyContent();
                     }
                 } else {
                     handleWriteCompleted();
                 }
             } else {
-                connectionManager_.debugMsg("doWriteContent: " + ec.message() + ':' +
+                connectionManager_.debugMsg("doWriteReplyContent: " + ec.message() + ':' +
                                             std::to_string(ec.value()));
                 shutdown();
             }
@@ -456,6 +473,24 @@ void Connection::doAckWsUpgrade() {
                 shutdown();
             }
         });
+}
+
+void Connection::doWriteWsFrame(bool continueReading) {
+    auto self(shared_from_this());
+    std::vector<asio::const_buffer> buffers;
+    buffers.push_back(asio::buffer(sendBuffer_));
+    asio::async_write(socket_, buffers, [this, self, continueReading](std::error_code ec, std::size_t) {
+        if (!ec) {
+            lastActivityTime_ = std::chrono::steady_clock::now();
+            if (continueReading) {
+                doRead();  // Continue reading after write completes
+            }
+        } else {
+            connectionManager_.debugMsg("doWriteWsFrame: " + ec.message() + ':' +
+                                        std::to_string(ec.value()));
+            shutdown();
+        }
+    });
 }
 
 void Connection::shutdown() {
