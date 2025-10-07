@@ -8,11 +8,11 @@ namespace beauty {
 // - Embedded: Can use (if available) hardware accelerated random
 // - General servers: Can use system random devices
 class IRandom {
-public:
+   public:
     virtual ~IRandom() = default;
-    
+
     // return 32-bit random value
     virtual uint32_t generateRandom() = 0;
 };
 
-} // namespace beauty
+}  // namespace beauty

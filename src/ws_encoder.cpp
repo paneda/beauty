@@ -5,13 +5,12 @@
 namespace beauty {
 
 // Server constructor - defaults to SERVER role, no masking
-WsEncoder::WsEncoder(std::vector<char>& buffer) 
-    : buffer_(buffer), role_(SERVER), random_(nullptr) {
+WsEncoder::WsEncoder(std::vector<char>& buffer) : buffer_(buffer), role_(SERVER), random_(nullptr) {
     buffer_.clear();  // Start with empty buffer
 }
 
 // Client constructor - CLIENT role with required random generator
-WsEncoder::WsEncoder(std::vector<char>& buffer, IRandom& random) 
+WsEncoder::WsEncoder(std::vector<char>& buffer, IRandom& random)
     : buffer_(buffer), role_(CLIENT), random_(&random) {
     buffer_.clear();  // Start with empty buffer
 }
@@ -41,35 +40,38 @@ void WsEncoder::encodePongFrame(const std::string& payload) {
 
 void WsEncoder::encodeCloseFrame(uint16_t statusCode, const std::string& reason) {
     std::vector<char> payload;
-    
+
     // Add 2-byte status code (network byte order)
     payload.push_back(static_cast<char>((statusCode >> 8) & 0xFF));
     payload.push_back(static_cast<char>(statusCode & 0xFF));
-    
+
     // Add reason string
     payload.insert(payload.end(), reason.begin(), reason.end());
-    
+
     encodeFrame(Close, payload, true, role_ == CLIENT);
 }
 
-void WsEncoder::encodeFrame(OpCode opcode, const std::vector<char>& payload, bool final, bool mask) {
+void WsEncoder::encodeFrame(OpCode opcode,
+                            const std::vector<char>& payload,
+                            bool final,
+                            bool mask) {
     buffer_.clear();  // Clear any previous frame data
-    
+
     // First byte: FIN bit + RSV bits (000) + opcode
     uint8_t firstByte = static_cast<uint8_t>(opcode);
     if (final) {
         firstByte |= 0x80;  // Set FIN bit
     }
     buffer_.push_back(static_cast<char>(firstByte));
-    
+
     // Second byte: MASK bit + payload length
     uint8_t secondByte = 0;
     if (mask) {
         secondByte |= 0x80;  // Set MASK bit
     }
-    
+
     uint64_t payloadLength = payload.size();
-    
+
     if (payloadLength < 126) {
         // 7-bit length
         secondByte |= static_cast<uint8_t>(payloadLength);
@@ -85,31 +87,31 @@ void WsEncoder::encodeFrame(OpCode opcode, const std::vector<char>& payload, boo
         buffer_.push_back(static_cast<char>(secondByte));
         encodePayloadLength(payloadLength);
     }
-    
+
     // Add masking key if needed (for client-side)
     uint8_t maskKey[4] = {0};
     if (mask) {
         // Generate 32-bit mask
         IRandom* rng = random_ ? random_ : &defaultRandom_;
         uint32_t mask = rng->generateRandom();
-        
+
         // Extract bytes from 32-bit mask
         maskKey[0] = static_cast<uint8_t>(mask & 0xFF);
         maskKey[1] = static_cast<uint8_t>((mask >> 8) & 0xFF);
         maskKey[2] = static_cast<uint8_t>((mask >> 16) & 0xFF);
         maskKey[3] = static_cast<uint8_t>((mask >> 24) & 0xFF);
-        
+
         for (int i = 0; i < 4; ++i) {
             buffer_.push_back(static_cast<char>(maskKey[i]));
         }
     }
-    
+
     // Add payload (apply mask if needed)
     std::vector<char> maskedPayload = payload;
     if (mask && !payload.empty()) {
         applyMask(maskedPayload, maskKey);
     }
-    
+
     buffer_.insert(buffer_.end(), maskedPayload.begin(), maskedPayload.end());
 }
 

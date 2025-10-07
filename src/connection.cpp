@@ -479,18 +479,19 @@ void Connection::doWriteWsFrame(bool continueReading) {
     auto self(shared_from_this());
     std::vector<asio::const_buffer> buffers;
     buffers.push_back(asio::buffer(sendBuffer_));
-    asio::async_write(socket_, buffers, [this, self, continueReading](std::error_code ec, std::size_t) {
-        if (!ec) {
-            lastActivityTime_ = std::chrono::steady_clock::now();
-            if (continueReading) {
-                doRead();  // Continue reading after write completes
+    asio::async_write(
+        socket_, buffers, [this, self, continueReading](std::error_code ec, std::size_t) {
+            if (!ec) {
+                lastActivityTime_ = std::chrono::steady_clock::now();
+                if (continueReading) {
+                    doRead();  // Continue reading after write completes
+                }
+            } else {
+                connectionManager_.debugMsg("doWriteWsFrame: " + ec.message() + ':' +
+                                            std::to_string(ec.value()));
+                shutdown();
             }
-        } else {
-            connectionManager_.debugMsg("doWriteWsFrame: " + ec.message() + ':' +
-                                        std::to_string(ec.value()));
-            shutdown();
-        }
-    });
+        });
 }
 
 void Connection::shutdown() {
