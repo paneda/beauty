@@ -754,11 +754,6 @@ bool sendText(const std::string& connectionId, const std::string& message);
 bool sendBinary(const std::string& connectionId, const std::vector<char>& data);
 bool sendClose(const std::string& connectionId, uint16_t statusCode = 1000, const std::string& reason = "");
 
-// Broadcast to all connections on this endpoint
-void broadcastText(const std::string& message);
-void broadcastBinary(const std::vector<char>& data);
-void broadcastClose(uint16_t statusCode = 1000, const std::string& reason = "");
-
 // Get connection information
 std::vector<std::string> getActiveConnections() const;
 ```
@@ -774,7 +769,7 @@ Beauty allows writing advanced flow control managment to prevent memory buildup 
 // Check if connection can send (not in middle of write operation)
 bool canSendTo(const std::string& connectionId) const;
 
-// Send with optional callbacks for flow control
+// Send with optional callbacks for flow control or monitoring
 WriteResult sendText(const std::string& connectionId, 
                      const std::string& message, 
                      WriteCompleteCallback callback);

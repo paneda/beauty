@@ -21,7 +21,7 @@ namespace beauty {
 //
 //     void onWsMessage(const std::string& connectionId, const WsMessage& msg) override {
 //         // Echo the message back
-//         sendText(connectionId, "Echo: " + msg.content_, nullptr);
+//         sendText(connectionId, "Echo: " + msg.content_);
 //     }
 // };
 class WsEndpoint : public IWsReceiver {
@@ -51,7 +51,7 @@ class WsEndpoint : public IWsReceiver {
     // returns: WriteResult indicating success, write in progress, or connection closed
     WriteResult sendText(const std::string& connectionId,
                          const std::string& message,
-                         WriteCompleteCallback callback) {
+                         WriteCompleteCallback callback = nullptr) {
         return wsSender_ ? wsSender_->sendWsText(connectionId, message, callback)
                          : WriteResult::CONNECTION_CLOSED;
     }
@@ -64,7 +64,7 @@ class WsEndpoint : public IWsReceiver {
     // returns: WriteResult indicating success, write in progress, or connection closed
     WriteResult sendBinary(const std::string& connectionId,
                            const std::vector<char>& data,
-                           WriteCompleteCallback callback) {
+                           WriteCompleteCallback callback = nullptr) {
         return wsSender_ ? wsSender_->sendWsBinary(connectionId, data, callback)
                          : WriteResult::CONNECTION_CLOSED;
     }
@@ -79,7 +79,7 @@ class WsEndpoint : public IWsReceiver {
     WriteResult sendClose(const std::string& connectionId,
                           uint16_t statusCode,
                           const std::string& reason,
-                          WriteCompleteCallback callback) {
+                          WriteCompleteCallback callback = nullptr) {
         return wsSender_ ? wsSender_->sendWsClose(connectionId, statusCode, reason, callback)
                          : WriteResult::CONNECTION_CLOSED;
     }

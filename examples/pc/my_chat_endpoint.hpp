@@ -19,8 +19,7 @@ class MyChatEndpoint : public beauty::WsEndpoint {
         for (const auto& connId : getActiveConnections()) {
             if (connId != connectionId) {
                 sendText(connId,
-                         "{\"type\":\"user_joined\",\"user\":\"" + connectionId + "\"}",
-                         nullptr);
+                         "{\"type\":\"user_joined\",\"user\":\"" + connectionId + "\"}");
             }
         }
     }
@@ -34,8 +33,7 @@ class MyChatEndpoint : public beauty::WsEndpoint {
             if (connId != connectionId) {
                 sendText(connId,
                          "{\"type\":\"chat_message\",\"from\":\"" + connectionId +
-                             "\",\"message\":\"" + message + "\"}",
-                         nullptr);
+                             "\",\"message\":\"" + message + "\"}");
             }
         }
     }
@@ -44,7 +42,7 @@ class MyChatEndpoint : public beauty::WsEndpoint {
         std::cout << "Chat client disconnected: " << connectionId << std::endl;
         // Notify remaining clients about disconnection
         for (const auto& connId : getActiveConnections()) {
-            sendText(connId, "{\"type\":\"user_left\",\"user\":\"" + connectionId + "\"}", nullptr);
+            sendText(connId, "{\"type\":\"user_left\",\"user\":\"" + connectionId + "\"}");
         }
     }
 

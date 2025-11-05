@@ -60,8 +60,7 @@ class MyDataStreamingEndpoint : public beauty::WsEndpoint {
         messageQueues_[connectionId] = MessageQueue{};
         sendText(connectionId,
                  "Welcome to advanced data streaming! Try commands: 'help', 'stats', 'drop_mode', "
-                 "'queue_mode'",
-                 nullptr);
+                 "'queue_mode'");
 
         // Send initial stats
         sendStats(connectionId);
@@ -140,7 +139,7 @@ class MyDataStreamingEndpoint : public beauty::WsEndpoint {
         auto& stats = connectionStats_[connId];
 
         if (canSendTo(connId)) {
-            auto result = sendText(connId, data, nullptr);
+            auto result = sendText(connId, data);
 
             if (result == beauty::WriteResult::SUCCESS) {
                 stats.messagesSent++;
@@ -164,7 +163,7 @@ class MyDataStreamingEndpoint : public beauty::WsEndpoint {
 
         // Try to send directly if no queue backlog
         if (queue.messages.empty() && canSendTo(connId)) {
-            auto result = sendText(connId, data, nullptr);
+            auto result = sendText(connId, data);
             if (result == beauty::WriteResult::SUCCESS) {
                 stats.messagesSent++;
                 stats.lastSendTime = std::chrono::steady_clock::now();
@@ -199,7 +198,7 @@ class MyDataStreamingEndpoint : public beauty::WsEndpoint {
         while (!queue.messages.empty() && processedCount < maxProcessPerCall) {
             std::string message = queue.messages.front();
 
-            auto result = sendText(connId, message, nullptr);
+            auto result = sendText(connId, message);
 
             if (result == beauty::WriteResult::SUCCESS) {
                 // Only remove message from queue if send was successful
@@ -241,8 +240,7 @@ class MyDataStreamingEndpoint : public beauty::WsEndpoint {
             const char* modeStr =
                 (mode == FlowControlMode::DROP_ON_BUSY) ? "drop-on-busy" : "queue-based";
             sendText(connId,
-                     std::string("Flow control mode set to: ") + modeStr + " (stats reset)",
-                     nullptr);
+                     std::string("Flow control mode set to: ") + modeStr + " (stats reset)");
         }
     }
 
@@ -259,7 +257,7 @@ class MyDataStreamingEndpoint : public beauty::WsEndpoint {
             }
             queue.queueOverflows = 0;
 
-            sendText(connId, "Statistics and queue reset", nullptr);
+            sendText(connId, "Statistics and queue reset");
         }
     }
 
@@ -277,7 +275,7 @@ class MyDataStreamingEndpoint : public beauty::WsEndpoint {
             "queue_mode - Handle bursts by QUEUING messages for later\n"
             "help - Show this help\n\n"
             "Try: 1) Set mode, 2) Send burst, 3) Check stats to compare!";
-        sendText(connId, help, nullptr);
+        sendText(connId, help);
     }
 
     std::string generateRandomData() {
@@ -294,7 +292,7 @@ class MyDataStreamingEndpoint : public beauty::WsEndpoint {
         // Behavior depends on current flow control mode
         auto& stats = connectionStats_[connectionId];
 
-        sendText(connectionId, "Starting burst mode (50 messages)...", nullptr);
+        sendText(connectionId, "Starting burst mode (50 messages)...");
 
         for (int i = 0; i < 50; i++) {
             std::string data = "BURST:" + std::to_string(i) + ":" + generateRandomData();
@@ -311,7 +309,7 @@ class MyDataStreamingEndpoint : public beauty::WsEndpoint {
             processQueuedMessages(connectionId);
         }
 
-        sendText(connectionId, "Burst complete. Check stats to see results.", nullptr);
+        sendText(connectionId, "Burst complete. Check stats to see results.");
     }
 
     void sendStats(const std::string& connectionId) {
@@ -347,7 +345,7 @@ class MyDataStreamingEndpoint : public beauty::WsEndpoint {
             }
             queue.messages = tempQueue;
         } else {
-            sendText(connectionId, statsMsg, nullptr);
+            sendText(connectionId, statsMsg);
         }
     }
 };
