@@ -23,7 +23,8 @@ std::string combineUploadPaths(const std::string &dir, const std::string &filena
 }
 }  // namespace
 
-RequestHandler::RequestHandler() : expectContinueCb_(defaultExpectContinueHandler) {}
+RequestHandler::RequestHandler(size_t maxContentSize)
+    : maxContentSize_(maxContentSize), expectContinueCb_(defaultExpectContinueHandler) {}
 
 void RequestHandler::defaultExpectContinueHandler(const Request &, Reply &rep) {
     // Default: approve all 100-continue requests
@@ -103,7 +104,7 @@ void RequestHandler::handleRequest(unsigned connectionId,
 void RequestHandler::handlePartialRead(unsigned connectionId, const Request &req, Reply &rep) {
     size_t nrReadBytes = readFromFile(connectionId, req, rep);
 
-    if (nrReadBytes < rep.maxContentSize_) {
+    if (nrReadBytes < maxContentSize_) {
         rep.finalPart_ = true;
         fileIO_->closeReadFile(std::to_string(connectionId));
     }
@@ -154,7 +155,7 @@ void RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, 
             fileIO_->closeReadFile(std::to_string(connectionId));
         } else {
             // fill initial content
-            rep.replyPartial_ = contentSize > rep.maxContentSize_;
+            rep.replyPartial_ = contentSize > maxContentSize_;
             readFromFile(connectionId, req, rep);
             if (!rep.replyPartial_) {
                 // all data fits in initial content
@@ -186,7 +187,7 @@ void RequestHandler::openAndReadFile(unsigned connectionId, const Request &req, 
 }
 
 size_t RequestHandler::readFromFile(unsigned connectionId, const Request &req, Reply &rep) {
-    rep.content_.resize(rep.maxContentSize_);
+    rep.content_.resize(maxContentSize_);
     int nrReadBytes = fileIO_->readFile(
         std::to_string(connectionId), req, rep.content_.data(), rep.content_.size());
     rep.content_.resize(nrReadBytes);

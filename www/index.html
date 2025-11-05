@@ -10,7 +10,7 @@
     <div class="container">
         <h2>File Management</h2>
         <p>This example demonstrates the Beauty HTTP server file API using the
-        routes defined in <code>examples/pc/my_file_api.cpp</code></p>
+        routes defined in <strong>examples/pc/my_file_api.cpp</strong></p>
         
         <button id="listFilesBtn" onclick="listFiles()">Refresh File List</button>
         
@@ -64,6 +64,166 @@
         
         <div id="uploadSuccess" class="upload-success">
             File uploaded successfully!
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>WebSocket Endpoints Testing</h2>
+        <p>Test both WebSocket endpoints: <strong>/ws/chat</strong> for interactive messaging and <strong>/ws/data</strong> for advanced flow control demonstration. The data endpoint simulates bursty production scenarios with queue management strategies.</p>
+        
+        <div class="websocket-dual-container">
+            <!-- Chat Endpoint -->
+            <div class="websocket-endpoint">
+                <h3>&#128172; Chat Endpoint (/ws/chat)</h3>
+                <p>Interactive messaging - send and receive messages with other connected clients</p>
+                
+                <div class="connection-controls">
+                    <input type="text" id="chatUrl" placeholder="ws://localhost:8080/ws/chat" value="ws://localhost:8080/ws/chat" style="width: 280px; padding: 8px; margin-right: 10px;">
+                    <button id="chatConnectBtn" onclick="connectWebSocket('chat')">Connect</button>
+                    <button id="chatDisconnectBtn" onclick="disconnectWebSocket('chat')" disabled>Disconnect</button>
+                    <span id="chatStatus" class="ws-status disconnected">Disconnected</span>
+                </div>
+                
+                <div class="message-controls">
+                    <div class="message-input-group">
+                        <textarea id="chatMessageInput" placeholder="Enter chat message..." rows="2" style="width: 100%; padding: 8px; margin-bottom: 10px; resize: vertical;"></textarea>
+                        <div class="message-buttons">
+                            <button onclick="sendTextMessage('chat')">Send Message</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="websocket-stats">
+                    <h4>Chat Statistics</h4>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">Messages Sent:</span>
+                            <span id="chatMessagesSent" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Messages Received:</span>
+                            <span id="chatMessagesReceived" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Connection Time:</span>
+                            <span id="chatConnectionTime" class="stat-value">00:00</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="ws-messages">
+                    <div class="message-header">
+                        <h4>Chat Messages</h4>
+                        <button onclick="clearMessages('chat')" class="clear-log-btn">Clear</button>
+                    </div>
+                    <div id="chatMessageLog" class="message-log"></div>
+                </div>
+            </div>
+
+            <!-- Data Stream Endpoint -->
+            <div class="websocket-endpoint">
+                <h3>&#128202; Data Stream Endpoint (/ws/data)</h3>
+                <p>Flow control demonstration - handles bursty data production with different strategies (drop vs queue)</p>
+                
+                <div class="connection-controls">
+                    <input type="text" id="dataUrl" placeholder="ws://localhost:8080/ws/data" value="ws://localhost:8080/ws/data" style="width: 280px; padding: 8px; margin-right: 10px;">
+                    <button id="dataConnectBtn" onclick="connectWebSocket('data')">Connect</button>
+                    <button id="dataDisconnectBtn" onclick="disconnectWebSocket('data')" disabled>Disconnect</button>
+                    <span id="dataStatus" class="ws-status disconnected">Disconnected</span>
+                </div>
+                
+                <div class="message-controls">
+                    <div class="flow-control-demo">
+                        <h4>&#9881; Bursty Data Producer Flow Control Demo</h4>
+                        <p>This demo simulates <strong>bursty data production</strong> scenarios (like IoT batch uploads, log aggregation, or mobile sync operations). 
+                        Compare how different flow control strategies handle sudden data spikes when normal 1msg/sec becomes 50msgs instantly.</p>
+                        
+                        <div class="flow-control-modes">
+                            <h5>Flow Control Strategy</h5>
+                            <div class="mode-buttons">
+                                <button onclick="setFlowControlMode('drop')" class="mode-button" id="dropModeBtn">Drop-on-Busy</button>
+                                <button onclick="setFlowControlMode('queue')" class="mode-button" id="queueModeBtn">Queue-based</button>
+                            </div>
+                            <p class="mode-description">
+                                <strong>Drop-on-busy:</strong> Excess messages during bursts are dropped (fast, low memory, data loss)<br>
+                                <strong>Queue-based:</strong> Burst messages are queued and drained over time (reliable, higher memory, no data loss)
+                            </p>
+                        </div>
+                        
+                        <div class="demo-controls">
+                            <h5>Test Flow Control</h5>
+                            <div class="test-buttons">
+                                <button onclick="sendBurstTest()" class="test-button" id="burstTestBtn">Burst Test</button>
+                                <button onclick="getDataStats()" class="stats-button">Get Stats</button>
+                                <button onclick="resetDataStats()" class="reset-button">Reset Stats</button>
+                                <button onclick="sendDataHelp()" class="help-button">Help</button>
+                            </div>
+                        </div>
+                        
+                        <div class="server-stats" id="serverStats" style="display: none;">
+                            <h5>Server-side Statistics</h5>
+                            <div class="server-stats-grid">
+                                <div class="stat-item">
+                                    <span class="stat-label">Flow Control Mode:</span>
+                                    <span id="serverFlowMode" class="stat-value">-</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Messages Sent:</span>
+                                    <span id="serverMessagesSent" class="stat-value">0</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Messages Dropped:</span>
+                                    <span id="serverMessagesDropped" class="stat-value">0</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Drop Rate:</span>
+                                    <span id="serverDropRate" class="stat-value">0%</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Queue Depth:</span>
+                                    <span id="serverQueueDepth" class="stat-value">0</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Queue Overflows:</span>
+                                    <span id="serverQueueOverflows" class="stat-value">0</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Callback Invocations:</span>
+                                    <span id="serverCallbacks" class="stat-value">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="websocket-stats">
+                    <h4>Data Stream Statistics</h4>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">Messages Received:</span>
+                            <span id="dataMessagesReceived" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Last Update:</span>
+                            <span id="dataLastUpdate" class="stat-value">Never</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Connection Time:</span>
+                            <span id="dataConnectionTime" class="stat-value">00:00</span>
+                        </div>
+                    </div>
+                    
+
+                </div>
+                
+                <div class="ws-messages">
+                    <div class="message-header">
+                        <h4>Data Stream</h4>
+                        <button onclick="clearMessages('data')" class="clear-log-btn">Clear</button>
+                    </div>
+                    <div id="dataMessageLog" class="message-log"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -423,6 +583,413 @@
                     }
                 });
             }
+            
+            // Setup WebSocket message input keyboard support
+            const chatMessageInput = document.getElementById('chatMessageInput');
+            if (chatMessageInput) {
+                chatMessageInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                        sendTextMessage('chat');
+                    }
+                });
+            }
+        });
+
+        // WebSocket functionality for dual endpoints
+        let websockets = {
+            chat: null,
+            data: null
+        };
+        let currentFlowMode = 'drop'; // Track current flow control mode
+        let wsStats = {
+            chat: {
+                messagesSent: 0,
+                messagesReceived: 0,
+                connectTime: null,
+            },
+            data: {
+                messagesReceived: 0,
+                connectTime: null,
+                lastUpdate: null,
+            }
+        };
+        let connectionTimers = {
+            chat: null,
+            data: null
+        };
+
+        function connectWebSocket(endpoint) {
+            const url = document.getElementById(`${endpoint}Url`).value.trim();
+            if (!url) {
+                addMessageToLog(endpoint, 'error', 'Please enter a WebSocket URL');
+                return;
+            }
+
+            if (websockets[endpoint] && websockets[endpoint].readyState === WebSocket.OPEN) {
+                addMessageToLog(endpoint, 'warning', 'WebSocket is already connected');
+                return;
+            }
+
+            try {
+                addMessageToLog(endpoint, 'info', `Connecting to ${url}...`);
+                websockets[endpoint] = new WebSocket(url);
+
+                websockets[endpoint].onopen = function(event) {
+                    addMessageToLog(endpoint, 'success', 'WebSocket connected successfully');
+                    updateConnectionStatus(endpoint, 'connected');
+                    wsStats[endpoint].connectTime = new Date();
+                    startConnectionTimer(endpoint);
+                    resetStats(endpoint);
+                    
+                    // Initialize flow control UI for data endpoint
+                    if (endpoint === 'data') {
+                        initializeFlowControlUI();
+                    }
+                };
+
+                websockets[endpoint].onmessage = function(event) {
+                    if (endpoint === 'data') {
+                        processDataMessage(event.data);
+                    } else {
+                        // Handle chat messages normally
+                        wsStats[endpoint].messagesReceived++;
+                        updateStats(endpoint);
+                        processChatMessage(event.data);
+                    }
+                };
+                
+                function processDataMessage(data) {
+                    wsStats.data.messagesReceived++;
+                    wsStats.data.lastUpdate = new Date();
+                    updateStats('data');
+                    
+                    if (data.startsWith('STATS:')) {
+                        // Parse and display server statistics
+                        if (parseAndDisplayServerStats(data)) {
+                            addMessageToLog('data', 'info', 'Server statistics updated');
+                        } else {
+                            addMessageToLog('data', 'received-text', data);
+                        }
+                    } else if (data.startsWith('DATA:') || data.startsWith('BURST:') || data.startsWith('QUEUE_BURST:')) {
+                        // Display data message
+                        addMessageToLog('data', 'received-text', data);
+                    } else if (data.startsWith('ECHO:')) {
+                        // Don't display echo messages to avoid clutter
+                        addMessageToLog('data', 'info', 'Received echo response (hidden to reduce clutter)');
+                    } else {
+                        // Regular message
+                        addMessageToLog('data', 'received-text', data);
+                    }
+                }
+                
+                function processChatMessage(data) {
+                    if (data instanceof Blob) {
+                        // Binary message
+                        data.arrayBuffer().then(buffer => {
+                            const bytes = new Uint8Array(buffer);
+                            const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                            addMessageToLog('chat', 'received-binary', `Binary message (${bytes.length} bytes): ${hex}`);
+                        });
+                    } else {
+                        // Text message
+                        let displayMessage = data;
+                        
+                        // Try to parse and format JSON for better readability
+                        try {
+                            const jsonData = JSON.parse(data);
+                            displayMessage = `[CHAT] ${jsonData.type || 'message'}: ${JSON.stringify(jsonData, null, 2)}`;
+                        } catch (e) {
+                            // Not JSON, display as-is
+                            displayMessage = data;
+                        }
+                        
+                        addMessageToLog('chat', 'received-text', displayMessage);
+                    }
+                }
+
+                websockets[endpoint].onclose = function(event) {
+                    const reason = event.reason || 'No reason provided';
+                    const code = event.code;
+                    addMessageToLog(endpoint, 'info', `WebSocket closed. Code: ${code}, Reason: ${reason}`);
+                    updateConnectionStatus(endpoint, 'disconnected');
+                    stopConnectionTimer(endpoint);
+                };
+
+                websockets[endpoint].onerror = function(event) {
+                    addMessageToLog(endpoint, 'error', 'WebSocket error occurred');
+                    updateConnectionStatus(endpoint, 'error');
+                };
+
+            } catch (error) {
+                addMessageToLog(endpoint, 'error', `Failed to connect: ${error.message}`);
+                updateConnectionStatus(endpoint, 'error');
+            }
+        }
+
+        function disconnectWebSocket(endpoint) {
+            if (websockets[endpoint]) {
+                addMessageToLog(endpoint, 'info', 'Disconnecting WebSocket...');
+                websockets[endpoint].close(1000, 'User initiated disconnect');
+            }
+        }
+
+
+
+        function sendTextMessage(endpoint) {
+            if (endpoint === 'data') {
+                addMessageToLog(endpoint, 'warning', 'Data endpoint is read-only');
+                return;
+            }
+            
+            const message = document.getElementById(`${endpoint}MessageInput`).value;
+            if (!message.trim()) {
+                addMessageToLog(endpoint, 'warning', 'Please enter a message to send');
+                return;
+            }
+
+            if (websockets[endpoint] && websockets[endpoint].readyState === WebSocket.OPEN) {
+                websockets[endpoint].send(message);
+                wsStats[endpoint].messagesSent++;
+                updateStats(endpoint);
+                addMessageToLog(endpoint, 'sent-text', `[SENT] ${message}`);
+                document.getElementById(`${endpoint}MessageInput`).value = '';
+            } else {
+                addMessageToLog(endpoint, 'warning', 'WebSocket is not connected');
+            }
+        }
+
+        function updateConnectionStatus(endpoint, status) {
+            const statusElement = document.getElementById(`${endpoint}Status`);
+            const connectBtn = document.getElementById(`${endpoint}ConnectBtn`);
+            const disconnectBtn = document.getElementById(`${endpoint}DisconnectBtn`);
+
+            statusElement.className = `ws-status ${status}`;
+            
+            switch (status) {
+                case 'connected':
+                    statusElement.textContent = 'Connected';
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    break;
+                case 'disconnected':
+                    statusElement.textContent = 'Disconnected';
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    break;
+                case 'error':
+                    statusElement.textContent = 'Error';
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    break;
+            }
+        }
+
+        function addMessageToLog(endpoint, type, message) {
+            const messageLog = document.getElementById(`${endpoint}MessageLog`);
+            const timestamp = new Date().toLocaleTimeString();
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `log-message ${type}`;
+            messageDiv.innerHTML = `<span class="timestamp">[${timestamp}]</span> <span class="message">${escapeHtml(message)}</span>`;
+            
+            messageLog.appendChild(messageDiv);
+            messageLog.scrollTop = messageLog.scrollHeight;
+        }
+
+        function clearMessages(endpoint) {
+            document.getElementById(`${endpoint}MessageLog`).innerHTML = '';
+        }
+
+        function resetStats(endpoint) {
+            wsStats[endpoint].messagesSent = 0;
+            wsStats[endpoint].messagesReceived = 0;
+            if (endpoint === 'data') {
+                wsStats[endpoint].lastUpdate = null;
+            }
+            updateStats(endpoint);
+        }
+
+        function updateStats(endpoint) {
+            if (endpoint === 'chat') {
+                document.getElementById('chatMessagesSent').textContent = wsStats.chat.messagesSent;
+                document.getElementById('chatMessagesReceived').textContent = wsStats.chat.messagesReceived;
+            } else if (endpoint === 'data') {
+                document.getElementById('dataMessagesReceived').textContent = wsStats.data.messagesReceived;
+                const lastUpdateElement = document.getElementById('dataLastUpdate');
+                if (wsStats.data.lastUpdate) {
+                    lastUpdateElement.textContent = wsStats.data.lastUpdate.toLocaleTimeString();
+                } else {
+                    lastUpdateElement.textContent = 'Never';
+                }
+            }
+        }
+
+        function startConnectionTimer(endpoint) {
+            connectionTimers[endpoint] = setInterval(() => {
+                if (wsStats[endpoint].connectTime) {
+                    const elapsed = Date.now() - wsStats[endpoint].connectTime.getTime();
+                    const minutes = Math.floor(elapsed / 60000);
+                    const seconds = Math.floor((elapsed % 60000) / 1000);
+                    document.getElementById(`${endpoint}ConnectionTime`).textContent = 
+                        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
+        }
+
+        function stopConnectionTimer(endpoint) {
+            if (connectionTimers[endpoint]) {
+                clearInterval(connectionTimers[endpoint]);
+                connectionTimers[endpoint] = null;
+            }
+        }
+
+        // Enhanced flow control demo functions
+        function setFlowControlMode(mode) {
+            if (websockets.data && websockets.data.readyState === WebSocket.OPEN) {
+                currentFlowMode = mode; // Track the current mode
+                const command = mode === 'drop' ? 'drop_mode' : 'queue_mode';
+                websockets.data.send(command);
+                addMessageToLog('data', 'sent', command);
+                
+                // Update button states - remove active from both first
+                document.getElementById('dropModeBtn').classList.remove('active');
+                document.getElementById('queueModeBtn').classList.remove('active');
+                
+                // Then add active to the selected one
+                if (mode === 'drop') {
+                    document.getElementById('dropModeBtn').classList.add('active');
+                } else {
+                    document.getElementById('queueModeBtn').classList.add('active');
+                }
+                
+                // Update burst button text based on mode
+                updateBurstButtonText();
+                
+                // Auto-refresh stats to show mode change
+                setTimeout(() => getDataStats(), 100);
+            } else {
+                addMessageToLog('data', 'error', 'Not connected to data endpoint');
+            }
+        }
+
+        function updateBurstButtonText() {
+            const button = document.getElementById('burstTestBtn');
+            if (currentFlowMode === 'drop') {
+                button.textContent = 'Burst Test (50 msgs)';
+                button.title = 'Send 50 messages rapidly to test drop-on-busy behavior';
+            } else {
+                button.textContent = 'Burst Test (50 msgs)';
+                button.title = 'Send 50 messages rapidly to test queue-based behavior';
+            }
+        }
+
+        function sendBurstTest() {
+            if (websockets.data && websockets.data.readyState === WebSocket.OPEN) {
+                // Both modes now use the same 'burst' command and send 50 messages
+                websockets.data.send('burst');
+                addMessageToLog('data', 'sent', 'burst');
+                if (currentFlowMode === 'drop') {
+                    addMessageToLog('data', 'info', 'Sent 50-message burst to test drop-on-busy flow control');
+                } else {
+                    addMessageToLog('data', 'info', 'Sent 50-message burst to test queue-based flow control');
+                }
+            } else {
+                addMessageToLog('data', 'error', 'Not connected to data endpoint');
+            }
+        }
+
+        function getDataStats() {
+            if (websockets.data && websockets.data.readyState === WebSocket.OPEN) {
+                websockets.data.send('stats');
+                addMessageToLog('data', 'sent', 'stats');
+            } else {
+                addMessageToLog('data', 'error', 'Not connected to data endpoint');
+            }
+        }
+
+        function resetDataStats() {
+            if (websockets.data && websockets.data.readyState === WebSocket.OPEN) {
+                websockets.data.send('reset');
+                addMessageToLog('data', 'sent', 'reset');
+                
+                // Clear server stats display
+                hideServerStats();
+            } else {
+                addMessageToLog('data', 'error', 'Not connected to data endpoint');
+            }
+        }
+
+        function sendDataHelp() {
+            if (websockets.data && websockets.data.readyState === WebSocket.OPEN) {
+                websockets.data.send('help');
+                addMessageToLog('data', 'sent', 'help');
+            } else {
+                addMessageToLog('data', 'error', 'Not connected to data endpoint');
+            }
+        }
+
+        function parseAndDisplayServerStats(statsMessage) {
+            // Parse server statistics message format: STATS:mode=...,sent=...,dropped=...
+            if (statsMessage.startsWith('STATS:')) {
+                console.log('Parsing stats message:', statsMessage); // Debug log
+                
+                const statsData = {};
+                const statsStr = statsMessage.substring(6); // Remove 'STATS:' prefix
+                const pairs = statsStr.split(',');
+                
+                pairs.forEach(pair => {
+                    const [key, value] = pair.split('=');
+                    if (key && value !== undefined) {
+                        statsData[key] = value;
+                    }
+                });
+                
+                console.log('Parsed stats data:', statsData); // Debug log
+                
+                // Update server stats display
+                if (statsData.mode) document.getElementById('serverFlowMode').textContent = statsData.mode;
+                if (statsData.sent) document.getElementById('serverMessagesSent').textContent = statsData.sent;
+                if (statsData.dropped) document.getElementById('serverMessagesDropped').textContent = statsData.dropped;
+                if (statsData.drop_rate) document.getElementById('serverDropRate').textContent = statsData.drop_rate;
+                if (statsData.queue_depth) document.getElementById('serverQueueDepth').textContent = statsData.queue_depth;
+                if (statsData.queue_overflows) document.getElementById('serverQueueOverflows').textContent = statsData.queue_overflows;
+                if (statsData.callbacks) document.getElementById('serverCallbacks').textContent = statsData.callbacks;
+                
+                // Show server stats section
+                document.getElementById('serverStats').style.display = 'block';
+                
+                // Also show the raw message in the log for troubleshooting
+                addMessageToLog('data', 'received-text', statsMessage);
+                
+                return true; // Indicate this was a stats message
+            }
+            return false; // Not a stats message
+        }
+
+        function hideServerStats() {
+            document.getElementById('serverStats').style.display = 'none';
+        }
+
+        function initializeFlowControlUI() {
+            // Initialize button states - default to drop mode
+            currentFlowMode = 'drop'; // Reset to default
+            document.getElementById('dropModeBtn').classList.remove('active');
+            document.getElementById('queueModeBtn').classList.remove('active');
+            document.getElementById('dropModeBtn').classList.add('active'); // Default to drop mode
+            
+            // Initialize burst button text
+            updateBurstButtonText();
+            
+            // Hide server stats initially
+            hideServerStats();
+            
+            // Auto-get initial stats to show current mode
+            setTimeout(() => getDataStats(), 500);
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Page initialization if needed
         });
     </script>
 </body>

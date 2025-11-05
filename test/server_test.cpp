@@ -75,8 +75,8 @@ const std::string GetApiRequest =
 
 TEST_CASE("server should return binded port", "[server]") {
     asio::io_context ioc;
-    HttpPersistence persistentOption(0s, 0, 0);
-    Server s(ioc, "127.0.0.1", "0", persistentOption);
+    Settings settings(0s, 0, 0);
+    Server s(ioc, "127.0.0.1", "0", settings);
     uint16_t port = s.getBindedPort();
     REQUIRE(port != 0);
 }
@@ -84,8 +84,8 @@ TEST_CASE("server should return binded port", "[server]") {
 TEST_CASE("construction", "[server]") {
     SECTION("it should allow connection with simple constructor") {
         asio::io_context ioc;
-        HttpPersistence persistentOption(0s, 0, 0);
-        Server s(ioc, 0, persistentOption);
+        Settings settings(0s, 0, 0);
+        Server s(ioc, 0, settings);
         uint16_t port = s.getBindedPort();
         REQUIRE(port != 0);
 
@@ -99,8 +99,8 @@ TEST_CASE("construction", "[server]") {
     }
     SECTION("it should allow connection with advanced constructor", "[server]") {
         asio::io_context ioc;
-        HttpPersistence persistentOption(0s, 0, 0);
-        Server s(ioc, 0, persistentOption);
+        Settings settings(0s, 0, 0);
+        Server s(ioc, 0, settings);
         uint16_t port = s.getBindedPort();
         REQUIRE(port != 0);
 
@@ -118,8 +118,8 @@ TEST_CASE("server without handlers", "[server]") {
     asio::io_context ioc;
     TestClient c(ioc);
 
-    HttpPersistence persistentOption(0s, 0, 0);
-    Server s(ioc, 0, persistentOption);
+    Settings settings(0s, 0, 0);
+    Server s(ioc, 0, settings);
     uint16_t port = s.getBindedPort();
     auto t = std::thread(&asio::io_context::run, &ioc);
 
@@ -165,8 +165,8 @@ TEST_CASE("server with file handler", "[server]") {
     TestClient c(ioc);
 
     MockFileIO mockFileIO;
-    HttpPersistence persistentOption(0s, 0, 0);
-    Server dut(ioc, "127.0.0.1", "0", persistentOption);
+    Settings settings(0s, 0, 0);
+    Server dut(ioc, "127.0.0.1", "0", settings);
     dut.setFileIO(&mockFileIO);
     uint16_t port = dut.getBindedPort();
     auto t = std::thread(&asio::io_context::run, &ioc);
@@ -306,8 +306,8 @@ TEST_CASE("server with request handler", "[server]") {
 
     std::vector<char> buffer;
     MockRequestHandler mockRequestHandler(buffer);
-    HttpPersistence persistentOption(0s, 0, 0);
-    Server dut(ioc, "127.0.0.1", "0", persistentOption);
+    Settings settings(0s, 0, 0);
+    Server dut(ioc, "127.0.0.1", "0", settings);
     uint16_t port = dut.getBindedPort();
     dut.addRequestHandler(std::bind(&MockRequestHandler::handleRequest,
                                     &mockRequestHandler,
@@ -446,8 +446,8 @@ TEST_CASE("server with write fileIO", "[server]") {
     TestClient c(ioc);
 
     MockFileIO mockFileIO;
-    HttpPersistence persistentOption(0s, 0, 0);
-    Server dut(ioc, "127.0.0.1", "0", persistentOption);
+    Settings settings(0s, 0, 0);
+    Server dut(ioc, "127.0.0.1", "0", settings);
     dut.setFileIO(&mockFileIO);
     uint16_t port = dut.getBindedPort();
     auto t = std::thread(&asio::io_context::run, &ioc);
@@ -607,8 +607,8 @@ TEST_CASE("request handler with 100-continue support", "[server]") {
 
     std::vector<char> buffer;
     MockRequestHandler mockRequestHandler(buffer);
-    HttpPersistence persistentOption(5s, 0, 0);
-    Server dut(ioc, "127.0.0.1", "0", persistentOption);
+    Settings settings(5s, 0, 0);
+    Server dut(ioc, "127.0.0.1", "0", settings);
     uint16_t port = dut.getBindedPort();
 
     dut.addRequestHandler(std::bind(&MockRequestHandler::handleRequest,
@@ -770,8 +770,8 @@ TEST_CASE("server with write fileIO with 100-continue support", "[server]") {
     TestClient c(ioc);
 
     MockFileIO mockFileIO;
-    HttpPersistence persistentOption(5s, 0, 0);
-    Server dut(ioc, "127.0.0.1", "0", persistentOption);
+    Settings settings(5s, 0, 0);
+    Server dut(ioc, "127.0.0.1", "0", settings);
     dut.setFileIO(&mockFileIO);
     uint16_t port = dut.getBindedPort();
 

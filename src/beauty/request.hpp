@@ -85,6 +85,7 @@ struct Request {
         noInitialBodyBytesReceived_ = 0;
         isChunked_ = false;
         expectContinue_ = false;
+        upgradeToWebSocket_ = false;
         queryParams_.clear();
         formParams_.clear();
     }
@@ -113,6 +114,7 @@ struct Request {
     size_t contentLength_ = std::numeric_limits<size_t>::max();  // means not specified
     bool isChunked_ = false;
     bool expectContinue_ = false;
+    bool upgradeToWebSocket_ = false;
 };
 
 }  // namespace beauty

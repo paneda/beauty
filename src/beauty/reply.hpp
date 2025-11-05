@@ -21,10 +21,11 @@ class Reply {
     Reply(const Reply&) = delete;
     Reply& operator=(const Reply&) = delete;
 
-    Reply(size_t maxContentSize);
+    Reply(std::vector<char>& content);
     virtual ~Reply() = default;
 
     enum status_type {
+        switching_protocols = 101,
         ok = 200,
         created = 201,
         accepted = 202,
@@ -52,7 +53,7 @@ class Reply {
     };
 
     // Content to be sent in the reply.
-    std::vector<char> content_;
+    std::vector<char>& content_;
 
     // File path to open.
     std::string filePath_;
@@ -140,9 +141,6 @@ class Reply {
 
     // Size of the content data pointed to by contentPtr_.
     size_t contentSize_;
-
-    // The max buffer size when writing socket.
-    const size_t maxContentSize_;
 
     // Keep track when replying with successive write buffers.
     bool replyPartial_ = false;

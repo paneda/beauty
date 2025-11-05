@@ -285,6 +285,10 @@ void RequestParser::storeHeaderValueIfNeeded(Request &req) {
                 req.keepAlive_ = false;
             }
         }
+
+        if (strcasecmp(h.value_.c_str(), "Upgrade") == 0) {
+            req.upgradeToWebSocket_ = true;
+        }
     }
 }
 
@@ -313,6 +317,22 @@ RequestParser::result_type RequestParser::checkRequestAfterAllHeaders(Request &r
             }
         }
     }
+
+    if (req.upgradeToWebSocket_) {
+        if (req.httpVersionMajor_ == 1 && req.httpVersionMinor_ == 1 && req.method_ == "GET") {
+            auto it = std::find_if(req.headers_.begin(), req.headers_.end(), [](const Header &h) {
+                return strcasecmp(h.name_.c_str(), "Upgrade") == 0 &&
+                       strcasecmp(h.value_.c_str(), "websocket") == 0;
+            });
+            if (it == req.headers_.end()) {
+                return bad;
+            }
+        } else {
+            return bad;
+        }
+        return upgrade_to_websocket;
+    }
+
     return indeterminate;
 }
 
