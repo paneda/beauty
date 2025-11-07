@@ -114,9 +114,8 @@ bool Reply::hasHeaders() const {
 void Reply::send(status_type status) {
     status_ = status;
 
-    if (status < 200 || status == no_content) {
-        content_.clear();
-    } else {
+    content_.clear();
+    if (status >= 200 && status != no_content) {
         headers_.push_back({"Content-Length", "0"});
     }
 

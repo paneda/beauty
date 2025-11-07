@@ -479,6 +479,7 @@ TEST_CASE("server with write fileIO", "[server]") {
         auto res = fut.get();
 
         REQUIRE(res.statusCode_ == 201);  // MockFileIO::writeFile returns 201
+        REQUIRE(res.content_.size() == 0);
         REQUIRE(mockFileIO.getOpenFileForWriteCalls() == 1);
         REQUIRE(mockFileIO.getLastData("/firstpart.txt0") == true);
         std::vector<char> result = mockFileIO.getMockWriteFile("/firstpart.txt0");
