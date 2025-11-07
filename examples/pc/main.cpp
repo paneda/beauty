@@ -118,7 +118,8 @@ int main(int argc, char *argv[]) {
         std::cout << "Web Interface:\n";
         std::cout << "  Main Demo UI: http://localhost:" << argv[2] << "/\n";
         std::cout << "Test_scripts: test_scripts/\n";
-        std::cout << "  Advanced tests using curl/python (see directory for details)" << argv[2] << "/\n";
+        std::cout << "  Advanced tests using curl/python (see directory for details)" << argv[2]
+                  << "/\n";
         std::cout << "\n";
         std::cout << "HTTP API Endpoints:\n";
         std::cout << "  API without Router:  /list-files, /download-file\n";

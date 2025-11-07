@@ -359,6 +359,34 @@ void Connection::doWriteHeaders() {
 
 void Connection::doWriteReplyContent() {
     auto self(shared_from_this());
+
+    // Handle big data callback before writing
+    if (reply_.streamCallback_ && !reply_.finalPart_) {
+        reply_.content_.resize(maxContentSize_);
+        int bytesRead = reply_.streamCallback_(
+            std::to_string(connectionId_), reply_.content_.data(), maxContentSize_);
+
+        if (bytesRead > 0) {
+            if (static_cast<size_t>(bytesRead) > maxContentSize_) {
+                // Callback returned invalid size, this is en error made by the
+                // application. Log the error and shutdown the connection.
+                reply_.finalPart_ = true;
+                reply_.content_.clear();
+                connectionManager_.debugMsg(
+                    "doWriteReplyContent: stream callback returned invalid size");
+                shutdown();
+            } else {
+                reply_.content_.resize(bytesRead);
+                reply_.streamedBytes_ += bytesRead;
+                reply_.finalPart_ = (reply_.streamedBytes_ >= reply_.totalStreamSize_) ||
+                                    (bytesRead < static_cast<int>(maxContentSize_));
+            }
+        } else {
+            reply_.finalPart_ = true;
+            reply_.content_.clear();
+        }
+    }
+
     asio::async_write(
         socket_, reply_.contentToBuffers(), [this, self](std::error_code ec, std::size_t) {
             if (!ec) {
@@ -368,7 +396,10 @@ void Connection::doWriteReplyContent() {
                     if (reply_.finalPart_) {
                         handleWriteCompleted();
                     } else {
-                        requestHandler_.handlePartialRead(connectionId_, request_, reply_);
+                        if (!reply_.streamCallback_) {
+                            // FileIO streaming
+                            requestHandler_.handlePartialRead(connectionId_, request_, reply_);
+                        }
                         doWriteReplyContent();
                     }
                 } else {

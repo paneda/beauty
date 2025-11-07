@@ -140,7 +140,7 @@ int FileIO::readFile(const std::string &id, const Request &, char *buf, size_t m
     auto it = openReadFiles_.find(id);
     if (it == openReadFiles_.end()) {
         std::cerr << "ERROR: readFile() called with invalid id: " << id << std::endl;
-        return 0; // No bytes read
+        return 0;  // No bytes read
     }
     it->second.read(buf, maxSize);
     return it->second.gcount();
@@ -199,7 +199,7 @@ void FileIO::writeFile(const std::string &id,
         std::cerr << "ERROR: writeFile() called with invalid id: " << id << std::endl;
         return;
     }
-    
+
     it->second.write(buf, size);
     if (lastData) {
         it->second.close();
