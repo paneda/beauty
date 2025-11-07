@@ -145,6 +145,22 @@ void Reply::sendPtr(status_type status,
     returnToClient_ = true;
 }
 
+void Reply::sendBig(status_type status,
+                       const std::string& contentType,
+                       size_t totalSize,
+                       StreamCallback callback) {
+    status_ = status;
+    headers_.push_back({"Content-Length", std::to_string(totalSize)});
+    headers_.push_back({"Content-Type", contentType});
+
+    streamCallback_ = callback;
+    totalStreamSize_ = totalSize;
+    streamedBytes_ = 0;
+    replyPartial_ = totalSize > 0;  // Enable partial processing for streaming
+
+    returnToClient_ = true;
+}
+
 std::vector<asio::const_buffer> Reply::headerToBuffers() {
     std::vector<asio::const_buffer> buffers;
 

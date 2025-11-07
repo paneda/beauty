@@ -67,7 +67,7 @@ cmake --build . ..
 #   • Flow control demonstrations
 ```
 
-> **Tip**: The the test_scripts folder can be used to  explore more advanced features like 100-continue.
+> 💡 **Tip**: The the test_scripts folder can be used to  explore more advanced features like 100-continue.
 
 ### 🔧 ESP32 Integration
 
@@ -264,14 +264,32 @@ The `Reply` object is your **canvas for crafting responses**. Modify it to send 
 |--------|----------|---------|
 | `send(status)` | Status-only responses | `rep.send(beauty::Reply::not_found)` |
 | `send(status, contentType)` | With `content_` buffer | JSON, HTML, custom data |
-| `send(status, contentType, data, size)` | Direct memory pointer | Large files |
+| `sendPtr(status, contentType, data, size)` | Direct memory pointer | Pre-loaded data and buffers <= `maxContentSize`|
+| `sendBig(status, contentType, totalSize, callback)` | Reply with large data | Any content > `maxContentSize` |
+
+##### sendBig example
+
+Use `sendBig()` for data larger than your configured `maxContentSize` as it allows Beauty to send the reply back in chunks that fits within `maxContentSize`. Note that the total data size must be known upfront for proper Content-Length header.
+
+```cpp
+// Send large data without loading it all into memory
+rep.sendBig(Reply::ok, "application/json", totalDataSize,
+    [&dataSource](char* buf, size_t maxSize) -> int {
+        // Return number of bytes written to buf, 0 or negative for end of data
+        return dataSource->getNextChunk(buf, maxSize);
+    });
+```
+
+**💡 Tip:**
+- Perfect for large sensor data, database result streaming, large file generation, or API pagination
+- The callback runs on each chunk, so keep it fast and efficient
 
 #### 🔧 Advanced Control
 
 ```cpp
 // Custom headers (takes full control)
-rep.addHeader("Cache-Control", "no-cache");
-rep.addHeader("Content-Type", "application/json");
+rep.addHeader("Content-Type", "application/octet-stream");
+rep.addHeader("Content-Disposition", "attachment; filename=" + filename);
 // Note: When using addHeader(), you control ALL headers except Content-Length and Connection
 
 // File handling magic
@@ -297,7 +315,7 @@ rep.addHeader("Content-Disposition", "attachment; filename=data.csv");
 rep.send(beauty::Reply::ok, "text/csv", csvData.data(), csvData.size());
 ```
 
-> ⚡ **Tip**: Use `content_` for dynamic data, direct pointers for static/large files
+> 💡 **Tip**: Use `content_` for dynamic data, direct pointers for static/large files
 
 
 ## 🚦 HTTP/1.1 100-continue Support
