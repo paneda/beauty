@@ -87,7 +87,7 @@ void RequestHandler::handleRequest(unsigned connectionId,
         if (rep.isMultiPart_ || rep.multiPartParser_.parseHeader(req)) {
             rep.status_ = Reply::ok;
             rep.isMultiPart_ = true;
-            handlePartialWrite(connectionId, req, content, rep);
+            handleFileIOWrite(connectionId, req, content, rep);
             return;
         } else {
             rep.stockReply(req, Reply::bad_request);
@@ -101,7 +101,19 @@ void RequestHandler::handleRequest(unsigned connectionId,
     rep.stockReply(req, Reply::not_implemented);
 }
 
-void RequestHandler::handlePartialRead(unsigned connectionId, const Request &req, Reply &rep) {
+void RequestHandler::handleStreamingRead(unsigned connectionId, Reply &rep) {
+    if (rep.streamCallback_ && !rep.finalPart_) {
+        rep.content_.resize(maxContentSize_);
+        int bytesRead =
+            rep.streamCallback_(std::to_string(connectionId), rep.content_.data(), maxContentSize_);
+        rep.content_.resize(bytesRead);
+        rep.streamedBytes_ += bytesRead;
+        rep.finalPart_ = (rep.streamedBytes_ >= rep.totalStreamSize_) ||
+                         (bytesRead < static_cast<int>(maxContentSize_));
+    }
+}
+
+void RequestHandler::handleFileIORead(unsigned connectionId, const Request &req, Reply &rep) {
     size_t nrReadBytes = readFromFile(connectionId, req, rep);
 
     if (nrReadBytes < maxContentSize_) {
@@ -110,10 +122,10 @@ void RequestHandler::handlePartialRead(unsigned connectionId, const Request &req
     }
 }
 
-void RequestHandler::handlePartialWrite(unsigned connectionId,
-                                        const Request &req,
-                                        std::vector<char> &content,
-                                        Reply &rep) {
+void RequestHandler::handleFileIOWrite(unsigned connectionId,
+                                       const Request &req,
+                                       std::vector<char> &content,
+                                       Reply &rep) {
     if (rep.finalPart_) {
         return;
     }
