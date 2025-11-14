@@ -18,8 +18,7 @@ class MyChatEndpoint : public beauty::WsEndpoint {
         // Notify others, send to all clients except the new one
         for (const auto& connId : getActiveConnections()) {
             if (connId != connectionId) {
-                sendText(connId,
-                         "{\"type\":\"user_joined\",\"user\":\"" + connectionId + "\"}");
+                sendText(connId, "{\"type\":\"user_joined\",\"user\":\"" + connectionId + "\"}");
             }
         }
     }

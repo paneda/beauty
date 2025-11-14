@@ -4,12 +4,17 @@
 #include <asio.hpp>
 #include <string>
 #include <vector>
+#include <functional>
 
 #include "beauty/request.hpp"
 #include "beauty/header.hpp"
 #include "beauty/multipart_parser.hpp"
 
 namespace beauty {
+
+// Callback function for streaming data - returns number of bytes written to
+// buffer, 0 or negative for end of stream
+typedef std::function<int(const std::string& id, char* buf, size_t maxSize)> StreamCallback;
 
 class RequestHandler;
 
@@ -64,6 +69,10 @@ class Reply {
     void send(status_type status);
     void send(status_type status, const std::string& contentType);
     void sendPtr(status_type status, const std::string& contentType, const char* data, size_t size);
+    void sendBig(status_type status,
+                 const std::string& contentType,
+                 size_t totalSize,
+                 StreamCallback callback);
     void addHeader(const std::string& name, const std::string& val);
     bool hasHeaders() const;
 
@@ -116,6 +125,9 @@ class Reply {
         isMultiPart_ = false;
         lastOpenFileForWriteId_ = "";
         multiPartParser_.reset();  // Reset multipart parser state between requests
+        streamCallback_ = nullptr;
+        totalStreamSize_ = 0;
+        streamedBytes_ = 0;
     }
 
     // Helper to provide standard server replies.
@@ -157,6 +169,11 @@ class Reply {
 
     // Parser to handle multipart uploads.
     MultiPartParser multiPartParser_;
+
+    // Streaming support for large data/streaming responses
+    StreamCallback streamCallback_ = nullptr;
+    size_t totalStreamSize_ = 0;
+    size_t streamedBytes_ = 0;
 
     // Convert the reply into a vector of buffers. The buffers do not own the
     // underlying memory blocks, therefore the reply object must remain valid
