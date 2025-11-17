@@ -149,7 +149,6 @@ int FileIO::readFile(const std::string &id, const Request &, char *buf, size_t m
 void FileIO::closeReadFile(const std::string &id) {
     auto it = openReadFiles_.find(id);
     if (it == openReadFiles_.end()) {
-        std::cerr << "ERROR: closeReadFile() called with invalid id: " << id << std::endl;
         return;
     }
     it->second.close();
