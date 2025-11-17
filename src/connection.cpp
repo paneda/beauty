@@ -311,10 +311,10 @@ void Connection::doReadBody() {
                 recvBuffer_.resize(bytesTransferred);
                 reply_.noBodyBytesReceived_ += bytesTransferred;
 
-                // Process more body data using handlePartialWrite as this is the only
+                // Process more body data using handleFileIOWrite as this is the only
                 // supported mode to handle additional body data after initial
                 // request processing.
-                requestHandler_.handlePartialWrite(connectionId_, request_, recvBuffer_, reply_);
+                requestHandler_.handleFileIOWrite(connectionId_, request_, recvBuffer_, reply_);
 
                 if (reply_.noBodyBytesReceived_ < request_.contentLength_) {
                     // Provide an early response to client if an error occurred
@@ -344,7 +344,8 @@ void Connection::doWriteHeaders() {
             if (!ec) {
                 lastActivityTime_ = std::chrono::steady_clock::now();
 
-                if (!reply_.content_.empty() || reply_.contentPtr_ != nullptr) {
+                if (!reply_.content_.empty() || reply_.contentPtr_ != nullptr ||
+                    reply_.streamCallback_ != nullptr) {
                     doWriteReplyContent();
                 } else {
                     handleWriteCompleted();
@@ -359,6 +360,10 @@ void Connection::doWriteHeaders() {
 
 void Connection::doWriteReplyContent() {
     auto self(shared_from_this());
+
+    // Handle streaming callback before writing
+    requestHandler_.handleStreamingRead(connectionId_, reply_);
+
     asio::async_write(
         socket_, reply_.contentToBuffers(), [this, self](std::error_code ec, std::size_t) {
             if (!ec) {
@@ -368,7 +373,10 @@ void Connection::doWriteReplyContent() {
                     if (reply_.finalPart_) {
                         handleWriteCompleted();
                     } else {
-                        requestHandler_.handlePartialRead(connectionId_, request_, reply_);
+                        if (!reply_.streamCallback_) {
+                            // FileIO streaming
+                            requestHandler_.handleFileIORead(connectionId_, request_, reply_);
+                        }
                         doWriteReplyContent();
                     }
                 } else {
@@ -490,10 +498,9 @@ void Connection::doReadBodyAfter100Continue() {
 
                 if (reply_.noBodyBytesReceived_ < request_.contentLength_) {
                     // Body is incomplete, continue reading
-                    // Always use handlePartialWrite for body processing (multipart state already
+                    // Always use handleFileIOWrite for body processing (multipart state already
                     // set up)
-                    requestHandler_.handlePartialWrite(
-                        connectionId_, request_, recvBuffer_, reply_);
+                    requestHandler_.handleFileIOWrite(connectionId_, request_, recvBuffer_, reply_);
                     if (!reply_.isStatusOk()) {
                         reply_.addHeader("Connection", "close");
                         doWriteHeaders();
@@ -501,8 +508,7 @@ void Connection::doReadBodyAfter100Continue() {
                     }
                     doReadBodyAfter100Continue();
                 } else {
-                    requestHandler_.handlePartialWrite(
-                        connectionId_, request_, recvBuffer_, reply_);
+                    requestHandler_.handleFileIOWrite(connectionId_, request_, recvBuffer_, reply_);
                     doWriteHeaders();
                 }
             } else if (ec != asio::error::operation_aborted) {

@@ -31,11 +31,12 @@ class RequestHandler {
                        const Request &req,
                        std::vector<char> &content,
                        Reply &rep);
-    void handlePartialRead(unsigned connectionId, const Request &req, Reply &rep);
-    void handlePartialWrite(unsigned connectionId,
-                            const Request &req,
-                            std::vector<char> &content,
-                            Reply &rep);
+    void handleStreamingRead(unsigned connectionId, Reply &rep);
+    void handleFileIORead(unsigned connectionId, const Request &req, Reply &rep);
+    void handleFileIOWrite(unsigned connectionId,
+                           const Request &req,
+                           std::vector<char> &content,
+                           Reply &rep);
     void closeFile(unsigned connectionId);
 
    private:
