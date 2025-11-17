@@ -344,7 +344,8 @@ void Connection::doWriteHeaders() {
             if (!ec) {
                 lastActivityTime_ = std::chrono::steady_clock::now();
 
-                if (!reply_.content_.empty() || reply_.contentPtr_ != nullptr) {
+                if (!reply_.content_.empty() || reply_.contentPtr_ != nullptr ||
+                    reply_.streamCallback_ != nullptr) {
                     doWriteReplyContent();
                 } else {
                     handleWriteCompleted();
