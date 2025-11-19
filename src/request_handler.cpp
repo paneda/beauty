@@ -103,13 +103,46 @@ void RequestHandler::handleRequest(unsigned connectionId,
 
 void RequestHandler::handleStreamingRead(unsigned connectionId, Reply &rep) {
     if (rep.streamCallback_ && !rep.finalPart_) {
-        rep.content_.resize(maxContentSize_);
-        int bytesRead =
-            rep.streamCallback_(std::to_string(connectionId), rep.content_.data(), maxContentSize_);
-        rep.content_.resize(bytesRead);
-        rep.streamedBytes_ += bytesRead;
-        rep.finalPart_ = (rep.streamedBytes_ >= rep.totalStreamSize_) ||
-                         (bytesRead < static_cast<int>(maxContentSize_));
+        // Calculate safe buffer size for chunked encoding
+        size_t callbackBufferSize = maxContentSize_;
+        if (rep.useChunkedEncoding_) {
+            // Worst case chunk overhead: "FFFFFFFF\r\n" + "\r\n" = 12 bytes for 32-bit size_t
+            // But for practical embedded use, assume max 6 hex digits: "100000\r\n" + "\r\n" = 10
+            // bytes The min size allowed for maxContentSize_ is 1024 so this is safe
+            const size_t maxChunkOverhead = 10;
+            callbackBufferSize = maxContentSize_ - maxChunkOverhead;
+        }
+
+        rep.content_.resize(callbackBufferSize);
+        int bytesRead = rep.streamCallback_(
+            std::to_string(connectionId), rep.content_.data(), callbackBufferSize);
+
+        if (bytesRead > 0) {
+            rep.content_.resize(bytesRead);
+            rep.streamedBytes_ += bytesRead;
+
+            if (rep.useChunkedEncoding_) {
+                // Wrap content in chunk format if using chunked encoding
+                rep.wrapContentInChunkFormat();
+                // For chunked: final when callback returns 0 or negative
+                rep.finalPart_ = false;  // Will be set on next iteration when bytesRead <= 0
+            } else {
+                // For sendBig: final when we've sent all expected bytes or chunk is smaller than
+                // buffer
+                rep.finalPart_ = (rep.streamedBytes_ >= rep.totalStreamSize_) ||
+                                 (bytesRead < static_cast<int>(maxContentSize_));
+            }
+        } else {
+            // End of stream
+            rep.finalPart_ = true;
+            if (rep.useChunkedEncoding_) {
+                // Send final chunk "0\r\n\r\n"
+                rep.content_.clear();
+                rep.wrapContentInChunkFormat();
+            } else {
+                rep.content_.clear();
+            }
+        }
     }
 }
 

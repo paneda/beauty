@@ -1,4 +1,5 @@
 #include <string>
+#include <cstring>
 
 #include "beauty/reply.hpp"
 
@@ -160,6 +161,22 @@ void Reply::sendBig(status_type status,
     returnToClient_ = true;
 }
 
+void Reply::sendStreaming(status_type status,
+                          const std::string& contentType,
+                          StreamCallback callback) {
+    status_ = status;
+    headers_.push_back({"Transfer-Encoding", "chunked"});
+    headers_.push_back({"Content-Type", contentType});
+
+    streamCallback_ = callback;
+    totalStreamSize_ = 0;  // Unknown size for chunked encoding
+    streamedBytes_ = 0;
+    useChunkedEncoding_ = true;
+    replyPartial_ = true;  // Enable partial processing for streaming
+
+    returnToClient_ = true;
+}
+
 std::vector<asio::const_buffer> Reply::headerToBuffers() {
     std::vector<asio::const_buffer> buffers;
 
@@ -284,6 +301,58 @@ void Reply::stockReply(const Request& req, Reply::status_type status) {
         content_.clear();
     }
     returnToClient_ = true;
+}
+
+void Reply::wrapContentInChunkFormat() {
+    if (content_.empty()) {
+        // Final chunk: "0\r\n\r\n"
+        const char* finalChunk = "0\r\n\r\n";
+        content_.assign(finalChunk, finalChunk + 5);
+        return;
+    }
+
+    // Convert content size to hex
+    std::string hexSize = toHexString(content_.size());
+
+    // Calculate how much space we need to add: hex + \r\n + existing_content + \r\n
+    size_t originalSize = content_.size();
+    size_t prefixSize = hexSize.size() + 2;  // hex + "\r\n"
+    size_t suffixSize = 2;                   // "\r\n"
+    size_t totalSize = prefixSize + originalSize + suffixSize;
+
+    // Resize buffer to final size (single allocation)
+    content_.resize(totalSize);
+
+    // Move existing content to make room for prefix
+    // Move from end to beginning to avoid overlap
+    std::memmove(&content_[prefixSize], &content_[0], originalSize);
+
+    // Write hex size at beginning
+    std::memcpy(&content_[0], hexSize.data(), hexSize.size());
+
+    // Write first \r\n after hex
+    content_[hexSize.size()] = '\r';
+    content_[hexSize.size() + 1] = '\n';
+
+    // Write final \r\n at end
+    content_[totalSize - 2] = '\r';
+    content_[totalSize - 1] = '\n';
+}
+
+std::string Reply::toHexString(size_t value) {
+    if (value == 0) {
+        return "0";
+    }
+
+    std::string result;
+    const char* hexChars = "0123456789ABCDEF";
+
+    while (value > 0) {
+        result = hexChars[value % 16] + result;
+        value /= 16;
+    }
+
+    return result;
 }
 
 }  // namespace beauty

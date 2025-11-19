@@ -73,6 +73,7 @@ class Reply {
                  const std::string& contentType,
                  size_t totalSize,
                  StreamCallback callback);
+    void sendStreaming(status_type status, const std::string& contentType, StreamCallback callback);
     void addHeader(const std::string& name, const std::string& val);
     bool hasHeaders() const;
 
@@ -128,6 +129,7 @@ class Reply {
         streamCallback_ = nullptr;
         totalStreamSize_ = 0;
         streamedBytes_ = 0;
+        useChunkedEncoding_ = false;
     }
 
     // Helper to provide standard server replies.
@@ -174,6 +176,11 @@ class Reply {
     StreamCallback streamCallback_ = nullptr;
     size_t totalStreamSize_ = 0;
     size_t streamedBytes_ = 0;
+    bool useChunkedEncoding_ = false;
+
+    // Helper methods for chunked transfer encoding
+    void wrapContentInChunkFormat();
+    std::string toHexString(size_t value);
 
     // Convert the reply into a vector of buffers. The buffers do not own the
     // underlying memory blocks, therefore the reply object must remain valid

@@ -266,6 +266,7 @@ The `Reply` object is your **canvas for crafting responses**. Modify it to send 
 | `send(status, contentType)` | With `content_` buffer | JSON, HTML, custom data |
 | `sendPtr(status, contentType, data, size)` | Direct memory pointer | Pre-loaded data and buffers <= `maxContentSize`|
 | `sendBig(status, contentType, totalSize, callback)` | Reply with large data | Any content > `maxContentSize` |
+| `sendStreaming(status, contentType, callback)` | Unlimited streaming | Server-sent events, real-time data |
 
 ##### sendBig example
 
@@ -284,6 +285,25 @@ rep.sendBig(Reply::ok, "application/json", totalDataSize,
 **💡 Tip:**
 - Perfect for large sensor data, database result streaming, large file generation, or API pagination
 - The callback runs on each chunk, so keep it fast and efficient
+
+##### sendStreaming example
+
+Use `sendStreaming()` for unlimited streaming where the total size is unknown. Uses HTTP chunked transfer encoding, allowing infinite streams like server-sent events or real-time data feeds.
+
+```cpp
+// Stream unlimited data (server-sent events, real-time feeds)
+rep.sendStreaming(Reply::ok, "text/event-stream",
+    [&eventSource](const std::string &id, char* buf, size_t maxSize) -> int {
+        // Return number of bytes written to buf, 0 or negative to end stream
+        // Stream can run indefinitely until client disconnects or you return 0
+        return eventSource->getNextEvent(id, buf, maxSize);
+    });
+```
+
+**💡 Tip:**
+- Perfect for server-sent events, real-time dashboards, varying buffers, or infinite data feeds
+- No Content-Length header sent - client receives data as it's generated
+- Return 0 from callback to close the stream gracefully
 
 #### 🔧 Advanced Control
 
