@@ -164,14 +164,26 @@ Router::RouteEntry Router::parsePathPattern(const std::string& pathPattern, Hand
     return entry;
 }
 
+std::string Router::stripQueryParameters(const std::string& path) {
+    // Find the first '?' character and return everything before it
+    size_t queryPos = path.find('?');
+    if (queryPos != std::string::npos) {
+        return path.substr(0, queryPos);
+    }
+    return path;
+}
+
 std::vector<std::string> Router::splitPath(const std::string& path) {
     std::vector<std::string> segments;
 
-    if (path.empty() || path == "/") {
+    // First, strip query parameters from the path
+    std::string pathWithoutQuery = stripQueryParameters(path);
+
+    if (pathWithoutQuery.empty() || pathWithoutQuery == "/") {
         return segments;
     }
 
-    std::string cleanPath = path;
+    std::string cleanPath = pathWithoutQuery;
     // Remove leading slash if present
     if (cleanPath[0] == '/') {
         cleanPath = cleanPath.substr(1);

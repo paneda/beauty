@@ -52,6 +52,9 @@ class Router {
     // Parse a path pattern into segments and parameter flags
     RouteEntry parsePathPattern(const std::string& pathPattern, Handler handler);
 
+    // Strip query parameters from a path (everything after '?')
+    std::string stripQueryParameters(const std::string& path);
+
     // Split a path into segments
     std::vector<std::string> splitPath(const std::string& path);
 
