@@ -441,6 +441,25 @@ TEST_CASE("router functionality", "[router]") {
         REQUIRE(split_methods(allowedMethods) == std::set<std::string>({"GET", "HEAD", "POST"}));
         REQUIRE(rep.getStatus() == Reply::ok);
     }
+    SECTION("should handle paths with query parameters") {
+        // Add a test route
+        router.addRoute(
+            "GET",
+            "/search",
+            [&](const Request&, Reply&, const std::unordered_map<std::string, std::string>&) {
+                handlerCalled = true;
+            });
+        // Create a mock request with query parameters
+        std::vector<char> body;
+        Request req(body);
+        req.method_ = "GET";
+        req.requestPath_ = "/search?q=test&sort=asc";
+        std::vector<char> sendBuffer(1024);
+        Reply rep(sendBuffer);
+        HandlerResult handled = router.handle(req, rep);
+        REQUIRE(handled == HandlerResult::Matched);
+        REQUIRE(handlerCalled == true);
+    }
 }
 
 TEST_CASE("router CORS functionality", "[router][cors]") {
