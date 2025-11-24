@@ -276,6 +276,10 @@ Use `sendBig()` for data larger than your configured `maxContentSize` as it allo
 // Send large data without loading it all into memory
 rep.sendBig(Reply::ok, "application/json", totalDataSize,
     [&dataSource](const std::string &id, char* buf, size_t maxSize) -> int {
+        if (maxSize == 0) {
+            // Beauty is signaling end of transfer, clean up resources
+            return 0;
+        }
         // Return number of bytes written to buf, 0 or negative for end of data
         // Use id to track read position for each connection
         return dataSource->getNextChunk(id, buf, maxSize);

@@ -131,6 +131,10 @@ void RequestHandler::handleStreamingRead(unsigned connectionId, Reply &rep) {
                 // buffer
                 rep.finalPart_ = (rep.streamedBytes_ >= rep.totalStreamSize_) ||
                                  (bytesRead < static_cast<int>(maxContentSize_));
+                if (rep.finalPart_) {
+                    // Make an additional call to indicate end of stream
+                    rep.streamCallback_(std::to_string(connectionId), nullptr, 0);
+                }
             }
         } else {
             // End of stream
