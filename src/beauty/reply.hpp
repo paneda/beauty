@@ -109,6 +109,10 @@ class Reply {
         }
         return "";
     }
+
+    void resetForTest() {
+        reset();
+    }
 #endif
 
    private:
