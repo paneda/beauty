@@ -293,11 +293,11 @@ void RequestParser::storeHeaderValueIfNeeded(Request &req) {
 }
 
 RequestParser::result_type RequestParser::checkRequestAfterAllHeaders(Request &req) {
-    if ((req.method_ == "GET" || req.method_ == "DELETE" || req.method_ == "HEAD" ||
-         req.method_ == "TRACE" || req.method_ == "OPTIONS")) {
+    if ((req.method_ == "GET" || req.method_ == "HEAD" || req.method_ == "TRACE" ||
+         req.method_ == "OPTIONS")) {
         if (req.expectContinue_ || req.isChunked_ ||
             req.contentLength_ != std::numeric_limits<size_t>::max()) {
-            // header are invalid for GET/HEAD/DELETE/TRACE/OPTIONS
+            // header are invalid for GET/HEAD/TRACE/OPTIONS
             return bad;
         }
         contentLength_ = 0;

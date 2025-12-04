@@ -460,3 +460,21 @@ TEST_CASE("Request parser 100-continue", "[request_parser]") {
         REQUIRE(result == RequestParser::missing_content_length);
     }
 }
+
+TEST_CASE("Should parse request with Content-Length:0", "[request_parser]") {
+    RequestFixture fixture(1024);
+
+    const std::string request =
+        "DELETE /submit HTTP/1.1\r\n"
+        "Host: example.com\r\n"
+        "Content-Length: 0\r\n"
+        "\r\n";
+
+    auto result = fixture.parse_complete(request);
+
+    REQUIRE(result == RequestParser::good_complete);
+    REQUIRE(fixture.request.method_ == "DELETE");
+    REQUIRE(fixture.request.httpVersionMajor_ == 1);
+    REQUIRE(fixture.request.httpVersionMinor_ == 1);
+    REQUIRE(fixture.request.body_.empty());
+}
