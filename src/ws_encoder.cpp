@@ -1,6 +1,6 @@
-#include "beauty/ws_encoder.hpp"
+#include <cassert>
 #include <chrono>
-#include <random>
+#include "beauty/ws_encoder.hpp"
 
 namespace beauty {
 
@@ -91,15 +91,16 @@ void WsEncoder::encodeFrame(OpCode opcode,
     // Add masking key if needed (for client-side)
     uint8_t maskKey[4] = {0};
     if (mask) {
-        // Generate 32-bit mask
-        IRandom* rng = random_ ? random_ : &defaultRandom_;
-        uint32_t mask = rng->generateRandom();
+        // Generate 32-bit mask - mask should only be true for CLIENT role,
+        // and CLIENT constructor always provides a random generator
+        assert(random_ != nullptr);
+        uint32_t maskValue = random_->generateRandom();
 
         // Extract bytes from 32-bit mask
-        maskKey[0] = static_cast<uint8_t>(mask & 0xFF);
-        maskKey[1] = static_cast<uint8_t>((mask >> 8) & 0xFF);
-        maskKey[2] = static_cast<uint8_t>((mask >> 16) & 0xFF);
-        maskKey[3] = static_cast<uint8_t>((mask >> 24) & 0xFF);
+        maskKey[0] = static_cast<uint8_t>(maskValue & 0xFF);
+        maskKey[1] = static_cast<uint8_t>((maskValue >> 8) & 0xFF);
+        maskKey[2] = static_cast<uint8_t>((maskValue >> 16) & 0xFF);
+        maskKey[3] = static_cast<uint8_t>((maskValue >> 24) & 0xFF);
 
         for (int i = 0; i < 4; ++i) {
             buffer_.push_back(static_cast<char>(maskKey[i]));
