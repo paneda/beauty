@@ -5,7 +5,6 @@
 #include <cstdint>
 
 #include "beauty/i_random_interface.hpp"
-#include "beauty/default_random.hpp"
 
 namespace beauty {
 
@@ -52,10 +51,9 @@ class WsEncoder {
     }
 
    private:
-    std::vector<char>& buffer_;    // Reference to pre-allocated buffer
-    Role role_;                    // Determines masking behavior
-    IRandom* random_;              // Platform-specific random generator
-    DefaultRandom defaultRandom_;  // Fallback random generator
+    std::vector<char>& buffer_;  // Reference to pre-allocated buffer
+    Role role_;                  // Determines masking behavior
+    IRandom* random_;            // Platform-specific random generator
 
     // Core encoding function
     void encodeFrame(OpCode opcode,
