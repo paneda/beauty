@@ -450,6 +450,7 @@ void Connection::doWrite100Continue() {
     asio::async_write(socket_,
                       asio::buffer(*continueResponse),
                       [this, self, continueResponse](std::error_code ec, std::size_t) {
+                          (void)continueResponse;
                           if (!ec) {
                               // Initialize reply for body reading - no body bytes received yet
                               reply_.noBodyBytesReceived_ = 0;
