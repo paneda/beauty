@@ -32,6 +32,7 @@ const std::string not_implemented = "HTTP/1.1 501 Not Implemented\r\n";
 const std::string bad_gateway = "HTTP/1.1 502 Bad Gateway\r\n";
 const std::string service_unavailable = "HTTP/1.1 503 Service Unavailable\r\n";
 const std::string version_not_supported = "HTTP/1.1 505 Version Not Supported\r\n";
+const std::string insufficient_storage = "HTTP/1.1 507 Insufficient Storage\r\n";
 
 asio::const_buffer toBuffer(Reply::status_type status) {
     switch (status) {
@@ -85,6 +86,8 @@ asio::const_buffer toBuffer(Reply::status_type status) {
             return asio::buffer(service_unavailable);
         case Reply::version_not_supported:
             return asio::buffer(version_not_supported);
+        case Reply::insufficient_storage:
+            return asio::buffer(insufficient_storage);
         default:
             return asio::buffer(internal_server_error);
     }
