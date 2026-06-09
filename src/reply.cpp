@@ -224,6 +224,7 @@ const char not_implemented[] = R"({"status":501,"message":"Not Implemented"})";
 const char bad_gateway[] = R"({"status":502,"message":"Bad Gateway"})";
 const char service_unavailable[] = R"({"status":503,"message":"Service Unavailable"})";
 const char version_not_supported[] = R"({"status":505,"message":"Version Not Supported"})";
+const char insufficient_storage[] = R"({"status":507,"message":"Insufficient Storage"})";
 
 std::vector<char> toArray(Reply::status_type status) {
     switch (status) {
@@ -274,6 +275,9 @@ std::vector<char> toArray(Reply::status_type status) {
         case Reply::version_not_supported:
             return std::vector<char>(version_not_supported,
                                      version_not_supported + sizeof(version_not_supported));
+        case Reply::insufficient_storage:
+            return std::vector<char>(insufficient_storage,
+                                     insufficient_storage + sizeof(insufficient_storage));
         default:
             return std::vector<char>(internal_server_error,
                                      internal_server_error + sizeof(internal_server_error));
