@@ -54,7 +54,8 @@ class Reply {
         not_implemented = 501,
         bad_gateway = 502,
         service_unavailable = 503,
-        version_not_supported = 505
+        version_not_supported = 505,
+        insufficient_storage = 507
     };
 
     // Content to be sent in the reply.
