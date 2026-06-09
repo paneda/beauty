@@ -444,22 +444,24 @@ void Connection::handleWriteCompleted() {
 void Connection::doWrite100Continue() {
     auto self(shared_from_this());
 
-    // Create 100 Continue response
-    std::string continueResponse = "HTTP/1.1 100 Continue\r\n\r\n";
+    // Create 100 Continue response as shared_ptr to ensure it outlives the async_write.
+    auto continueResponse = std::make_shared<std::string>("HTTP/1.1 100 Continue\r\n\r\n");
 
-    asio::async_write(
-        socket_, asio::buffer(continueResponse), [this, self](std::error_code ec, std::size_t) {
-            if (!ec) {
-                // Initialize reply for body reading - no body bytes received yet
-                reply_.noBodyBytesReceived_ = 0;
-                // Now read the body using special method for 100-continue
-                doReadBodyAfter100Continue();
-            } else {
-                connectionManager_.debugMsg("doWrite100Continue: " + ec.message() + ':' +
-                                            std::to_string(ec.value()));
-                shutdown();
-            }
-        });
+    asio::async_write(socket_,
+                      asio::buffer(*continueResponse),
+                      [this, self, continueResponse](std::error_code ec, std::size_t) {
+                          (void)continueResponse;
+                          if (!ec) {
+                              // Initialize reply for body reading - no body bytes received yet
+                              reply_.noBodyBytesReceived_ = 0;
+                              // Now read the body using special method for 100-continue
+                              doReadBodyAfter100Continue();
+                          } else {
+                              connectionManager_.debugMsg("doWrite100Continue: " + ec.message() +
+                                                          ':' + std::to_string(ec.value()));
+                              shutdown();
+                          }
+                      });
 }
 
 void Connection::doReadBodyAfter100Continue() {
