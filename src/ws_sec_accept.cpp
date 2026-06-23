@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "beauty/base64.hpp"
+#include "beauty/i_random_interface.hpp"
 #include "beauty/ws_sec_accept.hpp"
 
 namespace beauty {
@@ -151,6 +152,37 @@ std::string computeWsSecAccept(const char *key) {
     uint8_t digest[20];
     sha1digest(digest, totKey.data(), keySize + magicGUID.size());
     return base64_encode((unsigned char *)digest, 20);
+}
+
+// Generate a fresh Sec-WebSocket-Key value. RFC6455 section 4.1 requires the
+// client to send a base64 encoded 16 byte random value.
+std::string generateWsSecKey(IRandom &random) {
+    uint8_t nonce[16];
+    for (size_t i = 0; i < sizeof(nonce); i += 4) {
+        uint32_t value = random.generateRandom();
+        nonce[i + 0] = static_cast<uint8_t>(value & 0xFF);
+        nonce[i + 1] = static_cast<uint8_t>((value >> 8) & 0xFF);
+        nonce[i + 2] = static_cast<uint8_t>((value >> 16) & 0xFF);
+        nonce[i + 3] = static_cast<uint8_t>((value >> 24) & 0xFF);
+    }
+    return base64_encode(nonce, sizeof(nonce));
+}
+
+// Verify the server's Sec-WebSocket-Accept header against the key the client
+// sent. The expected accept value is computeWsSecAccept(key).
+bool verifyWsSecAccept(const std::string &key, const std::string &acceptHeader) {
+    std::string expected = computeWsSecAccept(key.c_str());
+
+    // Trim leading/trailing whitespace from the received header value.
+    size_t begin = 0;
+    while (begin < acceptHeader.size() && isspace((unsigned char)acceptHeader[begin])) {
+        begin++;
+    }
+    size_t end = acceptHeader.size();
+    while (end > begin && isspace((unsigned char)acceptHeader[end - 1])) {
+        end--;
+    }
+    return acceptHeader.compare(begin, end - begin, expected) == 0;
 }
 
 }  // namespace beauty

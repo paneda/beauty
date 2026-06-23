@@ -70,10 +70,12 @@ WsParser::result_type WsParser::consume(std::vector<char>::iterator inPtr) {
             } else if (hasMask_) {
                 state_ = s_mask_1;
             } else {
-                mask_[0] = 0xff;
-                mask_[1] = 0xff;
-                mask_[2] = 0xff;
-                mask_[3] = 0xff;
+                // Unmasked frame (e.g. server->client). Use an identity mask of
+                // 0x00 so the XOR in the payload states leaves the data intact.
+                mask_[0] = 0x00;
+                mask_[1] = 0x00;
+                mask_[2] = 0x00;
+                mask_[3] = 0x00;
                 state_ = getOpCodeState();
                 if (payloadLen_ == 0) {
                     return handleZeroLengthPayload();

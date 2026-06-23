@@ -207,3 +207,20 @@ TEST_CASE("fragmentation rejection", "[ws_parser]") {
         REQUIRE(wsMessage.isFinal_ == true);
     }
 }
+
+TEST_CASE("parse unmasked frame (server->client)", "[ws_parser]") {
+    SECTION("should parse unmasked text frame without inverting bytes") {
+        // FIN=1, opcode=1 (text) -> 0x81; MASK=0, length=12 -> 0x0c; raw payload.
+        std::vector<char> content = {(char)0x81, (char)0x0c};
+        const std::string payload = "Hello World!";
+        content.insert(content.end(), payload.begin(), payload.end());
+
+        WsMessage wsMessage(content);
+        WsParser dut(wsMessage);
+
+        REQUIRE(dut.parse() == WsParser::data_frame);
+        std::string res(content.begin(), content.end());
+        REQUIRE(res == payload);
+        REQUIRE(wsMessage.isFinal_ == true);
+    }
+}

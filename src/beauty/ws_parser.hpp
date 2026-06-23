@@ -34,6 +34,12 @@ class WsParser {
 
     result_type parse();
 
+    // Reset the parser to its initial state (e.g. before reusing it for a new
+    // connection).
+    void reset() {
+        state_ = s_start;
+    }
+
     // Getters for frame information (useful for connection layer)
     OpCode getOpCode() const {
         return opCode_;
