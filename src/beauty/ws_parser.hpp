@@ -32,7 +32,23 @@ class WsParser {
         Pong = 10,
     };
 
-    result_type parse();
+    result_type parse(size_t offset = 0);
+
+    // Reset the parser to its initial state (e.g. before reusing it for a new
+    // connection).
+    void reset() {
+        state_ = s_start;
+        isFin_ = false;
+        opCode_ = TextData;
+        payloadLen_ = 0;
+        hasMask_ = false;
+        extLenBytes_ = 0;
+        mask_.fill(0);
+        maskCounter_ = 0;
+        wsMessage_.outCounter_ = 0;
+        wsMessage_.payLoadCounter_ = 0;
+        wsMessage_.isFinal_ = false;
+    }
 
     // Getters for frame information (useful for connection layer)
     OpCode getOpCode() const {

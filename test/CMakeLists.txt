@@ -14,6 +14,8 @@ add_executable(${PROJECT_NAME}
 	ws_parser_test.cpp
 	ws_encoder_test.cpp
 	random_interface_test.cpp
+	response_parser_test.cpp
+	ws_client_test.cpp
 	${CMAKE_SOURCE_DIR}/examples/pc/file_io.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/utils/mock_file_io.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/utils/mock_request_handler.cpp
@@ -26,12 +28,12 @@ target_link_libraries(${PROJECT_NAME} PRIVATE Catch2::Catch2WithMain asio::asio 
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 include_directories(
-    ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/examples/pc
+	${CMAKE_SOURCE_DIR}/src
+	${CMAKE_SOURCE_DIR}/examples/pc
 )
 
 # define tests
 add_test(
-	NAME ${PROJECT_NAME} 
+	NAME ${PROJECT_NAME}
 	COMMAND $<TARGET_FILE:${PROJECT_NAME}> --success
 )

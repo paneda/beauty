@@ -15,14 +15,19 @@ const uint8_t LengthMask = 0x7f;
 
 WsParser::WsParser(WsMessage &wsMessage) : wsMessage_(wsMessage) {}
 
-WsParser::result_type WsParser::parse() {
+WsParser::result_type WsParser::parse(size_t offset) {
     result_type result = indeterminate;
 
     if (wsMessage_.content_.empty()) {
         return result;
     }
 
-    auto begin = wsMessage_.content_.begin();
+    // Guard against invalid offset (e.g. due to a logic error in the caller).
+    if (offset > wsMessage_.content_.size()) {
+        offset = wsMessage_.content_.size();
+    }
+
+    auto begin = wsMessage_.content_.begin() + static_cast<std::ptrdiff_t>(offset);
     auto end = wsMessage_.content_.end();
     while (begin != end) {
         result = consume(begin++);
@@ -70,10 +75,12 @@ WsParser::result_type WsParser::consume(std::vector<char>::iterator inPtr) {
             } else if (hasMask_) {
                 state_ = s_mask_1;
             } else {
-                mask_[0] = 0xff;
-                mask_[1] = 0xff;
-                mask_[2] = 0xff;
-                mask_[3] = 0xff;
+                // Unmasked frame (e.g. server->client). Use an identity mask of
+                // 0x00 so the XOR in the payload states leaves the data intact.
+                mask_[0] = 0x00;
+                mask_[1] = 0x00;
+                mask_[2] = 0x00;
+                mask_[3] = 0x00;
                 state_ = getOpCodeState();
                 if (payloadLen_ == 0) {
                     return handleZeroLengthPayload();

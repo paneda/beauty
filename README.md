@@ -39,6 +39,7 @@ Beauty was born with the realization that Asio is supported on ESP32 microcontro
   - [📊 HttpResult - JSON Made Easy](#-httpresult---json-made-easy)
   - [🛣️ Router - REST API Simplified](#️-router---rest-api-simplified)
   - [🔌 WebSocket Support](#-websocket-support)
+  - [📡 WebSocket Client](#-websocket-client)
 
 ## 📦 Dependencies
 - **Asio (non-boost)** - Async I/O operations
@@ -919,4 +920,124 @@ Beauty includes a comprehensive WebSocket test interface at `/ws/chat` and `/ws/
 - Flow control simulation with bursty data
 - Real-time statistics monitoring
 - Interactive message sending and broadcasting
+
+## 📡 WebSocket Client
+
+In addition to the server-side endpoints, Beauty ships a WebSocket **client**
+(`WsClient`) that follows the same design philosophy: it runs on a (shared)
+`asio::io_context`, uses fixed maximum-size receive/send buffers, and is fully
+asynchronous and callback based. This makes it a natural fit for
+device-to-device communication (for example one ESP32 streaming data to
+another) as well as for talking to any RFC 6455 server.
+
+### Key Features
+
+- **Fixed memory footprint**: Configurable `maxMessageSize` bounds the receive
+  and send buffers, mirroring the server.
+- **Shared event loop**: Runs on the same `asio::io_context` as everything else,
+  so a client and a server can coexist in a single-threaded application.
+- **Callback based**: Implement `IWsClientHandler` to react to connection
+  lifecycle events (`onWsOpen`, `onWsMessage`, `onWsClose`, `onWsError`).
+- **Automatic reconnection**: Optional reconnect with exponential backoff.
+- **Ping keep-alive**: Optional periodic ping frames to detect dead peers.
+
+### Handling Events
+
+Implement the `IWsClientHandler` interface to receive callbacks:
+
+```cpp
+#include "beauty/i_ws_client_handler.hpp"
+
+class MyHandler : public beauty::IWsClientHandler {
+public:
+    void onWsOpen() override {
+        // Connection established and handshake completed.
+    }
+
+    void onWsMessage(const beauty::WsMessage& message) override {
+        std::string text(message.content_.begin(), message.content_.end());
+        // Handle the incoming text/binary frame.
+    }
+
+    void onWsClose() override {
+        // Connection closed (gracefully or by the peer).
+    }
+
+    void onWsError(const std::string& error) override {
+        // A connection or handshake error occurred.
+    }
+};
+```
+
+### Connecting
+
+The client is owned through a `std::shared_ptr` (created via `WsClient::create`)
+so its lifetime is guaranteed for the duration of outstanding asynchronous
+operations:
+
+```cpp
+#include "beauty/ws_client.hpp"
+#include "beauty/default_random.hpp"
+
+asio::io_context ioc;
+beauty::DefaultRandom random;   // Used to generate the Sec-WebSocket-Key
+MyHandler handler;
+
+beauty::WsClient::Config config;
+config.maxMessageSize = 1024;   // Fixed buffer size (bytes)
+config.autoReconnect  = true;   // Reconnect with backoff on drop/failure
+
+auto client = beauty::WsClient::create(ioc, random, handler, config);
+client->connect("ws://127.0.0.1:8080/ws/data");
+
+ioc.run();
+```
+
+### Sending Messages
+
+```cpp
+// Send a text frame.
+beauty::WriteResult r = client->sendText("hello");
+
+// Send a binary frame.
+std::vector<char> payload = { /* ... */ };
+client->sendBinary(payload);
+
+// Send a ping (no-op if not open or a write is already in progress).
+client->sendPing();
+
+// Initiate a graceful close (disables auto-reconnect for this close).
+client->close(1000, "bye");
+```
+
+`sendText` / `sendBinary` return a `WriteResult` (`SUCCESS`,
+`WRITE_IN_PROGRESS`, or `CONNECTION_CLOSED`), giving you the same
+application-controlled back-pressure information as the server side.
+
+> **Note:** each connection is bound to a single path for its lifetime (the path
+> is part of the opening handshake). To use multiple endpoints such as
+> `/ws/data` and `/ws/chat`, create one `WsClient` per path (they can share the
+> same `io_context`), or multiplex logically over a single connection.
+
+### Example Clients
+
+Two ready-to-run example clients are provided under `examples/pc` (build with
+`-DBUILD_EXAMPLES=ON`):
+
+| Example | Target | Best for |
+|---------|--------|----------|
+| `ws_client_main.cpp` | `beauty_ws_client_example` | The **data** endpoint: sends messages passed as command-line arguments (e.g. `stats`, `burst`) and prints the stream of responses. |
+| `ws_chat_client_main.cpp` | `beauty_ws_chat_client_example` | The **chat** endpoint: interactive — reads lines you type on stdin and sends each as a message while printing replies. Type `/quit` (or Ctrl-C) to exit. |
+
+```bash
+# Terminal 1 - start the server demo
+./build/examples/beauty_example 127.0.0.1 8080 www
+
+# Terminal 2 - data client: trigger a burst and watch the responses
+./build/examples/beauty_ws_client_example ws://127.0.0.1:8080/ws/data burst
+
+# Terminal 3 - interactive chat client
+./build/examples/beauty_ws_chat_client_example ws://127.0.0.1:8080/ws/chat
+```
+
 
