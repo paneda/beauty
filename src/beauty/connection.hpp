@@ -158,6 +158,11 @@ class Connection : public std::enable_shared_from_this<Connection> {
 
     bool isWebSocket_ = false;
 
+    // Offset into recvBuffer_ where the next WebSocket read should place data.
+    // Non-zero when WsParser returned indeterminate (partial frame) and
+    // partially decoded payload bytes occupy [0, wsParseOffset_).
+    size_t wsParseOffset_ = 0;
+
     // WebSocket write state tracking
     bool writeInProgress_ = false;
     WriteCompleteCallback writeCallback_;

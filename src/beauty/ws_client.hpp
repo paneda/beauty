@@ -137,6 +137,17 @@ class WsClient : public std::enable_shared_from_this<WsClient> {
     bool closing_ = false;
     bool reconnectEnabled_ = true;
     bool finishing_ = false;
+    bool closePending_ = false;
+
+    // Offset into recvBuffer_ where the next socket read should place data.
+    // Non-zero when WsParser returned indeterminate (partial frame) and
+    // partially decoded payload bytes occupy [0, wsParseOffset_).
+    size_t wsParseOffset_ = 0;
+
+    // Deferred close parameters (used when close() is called while a write
+    // is in progress).
+    uint16_t pendingCloseCode_ = 1000;
+    std::string pendingCloseReason_;
 
     std::chrono::milliseconds currentReconnectDelay_;
 };

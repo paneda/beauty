@@ -32,7 +32,7 @@ class WsParser {
         Pong = 10,
     };
 
-    result_type parse();
+    result_type parse(size_t offset = 0);
 
     // Reset the parser to its initial state (e.g. before reusing it for a new
     // connection).

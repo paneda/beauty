@@ -67,6 +67,8 @@ void WsClient::resetForNewConnection() {
     writeInProgress_ = false;
     closing_ = false;
     finishing_ = false;
+    closePending_ = false;
+    wsParseOffset_ = 0;
 }
 
 void WsClient::doResolve() {
@@ -168,29 +170,39 @@ void WsClient::doReadHandshake() {
 }
 
 void WsClient::processWsBuffer() {
-    wsMessage_.reset();
-    WsParser::result_type result = wsParser_.parse();
+    if (wsParseOffset_ == 0) {
+        wsMessage_.reset();
+    }
+    WsParser::result_type result = wsParser_.parse(wsParseOffset_);
 
     if (result == WsParser::data_frame) {
+        wsParseOffset_ = 0;
         handler_.onWsMessage(wsMessage_);
         if (isOpen_) {
             doReadWs();
         }
     } else if (result == WsParser::indeterminate) {
+        // Partial frame — remember how many decoded bytes are in the buffer so
+        // the next read appends after them and the parser can resume.
+        wsParseOffset_ = recvBuffer_.size();
         if (isOpen_) {
             doReadWs();
         }
     } else if (result == WsParser::ping_frame) {
+        wsParseOffset_ = 0;
         wsEncoder_.encodePongFrame(wsMessage_.content_);
         doWriteWsFrame(true, nullptr);
     } else if (result == WsParser::pong_frame) {
+        wsParseOffset_ = 0;
         if (isOpen_) {
             doReadWs();
         }
     } else if (result == WsParser::close_frame) {
+        wsParseOffset_ = 0;
         isOpen_ = false;
         finishConnection(true);
     } else if (result == WsParser::fragmentation_error) {
+        wsParseOffset_ = 0;
         handler_.onWsError("Fragmented messages are not supported");
         if (isOpen_) {
             isOpen_ = false;
@@ -203,14 +215,17 @@ void WsClient::processWsBuffer() {
 
 void WsClient::doReadWs() {
     auto self(shared_from_this());
-    recvBuffer_.resize(config_.maxMessageSize);
-    socket_.async_read_some(asio::buffer(recvBuffer_),
+    // When resuming a partial frame, wsParseOffset_ decoded payload bytes
+    // occupy the front of recvBuffer_. Read new data after them.
+    size_t readSize = config_.maxMessageSize - wsParseOffset_;
+    recvBuffer_.resize(wsParseOffset_ + readSize);
+    socket_.async_read_some(asio::buffer(recvBuffer_.data() + wsParseOffset_, readSize),
                             [this, self](const std::error_code &ec, std::size_t bytesTransferred) {
                                 if (ec) {
                                     handleDisconnect("Read failed: " + ec.message());
                                     return;
                                 }
-                                recvBuffer_.resize(bytesTransferred);
+                                recvBuffer_.resize(wsParseOffset_ + bytesTransferred);
                                 processWsBuffer();
                             });
 }
@@ -232,6 +247,19 @@ void WsClient::doWriteWsFrame(bool continueReading, WriteCompleteCallback callba
                           }
                           if (callback) {
                               callback(ec, bytesWritten);
+                          }
+                          // If close() was called while this write was in
+                          // flight, now send the close frame.
+                          if (closePending_ && !closing_) {
+                              closePending_ = false;
+                              isOpen_ = false;
+                              closing_ = true;
+                              wsEncoder_.encodeCloseFrame(pendingCloseCode_, pendingCloseReason_);
+                              doWriteWsFrame(false,
+                                             [this, self](const std::error_code &, std::size_t) {
+                                                 finishConnection(true);
+                                             });
+                              return;
                           }
                           if (continueReading && isOpen_) {
                               doReadWs();
@@ -273,11 +301,14 @@ void WsClient::sendPing() {
 
 void WsClient::close(uint16_t statusCode, const std::string &reason) {
     reconnectEnabled_ = false;
-    if (!isOpen_ || writeInProgress_) {
-        if (isOpen_) {
-            isOpen_ = false;
-            finishConnection(true);
-        }
+    if (!isOpen_) {
+        return;
+    }
+    if (writeInProgress_) {
+        // Defer the close frame until the current write completes.
+        closePending_ = true;
+        pendingCloseCode_ = statusCode;
+        pendingCloseReason_ = reason;
         return;
     }
     isOpen_ = false;

@@ -15,14 +15,14 @@ const uint8_t LengthMask = 0x7f;
 
 WsParser::WsParser(WsMessage &wsMessage) : wsMessage_(wsMessage) {}
 
-WsParser::result_type WsParser::parse() {
+WsParser::result_type WsParser::parse(size_t offset) {
     result_type result = indeterminate;
 
     if (wsMessage_.content_.empty()) {
         return result;
     }
 
-    auto begin = wsMessage_.content_.begin();
+    auto begin = wsMessage_.content_.begin() + static_cast<std::ptrdiff_t>(offset);
     auto end = wsMessage_.content_.end();
     while (begin != end) {
         result = consume(begin++);
