@@ -262,9 +262,11 @@ void ResponseParser::storeHeaderValueIfNeeded(Response &res) {
     Header &h = res.headers_.back();
 
     if (strcasecmp(h.name_.c_str(), "Content-Length") == 0) {
-        size_t actualContentLength = atoi(h.value_.c_str());
-        res.contentLength_ = actualContentLength;
-        contentLength_ = actualContentLength;
+        size_t actualContentLength = 0;
+        if (parseUint(h.value_.c_str(), actualContentLength)) {
+            res.contentLength_ = actualContentLength;
+            contentLength_ = actualContentLength;
+        }
     } else if (strcasecmp(h.name_.c_str(), "Transfer-Encoding") == 0) {
         if (strcasecmp(h.value_.c_str(), "chunked") == 0) {
             res.isChunked_ = true;

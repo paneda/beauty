@@ -3,8 +3,9 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdlib.h>
-
 #include <string>
+
+#include "beauty/parse_common.hpp"
 
 namespace beauty {
 
@@ -203,7 +204,11 @@ class UrlParser {
                     } else if (ch == '/') {
                         std::swap(url_.hostname_, usernameOrHostname);
                         std::swap(url_.port_, portOrPassword);
-                        url_.integerPort_ = atoi(url_.port_.c_str());
+                        if (!parseUint16(url_.port_.c_str(), url_.integerPort_)) {
+                            valid_ = false;
+                            url_ = Url();
+                            break;
+                        }
                         state = path;
                     } else if (isalnum(ch) || ch == '%') {
                         std::swap(url_.username_, usernameOrHostname);
@@ -220,7 +225,11 @@ class UrlParser {
                         portOrPassword += ch;
                     } else if (ch == '/') {
                         std::swap(url_.port_, portOrPassword);
-                        url_.integerPort_ = atoi(url_.port_.c_str());
+                        if (!parseUint16(url_.port_.c_str(), url_.integerPort_)) {
+                            valid_ = false;
+                            url_ = Url();
+                            break;
+                        }
                         state = path;
                     } else {
                         valid_ = false;

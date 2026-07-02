@@ -262,9 +262,11 @@ void RequestParser::storeHeaderValueIfNeeded(Request &req) {
     Header &h = req.headers_.back();
 
     if (strcasecmp(h.name_.c_str(), "Content-Length") == 0) {
-        size_t actualContentLength = atoi(h.value_.c_str());
-        req.contentLength_ = actualContentLength;
-        contentLength_ = actualContentLength;
+        size_t actualContentLength = 0;
+        if (parseUint(h.value_.c_str(), actualContentLength)) {
+            req.contentLength_ = actualContentLength;
+            contentLength_ = actualContentLength;
+        }
     } else if (strcasecmp(h.name_.c_str(), "Transfer-Encoding") == 0) {
         if (strcasecmp(h.value_.c_str(), "chunked") == 0) {
             req.isChunked_ = true;
