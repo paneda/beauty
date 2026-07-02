@@ -217,6 +217,15 @@ void WsClient::doReadWs() {
     auto self(shared_from_this());
     // When resuming a partial frame, wsParseOffset_ decoded payload bytes
     // occupy the front of recvBuffer_. Read new data after them.
+    if (wsParseOffset_ >= config_.maxMessageSize) {
+        wsParseOffset_ = 0;
+        handler_.onWsError("WebSocket message too large");
+        isOpen_ = false;
+        wsEncoder_.encodeCloseFrame(1009, "Message too big");
+        doWriteWsFrame(false,
+                       [this](const std::error_code &, std::size_t) { finishConnection(true); });
+        return;
+    }
     size_t readSize = config_.maxMessageSize - wsParseOffset_;
     recvBuffer_.resize(wsParseOffset_ + readSize);
     socket_.async_read_some(asio::buffer(recvBuffer_.data() + wsParseOffset_, readSize),

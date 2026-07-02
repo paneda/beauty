@@ -22,6 +22,11 @@ WsParser::result_type WsParser::parse(size_t offset) {
         return result;
     }
 
+    // Guard against invalid offset (e.g. due to a logic error in the caller).
+    if (offset > wsMessage_.content_.size()) {
+        offset = wsMessage_.content_.size();
+    }
+
     auto begin = wsMessage_.content_.begin() + static_cast<std::ptrdiff_t>(offset);
     auto end = wsMessage_.content_.end();
     while (begin != end) {

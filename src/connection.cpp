@@ -139,6 +139,17 @@ void Connection::doRead() {
         // When resuming a partial WebSocket frame, wsParseOffset_ decoded
         // payload bytes occupy the front of recvBuffer_. Read new data after
         // them so the parser can resume from where it left off.
+        if (wsParseOffset_ >= maxContentSize_) {
+            wsParseOffset_ = 0;
+            if (wsEndpoint_) {
+                wsEndpoint_->onWsError(std::to_string(connectionId_),
+                                       "WebSocket message too large");
+            }
+            wsEncoder_.encodeCloseFrame(1009, "Message too big");
+            doWriteWsFrame(false, nullptr);
+            connectionManager_.stop(shared_from_this());
+            return;
+        }
         size_t readSize = maxContentSize_ - wsParseOffset_;
         recvBuffer_.resize(wsParseOffset_ + readSize);
         socket_.async_read_some(
