@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cerrno>
 #include <climits>
 #include <cstddef>
 #include <cstdlib>
@@ -61,7 +62,11 @@ inline bool parseUint(const char *str, size_t &out) {
         return false;
     }
     char *end = nullptr;
+    errno = 0;
     unsigned long long v = strtoull(str, &end, 10);
+    if (errno == ERANGE) {
+        return false;
+    }
     if (end == nullptr || *end != '\0' || end == str) {
         return false;
     }
