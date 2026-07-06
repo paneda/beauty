@@ -1,5 +1,6 @@
-#include "beauty/http_client.hpp"
+#include <array>
 
+#include "beauty/http_client.hpp"
 #include "beauty/parse_common.hpp"
 
 namespace beauty {

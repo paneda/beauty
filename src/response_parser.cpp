@@ -18,6 +18,7 @@ void ResponseParser::reset() {
     interimResponse_ = false;
     chunkSizeDigitSeen_ = false;
     chunkRemaining_ = 0;
+    headRequest_ = false;
 }
 
 void ResponseParser::setMaxBodySize(size_t maxBodySize) {

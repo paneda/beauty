@@ -23,7 +23,7 @@ class ResponseParser {
 
     // Tell the parser that the request method was HEAD. HEAD responses never
     // carry a body regardless of Content-Length. Must be called after reset()
-    // and before parse(). Not cleared by reset() (same lifetime as maxBodySize).
+    // and before parse().
     void setHeadRequest(bool head);
 
     // Result of parse.
