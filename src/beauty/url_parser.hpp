@@ -260,10 +260,15 @@ class UrlParser {
             }
         }
 
-        assert(portOrPassword.empty());
-
         if (!usernameOrHostname.empty()) {
             url_.hostname_ = usernameOrHostname;
+        }
+        if (!portOrPassword.empty()) {
+            url_.port_ = portOrPassword;
+            if (!parseUint16(url_.port_.c_str(), url_.integerPort_)) {
+                valid_ = false;
+                url_ = Url();
+            }
         }
     }
 

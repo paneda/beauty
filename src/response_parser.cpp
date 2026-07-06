@@ -14,6 +14,32 @@ void ResponseParser::reset() {
     state_ = http_version_h;
     contentLength_ = std::numeric_limits<size_t>::max();
     noBodyExpected_ = false;
+    isChunked_ = false;
+    interimResponse_ = false;
+    chunkSizeDigitSeen_ = false;
+    chunkRemaining_ = 0;
+    headRequest_ = false;
+}
+
+void ResponseParser::setMaxBodySize(size_t maxBodySize) {
+    maxBodySize_ = maxBodySize;
+}
+
+void ResponseParser::setHeadRequest(bool head) {
+    headRequest_ = head;
+}
+
+ResponseParser::result_type ResponseParser::finish(Response &res) {
+    // The peer closed the connection. A response with neither Content-Length
+    // nor chunked encoding is delimited by the close itself, so whatever body
+    // bytes we accumulated form the complete body.
+    if (state_ == body && contentLength_ == std::numeric_limits<size_t>::max() && !isChunked_) {
+        res.keepAlive_ = false;
+        return good_complete;
+    }
+    // Anything else means the connection closed mid-response.
+    (void)res;
+    return bad;
 }
 
 ResponseParser::result_type ResponseParser::parse(Response &res, std::vector<char> &content) {
@@ -237,8 +263,24 @@ ResponseParser::result_type ResponseParser::consume(Response &res,
             if (res2 != indeterminate) {
                 return res2;
             }
+            if (interimResponse_) {
+                // A 1xx interim response (other than 101) is not the final
+                // response. Discard it and continue parsing the response that
+                // follows on the same connection.
+                res.reset();
+                reset();
+                return indeterminate;
+            }
             // start filling up body data
             res.body_.clear();
+            if (noBodyExpected_) {
+                return good_complete;
+            }
+            if (isChunked_) {
+                chunkRemaining_ = 0;
+                state_ = chunk_size;
+                return indeterminate;
+            }
             if (contentLength_ == 0) {
                 return good_complete;
             }
@@ -246,6 +288,9 @@ ResponseParser::result_type ResponseParser::consume(Response &res,
             return indeterminate;
         }
         case body:
+            if (res.body_.size() >= maxBodySize_) {
+                return too_large;
+            }
             res.body_.push_back(input);
             if (contentLength_ != std::numeric_limits<size_t>::max()) {
                 if (res.body_.size() >= contentLength_) {
@@ -253,6 +298,87 @@ ResponseParser::result_type ResponseParser::consume(Response &res,
                 }
             }
             return indeterminate;
+        case chunk_size:
+            if (isHexDigit(input)) {
+                chunkSizeDigitSeen_ = true;
+                chunkRemaining_ = chunkRemaining_ * 16 + hexValue(input);
+            } else if (input == ';') {
+                if (!chunkSizeDigitSeen_) {
+                    return bad;
+                }
+                state_ = chunk_extension;
+            } else if (input == '\r') {
+                if (!chunkSizeDigitSeen_) {
+                    return bad;
+                }
+                state_ = chunk_size_newline;
+            } else {
+                return bad;
+            }
+            return indeterminate;
+        case chunk_extension:
+            // Chunk extensions are ignored.
+            if (input == '\r') {
+                state_ = chunk_size_newline;
+            }
+            return indeterminate;
+        case chunk_size_newline:
+            if (input != '\n') {
+                return bad;
+            }
+            if (chunkRemaining_ == 0) {
+                // Last chunk - trailers (if any) follow.
+                state_ = chunk_trailer_start;
+            } else {
+                state_ = chunk_data;
+            }
+            return indeterminate;
+        case chunk_data:
+            if (res.body_.size() >= maxBodySize_) {
+                return too_large;
+            }
+            res.body_.push_back(input);
+            if (--chunkRemaining_ == 0) {
+                state_ = chunk_data_cr;
+            }
+            return indeterminate;
+        case chunk_data_cr:
+            if (input != '\r') {
+                return bad;
+            }
+            state_ = chunk_data_newline;
+            return indeterminate;
+        case chunk_data_newline:
+            if (input != '\n') {
+                return bad;
+            }
+            chunkRemaining_ = 0;
+            chunkSizeDigitSeen_ = false;
+            state_ = chunk_size;
+            return indeterminate;
+        case chunk_trailer_start:
+            if (input == '\r') {
+                state_ = chunk_trailer_end_newline;
+            } else {
+                state_ = chunk_trailer_line;
+            }
+            return indeterminate;
+        case chunk_trailer_line:
+            if (input == '\r') {
+                state_ = chunk_trailer_line_newline;
+            }
+            return indeterminate;
+        case chunk_trailer_line_newline:
+            if (input != '\n') {
+                return bad;
+            }
+            state_ = chunk_trailer_start;
+            return indeterminate;
+        case chunk_trailer_end_newline:
+            if (input != '\n') {
+                return bad;
+            }
+            return good_complete;
         default:
             return bad;
     }
@@ -268,7 +394,11 @@ void ResponseParser::storeHeaderValueIfNeeded(Response &res) {
             contentLength_ = actualContentLength;
         }
     } else if (strcasecmp(h.name_.c_str(), "Transfer-Encoding") == 0) {
-        if (strcasecmp(h.value_.c_str(), "chunked") == 0) {
+        // Handle both bare "chunked" and lists like "gzip, chunked".
+        // Per HTTP/1.1, chunked is always the last transfer-coding when present.
+        std::string lower = h.value_;
+        std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+        if (lower.find("chunked") != std::string::npos) {
             res.isChunked_ = true;
         }
     } else if (strcasecmp(h.name_.c_str(), "Connection") == 0) {
@@ -281,15 +411,32 @@ void ResponseParser::storeHeaderValueIfNeeded(Response &res) {
 }
 
 ResponseParser::result_type ResponseParser::checkResponseAfterAllHeaders(Response &res) {
-    // 1xx informational, 204 No Content and 304 Not Modified never carry a body.
-    if ((res.statusCode_ >= 100 && res.statusCode_ < 200) || res.statusCode_ == 204 ||
-        res.statusCode_ == 304) {
-        contentLength_ = 0;
-        noBodyExpected_ = true;
-    }
-
     if (res.statusCode_ == 101) {
         return switching_protocols;
+    }
+
+    // 1xx informational responses (other than 101) are interim: the real
+    // response follows on the same connection and must be parsed next.
+    if (res.statusCode_ >= 100 && res.statusCode_ < 200) {
+        interimResponse_ = true;
+        return indeterminate;
+    }
+
+    // 204 No Content and 304 Not Modified never carry a body.
+    if (res.statusCode_ == 204 || res.statusCode_ == 304) {
+        noBodyExpected_ = true;
+        return indeterminate;
+    }
+
+    // HEAD responses never carry a body regardless of Content-Length.
+    if (headRequest_) {
+        noBodyExpected_ = true;
+        return indeterminate;
+    }
+
+    // A chunked response is self-delimiting regardless of Content-Length.
+    if (res.isChunked_) {
+        isChunked_ = true;
     }
 
     return indeterminate;
