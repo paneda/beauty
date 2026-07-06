@@ -51,6 +51,26 @@ inline bool isDigit(int c) {
     return c >= '0' && c <= '9';
 }
 
+// Check if a byte is a hexadecimal digit.
+inline bool isHexDigit(int c) {
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+// Convert a hexadecimal digit to its numeric value. Returns 0 for non-hex input
+// (callers are expected to validate with isHexDigit first).
+inline int hexValue(int c) {
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    }
+    if (c >= 'a' && c <= 'f') {
+        return c - 'a' + 10;
+    }
+    if (c >= 'A' && c <= 'F') {
+        return c - 'A' + 10;
+    }
+    return 0;
+}
+
 // Safely parse a non-negative decimal integer from a C string.
 // Returns true and writes the value to *out on success.
 // Returns false (and leaves *out unchanged) when the string is empty, contains

@@ -17,6 +17,10 @@ class ResponseParser {
     // Reset to initial parser state.
     void reset();
 
+    // Set an upper bound on the accumulated body size. If the body grows beyond
+    // this, parse() returns too_large. Defaults to no limit.
+    void setMaxBodySize(size_t maxBodySize);
+
     // Result of parse.
     enum result_type {
         good_complete,        // A complete response (status line + headers + body) parsed
@@ -24,6 +28,7 @@ class ResponseParser {
         switching_protocols,  // 101 response - headers complete, no body (WebSocket upgrade)
         bad,                  // Malformed response
         version_not_supported,
+        too_large,  // Body exceeded the configured maximum size
         indeterminate
     };
 
@@ -31,6 +36,11 @@ class ResponseParser {
     // parsed, bad on invalid data, good_part when more data is required and
     // switching_protocols when a 101 response was received.
     result_type parse(Response &res, std::vector<char> &content);
+
+    // Called by the client when the peer closed the connection with no further
+    // data. Returns good_complete if the body was delimited by connection close
+    // (no Content-Length, not chunked), otherwise bad (truncated response).
+    result_type finish(Response &res);
 
    private:
     // Handle the next character of input.
@@ -63,10 +73,25 @@ class ResponseParser {
         expecting_newline_2,
         expecting_newline_3,
         body,
+        // Chunked transfer-encoding states.
+        chunk_size,
+        chunk_extension,
+        chunk_size_newline,
+        chunk_data,
+        chunk_data_cr,
+        chunk_data_newline,
+        chunk_trailer_start,
+        chunk_trailer_line,
+        chunk_trailer_line_newline,
+        chunk_trailer_end_newline,
     } state_;
 
     std::size_t contentLength_ = std::numeric_limits<size_t>::max();
     bool noBodyExpected_ = false;
+    bool isChunked_ = false;
+    bool interimResponse_ = false;
+    std::size_t chunkRemaining_ = 0;
+    std::size_t maxBodySize_ = std::numeric_limits<size_t>::max();
 };
 
 }  // namespace beauty

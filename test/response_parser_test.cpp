@@ -179,3 +179,145 @@ TEST_CASE("parse websocket upgrade", "[response_parser]") {
         REQUIRE(std::string(fixture.recvBuffer_.begin(), fixture.recvBuffer_.end()) == "FRAMEDATA");
     }
 }
+
+TEST_CASE("parse 1xx interim responses", "[response_parser]") {
+    ResponseFixture fixture(1024);
+
+    SECTION("should skip a 100 Continue and parse the final response") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 100 Continue\r\n"
+            "\r\n"
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Length: 5\r\n"
+            "\r\n"
+            "hello");
+        REQUIRE(result == ResponseParser::good_complete);
+        REQUIRE(fixture.response.statusCode_ == 200);
+        REQUIRE(bodyAsString(fixture.response) == "hello");
+    }
+
+    SECTION("should skip an interim response that arrives before the final one") {
+        auto result = fixture.parse_chunk("HTTP/1.1 100 Continue\r\n\r\n");
+        REQUIRE(result == ResponseParser::good_part);
+        result = fixture.parse_chunk(
+            "HTTP/1.1 201 Created\r\n"
+            "Content-Length: 2\r\n"
+            "\r\n"
+            "ok");
+        REQUIRE(result == ResponseParser::good_complete);
+        REQUIRE(fixture.response.statusCode_ == 201);
+        REQUIRE(bodyAsString(fixture.response) == "ok");
+    }
+}
+
+TEST_CASE("parse chunked transfer encoding", "[response_parser]") {
+    ResponseFixture fixture(1024);
+
+    SECTION("should decode a simple chunked body") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Transfer-Encoding: chunked\r\n"
+            "\r\n"
+            "5\r\nhello\r\n"
+            "6\r\n world\r\n"
+            "0\r\n"
+            "\r\n");
+        REQUIRE(result == ResponseParser::good_complete);
+        REQUIRE(bodyAsString(fixture.response) == "hello world");
+    }
+
+    SECTION("should ignore chunk extensions") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Transfer-Encoding: chunked\r\n"
+            "\r\n"
+            "5;foo=bar\r\nhello\r\n"
+            "0\r\n"
+            "\r\n");
+        REQUIRE(result == ResponseParser::good_complete);
+        REQUIRE(bodyAsString(fixture.response) == "hello");
+    }
+
+    SECTION("should skip trailers after the last chunk") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Transfer-Encoding: chunked\r\n"
+            "\r\n"
+            "3\r\nabc\r\n"
+            "0\r\n"
+            "X-Trailer: value\r\n"
+            "\r\n");
+        REQUIRE(result == ResponseParser::good_complete);
+        REQUIRE(bodyAsString(fixture.response) == "abc");
+    }
+
+    SECTION("should decode chunked body fed incrementally") {
+        auto result = fixture.parse_chunk(
+            "HTTP/1.1 200 OK\r\n"
+            "Transfer-Encoding: chunked\r\n"
+            "\r\n"
+            "5\r\nhel");
+        REQUIRE(result == ResponseParser::good_part);
+        result = fixture.parse_chunk("lo\r\n0\r\n\r\n");
+        REQUIRE(result == ResponseParser::good_complete);
+        REQUIRE(bodyAsString(fixture.response) == "hello");
+    }
+
+    SECTION("should decode hex chunk sizes larger than 9") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Transfer-Encoding: chunked\r\n"
+            "\r\n"
+            "a\r\n0123456789\r\n"
+            "0\r\n\r\n");
+        REQUIRE(result == ResponseParser::good_complete);
+        REQUIRE(bodyAsString(fixture.response) == "0123456789");
+    }
+}
+
+TEST_CASE("parse body delimited by connection close", "[response_parser]") {
+    ResponseFixture fixture(1024);
+
+    SECTION("finish() completes a body with no Content-Length") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.0 200 OK\r\n"
+            "\r\n"
+            "some body bytes");
+        REQUIRE(result == ResponseParser::good_part);
+        result = fixture.parser.finish(fixture.response);
+        REQUIRE(result == ResponseParser::good_complete);
+        REQUIRE(bodyAsString(fixture.response) == "some body bytes");
+    }
+
+    SECTION("finish() reports bad when closed mid-headers") {
+        auto result = fixture.parse_complete("HTTP/1.1 200 OK\r\nContent-Len");
+        REQUIRE(result == ResponseParser::good_part);
+        result = fixture.parser.finish(fixture.response);
+        REQUIRE(result == ResponseParser::bad);
+    }
+}
+
+TEST_CASE("parse enforces max body size", "[response_parser]") {
+    ResponseFixture fixture(1024);
+
+    SECTION("should reject a Content-Length body that exceeds the limit") {
+        fixture.parser.setMaxBodySize(4);
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Length: 10\r\n"
+            "\r\n"
+            "0123456789");
+        REQUIRE(result == ResponseParser::too_large);
+    }
+
+    SECTION("should reject a chunked body that exceeds the limit") {
+        fixture.parser.setMaxBodySize(4);
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Transfer-Encoding: chunked\r\n"
+            "\r\n"
+            "a\r\n0123456789\r\n"
+            "0\r\n\r\n");
+        REQUIRE(result == ResponseParser::too_large);
+    }
+}

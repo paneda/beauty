@@ -16,6 +16,7 @@ add_executable(${PROJECT_NAME}
 	random_interface_test.cpp
 	response_parser_test.cpp
 	ws_client_test.cpp
+	http_client_test.cpp
 	${CMAKE_SOURCE_DIR}/examples/pc/file_io.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/utils/mock_file_io.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/utils/mock_request_handler.cpp

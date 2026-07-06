@@ -43,3 +43,17 @@ target_include_directories(beauty_ws_chat_client_example PRIVATE
 target_link_libraries(beauty_ws_chat_client_example PRIVATE asio::asio cjson ${CMAKE_PROJECT_NAME})
 
 target_compile_options(beauty_ws_chat_client_example PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+# HTTP client example
+add_executable(beauty_http_client_example
+	pc/http_client_main.cpp
+)
+
+target_include_directories(beauty_http_client_example PRIVATE
+	${CMAKE_SOURCE_DIR}/examples/pc
+	${CMAKE_SOURCE_DIR}/src
+)
+
+target_link_libraries(beauty_http_client_example PRIVATE asio::asio cjson ${CMAKE_PROJECT_NAME})
+
+target_compile_options(beauty_http_client_example PRIVATE -Wall -Wextra -Wpedantic -Werror)

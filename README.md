@@ -40,6 +40,7 @@ Beauty was born with the realization that Asio is supported on ESP32 microcontro
   - [🛣️ Router - REST API Simplified](#️-router---rest-api-simplified)
   - [🔌 WebSocket Support](#-websocket-support)
   - [📡 WebSocket Client](#-websocket-client)
+  - [🌐 HTTP Client](#-http-client)
 
 ## 📦 Dependencies
 - **Asio (non-boost)** - Async I/O operations
@@ -1038,6 +1039,96 @@ Two ready-to-run example clients are provided under `examples/pc` (build with
 
 # Terminal 3 - interactive chat client
 ./build/examples/beauty_ws_chat_client_example ws://127.0.0.1:8080/ws/chat
+```
+
+## 🌐 HTTP Client
+
+Beauty also includes an asynchronous HTTP/1.1 client (`HttpClient`) that
+follows the same design principles as the WebSocket client: fixed-size
+buffers, shared `asio::io_context`, and fully callback-driven operation.
+This makes it suitable for device-to-device REST calls (e.g. one ESP32
+querying another) as well as general-purpose HTTP requests.
+
+### Key Features
+
+- **Fixed memory footprint**: Configurable `maxResponseSize` bounds both
+  the receive buffer and the accumulated response body.
+- **Shared event loop**: Runs on the same `io_context` as the server and
+  WebSocket client.
+- **Keep-alive**: Optional TCP connection reuse for sequential requests
+  to the same host.
+- **Request timeout**: Configurable deadline covering resolve, connect,
+  send and receive.
+- **Chunked & EOF-delimited bodies**: The response parser handles
+  `Transfer-Encoding: chunked`, `Content-Length`, and connection-close
+  delimited responses.
+- **1xx interim responses**: Automatically skipped (e.g. `100 Continue`).
+
+### Handling Responses
+
+Implement the `IHttpClientHandler` interface:
+
+```cpp
+#include "beauty/i_http_client_handler.hpp"
+
+class MyHandler : public beauty::IHttpClientHandler {
+public:
+    void onResponse(const beauty::Response& response) override {
+        // response.statusCode_, response.headers_, response.body_
+    }
+
+    void onError(const std::string& error) override {
+        // Timeout, connection refused, parse error, etc.
+    }
+};
+```
+
+### Making Requests
+
+```cpp
+#include "beauty/http_client.hpp"
+
+asio::io_context ioc;
+MyHandler handler;
+
+beauty::HttpClient::Config config;
+config.maxResponseSize  = 4096;               // Max body size (bytes)
+config.requestTimeout   = std::chrono::seconds(5);
+config.keepAlive        = true;               // Reuse connections
+
+auto client = beauty::HttpClient::create(ioc, handler, config);
+
+// Convenience methods
+client->get("http://192.168.1.10:8080/api/status");
+client->post("http://192.168.1.10:8080/api/data",
+             "application/json", "{\"key\":\"value\"}");
+
+// Or the generic request() for any method
+client->request("DELETE", "http://192.168.1.10:8080/api/item/42");
+
+ioc.run();
+```
+
+The `http://` scheme is assumed when no scheme is present, so
+`192.168.1.10:8080/path` works as well.
+
+> **Note:** Only one request may be in flight at a time. Issue the next
+> request from within the `onResponse` / `onError` callback or after it
+> returns.
+
+### Example Client
+
+A ready-to-run example is provided under `examples/pc`:
+
+```bash
+# Start the server demo
+./build/examples/beauty_example 127.0.0.1 8080 www
+
+# GET request
+./build/examples/beauty_http_client_example http://127.0.0.1:8080/index.html
+
+# POST request with body
+./build/examples/beauty_http_client_example http://127.0.0.1:8080/api POST '{"key":"value"}'
 ```
 
 
