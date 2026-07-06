@@ -109,6 +109,7 @@ bool HttpClient::put(const std::string &url,
 void HttpClient::startRequest() {
     requestInProgress_ = true;
     responseParser_.reset();
+    responseParser_.setHeadRequest(method_ == "HEAD");
     response_.reset();
     recvBuffer_.clear();
     bodyBuffer_.clear();

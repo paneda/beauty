@@ -21,6 +21,11 @@ class ResponseParser {
     // this, parse() returns too_large. Defaults to no limit.
     void setMaxBodySize(size_t maxBodySize);
 
+    // Tell the parser that the request method was HEAD. HEAD responses never
+    // carry a body regardless of Content-Length. Must be called after reset()
+    // and before parse(). Not cleared by reset() (same lifetime as maxBodySize).
+    void setHeadRequest(bool head);
+
     // Result of parse.
     enum result_type {
         good_complete,        // A complete response (status line + headers + body) parsed
@@ -93,6 +98,7 @@ class ResponseParser {
     bool chunkSizeDigitSeen_ = false;
     std::size_t chunkRemaining_ = 0;
     std::size_t maxBodySize_ = std::numeric_limits<size_t>::max();
+    bool headRequest_ = false;
 };
 
 }  // namespace beauty

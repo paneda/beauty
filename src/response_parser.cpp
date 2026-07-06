@@ -24,6 +24,10 @@ void ResponseParser::setMaxBodySize(size_t maxBodySize) {
     maxBodySize_ = maxBodySize;
 }
 
+void ResponseParser::setHeadRequest(bool head) {
+    headRequest_ = head;
+}
+
 ResponseParser::result_type ResponseParser::finish(Response &res) {
     // The peer closed the connection. A response with neither Content-Length
     // nor chunked encoding is delimited by the close itself, so whatever body
@@ -415,6 +419,12 @@ ResponseParser::result_type ResponseParser::checkResponseAfterAllHeaders(Respons
 
     // 204 No Content and 304 Not Modified never carry a body.
     if (res.statusCode_ == 204 || res.statusCode_ == 304) {
+        noBodyExpected_ = true;
+        return indeterminate;
+    }
+
+    // HEAD responses never carry a body regardless of Content-Length.
+    if (headRequest_) {
         noBodyExpected_ = true;
         return indeterminate;
     }

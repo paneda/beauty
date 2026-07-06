@@ -123,6 +123,18 @@ TEST_CASE("http client request/response", "[http_client]") {
         REQUIRE(handler.lastStatus_ == 404);
     }
 
+    SECTION("should HEAD a resource and get no body") {
+        TestHttpHandler handler(ioc);
+        auto client = HttpClient::create(ioc, handler);
+        REQUIRE(client->head(base + "/hello"));
+        ioc.run();
+
+        REQUIRE(handler.error_.empty());
+        REQUIRE(handler.responseCount_ == 1);
+        REQUIRE(handler.lastStatus_ == 200);
+        REQUIRE(handler.lastBody_.empty());
+    }
+
     SECTION("should POST a body and receive it echoed back") {
         TestHttpHandler handler(ioc);
         auto client = HttpClient::create(ioc, handler);
