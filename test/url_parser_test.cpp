@@ -28,6 +28,18 @@ TEST_CASE("http", "[url_parser]") {
         REQUIRE(parser.path() == "/");
     }
 
+    SECTION("it should parse hostname with port but no path") {
+        const char *text = "http://127.0.0.1:8080";
+        UrlParser parser(text);
+
+        REQUIRE(parser.isValid() == true);
+        REQUIRE(parser.scheme() == "http");
+        REQUIRE(parser.hostname() == "127.0.0.1");
+        REQUIRE(parser.port() == "8080");
+        REQUIRE(parser.httpPort() == 8080);
+        REQUIRE(parser.path() == "/");
+    }
+
     SECTION("it should parse url with username") {
         const char *text =
             "http://username@www.example.com/dir/subdir?param=1&param=2;param%20=%20#fragment";
