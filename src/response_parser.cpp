@@ -393,7 +393,11 @@ void ResponseParser::storeHeaderValueIfNeeded(Response &res) {
             contentLength_ = actualContentLength;
         }
     } else if (strcasecmp(h.name_.c_str(), "Transfer-Encoding") == 0) {
-        if (strcasecmp(h.value_.c_str(), "chunked") == 0) {
+        // Handle both bare "chunked" and lists like "gzip, chunked".
+        // Per HTTP/1.1, chunked is always the last transfer-coding when present.
+        std::string lower = h.value_;
+        std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+        if (lower.find("chunked") != std::string::npos) {
             res.isChunked_ = true;
         }
     } else if (strcasecmp(h.name_.c_str(), "Connection") == 0) {
