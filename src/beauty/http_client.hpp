@@ -65,12 +65,9 @@ class HttpClient : public std::enable_shared_from_this<HttpClient> {
                  const std::string &body = std::string());
 
     // Convenience wrappers around request().
-    bool get(const std::string &url,
-             const std::vector<Header> &headers = std::vector<Header>());
-    bool head(const std::string &url,
-              const std::vector<Header> &headers = std::vector<Header>());
-    bool del(const std::string &url,
-             const std::vector<Header> &headers = std::vector<Header>());
+    bool get(const std::string &url, const std::vector<Header> &headers = std::vector<Header>());
+    bool head(const std::string &url, const std::vector<Header> &headers = std::vector<Header>());
+    bool del(const std::string &url, const std::vector<Header> &headers = std::vector<Header>());
     bool post(const std::string &url,
               const std::string &contentType,
               const std::string &body,
@@ -132,13 +129,13 @@ class HttpClient : public std::enable_shared_from_this<HttpClient> {
 };
 
 inline std::shared_ptr<HttpClient> HttpClient::create(asio::io_context &ioContext,
-                                                     IHttpClientHandler &handler,
-                                                     const Config &config) {
+                                                      IHttpClientHandler &handler,
+                                                      const Config &config) {
     return std::shared_ptr<HttpClient>(new HttpClient(ioContext, handler, config));
 }
 
 inline std::shared_ptr<HttpClient> HttpClient::create(asio::io_context &ioContext,
-                                                     IHttpClientHandler &handler) {
+                                                      IHttpClientHandler &handler) {
     return std::shared_ptr<HttpClient>(new HttpClient(ioContext, handler, Config()));
 }
 
