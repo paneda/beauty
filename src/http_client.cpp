@@ -143,6 +143,9 @@ void HttpClient::doResolve() {
                             port_,
                             [this, self](const std::error_code &ec,
                                          const asio::ip::tcp::resolver::results_type &endpoints) {
+                                if (!requestInProgress_) {
+                                    return;
+                                }
                                 if (ec) {
                                     reportError("Resolve failed: " + ec.message());
                                     return;
@@ -156,6 +159,9 @@ void HttpClient::doConnect(const asio::ip::tcp::resolver::results_type &endpoint
     asio::async_connect(socket_,
                         endpoints,
                         [this, self](const std::error_code &ec, const asio::ip::tcp::endpoint &) {
+                            if (!requestInProgress_) {
+                                return;
+                            }
                             if (ec) {
                                 reportError("Connect failed: " + ec.message());
                                 return;
@@ -247,11 +253,15 @@ void HttpClient::reportError(const std::string &error) {
 }
 
 void HttpClient::close() {
+    timeoutTimer_.cancel();
+    resolver_.cancel();
+    requestInProgress_ = false;
     closeSocket();
 }
 
 void HttpClient::closeSocket() {
     std::error_code ignore;
+    resolver_.cancel();
     socket_.close(ignore);
     connected_ = false;
     connectedHost_.clear();

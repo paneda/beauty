@@ -16,6 +16,7 @@ void ResponseParser::reset() {
     noBodyExpected_ = false;
     isChunked_ = false;
     interimResponse_ = false;
+    chunkSizeDigitSeen_ = false;
     chunkRemaining_ = 0;
 }
 
@@ -28,6 +29,7 @@ ResponseParser::result_type ResponseParser::finish(Response &res) {
     // nor chunked encoding is delimited by the close itself, so whatever body
     // bytes we accumulated form the complete body.
     if (state_ == body && contentLength_ == std::numeric_limits<size_t>::max() && !isChunked_) {
+        res.keepAlive_ = false;
         return good_complete;
     }
     // Anything else means the connection closed mid-response.
@@ -293,10 +295,17 @@ ResponseParser::result_type ResponseParser::consume(Response &res,
             return indeterminate;
         case chunk_size:
             if (isHexDigit(input)) {
+                chunkSizeDigitSeen_ = true;
                 chunkRemaining_ = chunkRemaining_ * 16 + hexValue(input);
             } else if (input == ';') {
+                if (!chunkSizeDigitSeen_) {
+                    return bad;
+                }
                 state_ = chunk_extension;
             } else if (input == '\r') {
+                if (!chunkSizeDigitSeen_) {
+                    return bad;
+                }
                 state_ = chunk_size_newline;
             } else {
                 return bad;
@@ -338,6 +347,8 @@ ResponseParser::result_type ResponseParser::consume(Response &res,
             if (input != '\n') {
                 return bad;
             }
+            chunkRemaining_ = 0;
+            chunkSizeDigitSeen_ = false;
             state_ = chunk_size;
             return indeterminate;
         case chunk_trailer_start:

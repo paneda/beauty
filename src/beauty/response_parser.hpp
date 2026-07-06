@@ -90,6 +90,7 @@ class ResponseParser {
     bool noBodyExpected_ = false;
     bool isChunked_ = false;
     bool interimResponse_ = false;
+    bool chunkSizeDigitSeen_ = false;
     std::size_t chunkRemaining_ = 0;
     std::size_t maxBodySize_ = std::numeric_limits<size_t>::max();
 };
