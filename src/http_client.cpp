@@ -259,7 +259,20 @@ void HttpClient::deliverResponse() {
         closeSocket();
     }
 
-    handler_.onResponse(response_);
+    // Snapshot the response into stack-locals so that a re-entrant
+    // request() from within onResponse does not mutate the object the
+    // handler is still inspecting.
+    std::vector<char> deliveredBody;
+    deliveredBody.swap(bodyBuffer_);
+    Response snapshot(deliveredBody);
+    snapshot.httpVersionMajor_ = response_.httpVersionMajor_;
+    snapshot.httpVersionMinor_ = response_.httpVersionMinor_;
+    snapshot.statusCode_ = response_.statusCode_;
+    snapshot.statusMessage_.swap(response_.statusMessage_);
+    snapshot.headers_.swap(response_.headers_);
+    snapshot.keepAlive_ = response_.keepAlive_;
+
+    handler_.onResponse(snapshot);
 }
 
 void HttpClient::reportError(const std::string &error) {
