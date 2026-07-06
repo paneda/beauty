@@ -209,4 +209,15 @@ TEST_CASE("http client error handling", "[http_client]") {
         ioc.run();
         REQUIRE_FALSE(handler.error_.empty());
     }
+
+    SECTION("should reject a request body that exceeds maxRequestBodySize") {
+        TestHttpHandler handler(ioc);
+        HttpClient::Config config;
+        config.maxRequestBodySize = 16;
+        auto client = HttpClient::create(ioc, handler, config);
+        std::string bigBody(17, 'x');
+        REQUIRE(client->post("http://127.0.0.1:1/echo", "text/plain", bigBody));
+        ioc.run();
+        REQUIRE(handler.error_ == "Request body exceeds maximum size");
+    }
 }

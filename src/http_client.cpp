@@ -15,7 +15,12 @@ HttpClient::HttpClient(asio::io_context &ioContext,
       config_(config),
       response_(bodyBuffer_),
       responseParser_() {
+    // Default maxRequestBodySize to maxResponseSize when left at 0.
+    if (config_.maxRequestBodySize == 0) {
+        config_.maxRequestBodySize = config_.maxResponseSize;
+    }
     recvBuffer_.reserve(config_.maxResponseSize);
+    sendBuffer_.reserve(config_.maxRequestBodySize);
     bodyBuffer_.reserve(config_.maxResponseSize);
     responseParser_.setMaxBodySize(config_.maxResponseSize);
 }
@@ -47,6 +52,15 @@ bool HttpClient::request(const std::string &method,
     port_ = std::to_string(url_.httpPort());
     method_ = method;
 
+    // Reject bodies that exceed the configured cap.
+    if (body.size() > config_.maxRequestBodySize) {
+        requestInProgress_ = true;
+        auto self(shared_from_this());
+        asio::post(ioContext_,
+                   [this, self]() { reportError("Request body exceeds maximum size"); });
+        return true;
+    }
+
     std::string target = url_.path();
     if (target.empty()) {
         target = "/";
@@ -55,9 +69,9 @@ bool HttpClient::request(const std::string &method,
         target += "?" + url_.query();
     }
 
-    // Render the request head (and body) into a single buffer.
+    // Build only headers into headerBlock_ (bounded, small).
     std::string req;
-    req.reserve(128 + body.size());
+    req.reserve(256);
     req += method_ + " " + target + " HTTP/1.1\r\n";
     req += "Host: " + host_ + ":" + port_ + "\r\n";
     req += std::string("Connection: ") + (config_.keepAlive ? "keep-alive" : "close") + "\r\n";
@@ -68,9 +82,11 @@ bool HttpClient::request(const std::string &method,
         req += "Content-Length: " + std::to_string(body.size()) + "\r\n";
     }
     req += "\r\n";
-    req += body;
 
     headerBlock_ = std::move(req);
+
+    // Store body separately in the fixed-size send buffer.
+    sendBuffer_.assign(body.begin(), body.end());
 
     startRequest();
     return true;
@@ -175,18 +191,21 @@ void HttpClient::doConnect(const asio::ip::tcp::resolver::results_type &endpoint
 }
 
 void HttpClient::doWriteRequest() {
-    sendBuffer_.assign(headerBlock_.begin(), headerBlock_.end());
+    // Scatter-gather write: send headers and body without concatenating.
+    std::array<asio::const_buffer, 2> buffers = {{
+        asio::buffer(headerBlock_),
+        asio::buffer(sendBuffer_),
+    }};
     auto self(shared_from_this());
-    asio::async_write(
-        socket_, asio::buffer(sendBuffer_), [this, self](const std::error_code &ec, std::size_t) {
-            if (ec) {
-                // A keep-alive connection may have been closed by the server
-                // between requests; surface it as an error.
-                reportError("Write failed: " + ec.message());
-                return;
-            }
-            doReadResponse();
-        });
+    asio::async_write(socket_, buffers, [this, self](const std::error_code &ec, std::size_t) {
+        if (ec) {
+            // A keep-alive connection may have been closed by the server
+            // between requests; surface it as an error.
+            reportError("Write failed: " + ec.message());
+            return;
+        }
+        doReadResponse();
+    });
 }
 
 void HttpClient::doReadResponse() {

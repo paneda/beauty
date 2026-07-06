@@ -35,6 +35,11 @@ class HttpClient : public std::enable_shared_from_this<HttpClient> {
         // body, in bytes. Responses whose body exceeds this are rejected.
         size_t maxResponseSize = 1024;
 
+        // Maximum size of a request body, in bytes. Requests with a body
+        // larger than this are rejected with an asynchronous onError.
+        // Defaults to maxResponseSize.
+        size_t maxRequestBodySize = 0;
+
         // Maximum time to wait for a request to complete (resolve + connect +
         // send + receive). 0 disables the timeout.
         std::chrono::milliseconds requestTimeout = std::chrono::milliseconds(5000);
@@ -110,14 +115,14 @@ class HttpClient : public std::enable_shared_from_this<HttpClient> {
 
     // Fixed maximum size buffers.
     std::vector<char> recvBuffer_;  // Socket reads / response parsing input
-    std::vector<char> sendBuffer_;  // Outgoing request bytes
+    std::vector<char> sendBuffer_;  // Outgoing request body (bounded by maxRequestBodySize)
     std::vector<char> bodyBuffer_;  // Response body (referenced by response_)
 
     UrlParser url_;
     std::string host_;
     std::string port_;
     std::string method_;
-    std::string headerBlock_;  // Fully rendered request head + body for the current request
+    std::string headerBlock_;  // Rendered request-line + headers (no body)
 
     Response response_;
     ResponseParser responseParser_;
