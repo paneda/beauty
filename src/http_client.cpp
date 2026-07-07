@@ -23,6 +23,13 @@ HttpClient::HttpClient(asio::io_context &ioContext,
     recvBuffer_.reserve(config_.maxResponseSize);
     sendBuffer_.reserve(config_.maxRequestBodySize);
     bodyBuffer_.reserve(config_.maxResponseSize);
+    // Pre-allocate the write buffer for the maximum combined request size.
+    // The 512-byte header budget covers the request line, Host, Connection,
+    // Content-Length, and a reasonable set of user-supplied headers (the
+    // reserve(256) in request() reflects the typical case).  If a request's
+    // headers happen to exceed this, the vector simply grows once and stays
+    // at the new high-water mark for subsequent requests.
+    writeBuffer_.reserve(512 + config_.maxRequestBodySize);
     responseParser_.setMaxBodySize(config_.maxResponseSize);
 }
 
@@ -192,21 +199,25 @@ void HttpClient::doConnect(const asio::ip::tcp::resolver::results_type &endpoint
 }
 
 void HttpClient::doWriteRequest() {
-    // Scatter-gather write: send headers and body without concatenating.
-    std::array<asio::const_buffer, 2> buffers = {{
-        asio::buffer(headerBlock_),
-        asio::buffer(sendBuffer_),
-    }};
+    // Build a single contiguous write buffer from headerBlock_ + sendBuffer_.
+    // Scatter-gather writes (writev/sendmsg) are not reliably supported on all
+    // platforms (e.g. lwIP on ESP-IDF).  writeBuffer_ is pre-reserved in the
+    // constructor so this copy does not allocate in the common case.
+    writeBuffer_.clear();
+    writeBuffer_.insert(writeBuffer_.end(), headerBlock_.begin(), headerBlock_.end());
+    writeBuffer_.insert(writeBuffer_.end(), sendBuffer_.begin(), sendBuffer_.end());
+
     auto self(shared_from_this());
-    asio::async_write(socket_, buffers, [this, self](const std::error_code &ec, std::size_t) {
-        if (ec) {
-            // A keep-alive connection may have been closed by the server
-            // between requests; surface it as an error.
-            reportError("Write failed: " + ec.message());
-            return;
-        }
-        doReadResponse();
-    });
+    asio::async_write(
+        socket_, asio::buffer(writeBuffer_), [this, self](const std::error_code &ec, std::size_t) {
+            if (ec) {
+                // A keep-alive connection may have been closed by the server
+                // between requests; surface it as an error.
+                reportError("Write failed: " + ec.message());
+                return;
+            }
+            doReadResponse();
+        });
 }
 
 void HttpClient::doReadResponse() {

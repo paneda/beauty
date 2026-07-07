@@ -114,9 +114,10 @@ class HttpClient : public std::enable_shared_from_this<HttpClient> {
     Config config_;
 
     // Fixed maximum size buffers.
-    std::vector<char> recvBuffer_;  // Socket reads / response parsing input
-    std::vector<char> sendBuffer_;  // Outgoing request body (bounded by maxRequestBodySize)
-    std::vector<char> bodyBuffer_;  // Response body (referenced by response_)
+    std::vector<char> recvBuffer_;   // Socket reads / response parsing input
+    std::vector<char> sendBuffer_;   // Outgoing request body (bounded by maxRequestBodySize)
+    std::vector<char> writeBuffer_;  // Combined headers + body for the wire
+    std::vector<char> bodyBuffer_;   // Response body (referenced by response_)
 
     UrlParser url_;
     std::string host_;
