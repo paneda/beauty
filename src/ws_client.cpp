@@ -13,7 +13,7 @@ WsClient::WsClient(asio::io_context &ioContext,
                    const Config &config)
     : ioContext_(ioContext),
       resolver_(ioContext),
-      socket_(ioContext),
+      socket_(std::unique_ptr<PlainSocket>(new PlainSocket(ioContext))),
       reconnectTimer_(ioContext),
       pingTimer_(ioContext),
       random_(random),
@@ -49,7 +49,7 @@ void WsClient::connect(const std::string &urlStr) {
     currentReconnectDelay_ = config_.reconnectInitialDelay;
 
     std::error_code ignore;
-    socket_.close(ignore);
+    socket_->close();
 
     resetForNewConnection();
     doResolve();
@@ -87,14 +87,21 @@ void WsClient::doResolve() {
 
 void WsClient::doConnect(const asio::ip::tcp::resolver::results_type &endpoints) {
     auto self(shared_from_this());
-    asio::async_connect(socket_,
+    socket_->asyncConnect(
                         endpoints,
                         [this, self](const std::error_code &ec, const asio::ip::tcp::endpoint &) {
                             if (ec) {
                                 handleDisconnect("Connect failed: " + ec.message());
                                 return;
                             }
-                            doWriteHandshake();
+                            // For SSL, perform TLS handshake before WebSocket upgrade.
+                            socket_->asyncHandshake(false, [this, self](const std::error_code &ec) {
+                                if (ec) {
+                                    handleDisconnect("TLS handshake failed: " + ec.message());
+                                    return;
+                                }
+                                doWriteHandshake();
+                            });
                         });
 }
 
@@ -114,8 +121,8 @@ void WsClient::doWriteHandshake() {
     sendBuffer_.assign(request.begin(), request.end());
 
     auto self(shared_from_this());
-    asio::async_write(
-        socket_, asio::buffer(sendBuffer_), [this, self](const std::error_code &ec, std::size_t) {
+    socket_->asyncWrite(
+        {asio::buffer(sendBuffer_)}, [this, self](const std::error_code &ec, std::size_t) {
             if (ec) {
                 handleDisconnect("Handshake write failed: " + ec.message());
                 return;
@@ -127,7 +134,7 @@ void WsClient::doWriteHandshake() {
 void WsClient::doReadHandshake() {
     auto self(shared_from_this());
     recvBuffer_.resize(config_.maxMessageSize);
-    socket_.async_read_some(
+    socket_->asyncReadSome(
         asio::buffer(recvBuffer_),
         [this, self](const std::error_code &ec, std::size_t bytesTransferred) {
             if (ec) {
@@ -228,7 +235,7 @@ void WsClient::doReadWs() {
     }
     size_t readSize = config_.maxMessageSize - wsParseOffset_;
     recvBuffer_.resize(wsParseOffset_ + readSize);
-    socket_.async_read_some(asio::buffer(recvBuffer_.data() + wsParseOffset_, readSize),
+    socket_->asyncReadSome(asio::buffer(recvBuffer_.data() + wsParseOffset_, readSize),
                             [this, self](const std::error_code &ec, std::size_t bytesTransferred) {
                                 if (ec) {
                                     handleDisconnect("Read failed: " + ec.message());
@@ -242,8 +249,8 @@ void WsClient::doReadWs() {
 void WsClient::doWriteWsFrame(bool continueReading, WriteCompleteCallback callback) {
     writeInProgress_ = true;
     auto self(shared_from_this());
-    asio::async_write(socket_,
-                      asio::buffer(sendBuffer_),
+    socket_->asyncWrite(
+                      {asio::buffer(sendBuffer_)},
                       [this, self, continueReading, callback](const std::error_code &ec,
                                                               std::size_t bytesWritten) {
                           writeInProgress_ = false;
@@ -350,7 +357,7 @@ void WsClient::finishConnection(bool notifyClose) {
 
     std::error_code ignore;
     pingTimer_.cancel();
-    socket_.close(ignore);
+    socket_->close();
 
     if (notifyClose) {
         handler_.onWsClose();
@@ -371,7 +378,7 @@ void WsClient::handleDisconnect(const std::string &error) {
 
     std::error_code ignore;
     pingTimer_.cancel();
-    socket_.close(ignore);
+    socket_->close();
 
     handler_.onWsError(error);
     if (wasOpen) {

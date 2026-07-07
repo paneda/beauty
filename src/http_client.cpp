@@ -7,10 +7,11 @@ namespace beauty {
 
 HttpClient::HttpClient(asio::io_context &ioContext,
                        IHttpClientHandler &handler,
-                       const Config &config)
+                       const Config &config,
+                       std::unique_ptr<ISocket> socket)
     : ioContext_(ioContext),
       resolver_(ioContext),
-      socket_(ioContext),
+      socket_(std::move(socket)),
       timeoutTimer_(ioContext),
       handler_(handler),
       config_(config),
@@ -141,7 +142,7 @@ void HttpClient::startRequest() {
     startTimeoutTimer();
 
     // Reuse an existing keep-alive connection to the same target if possible.
-    if (connected_ && socket_.is_open() && sameTarget(host_, port_)) {
+    if (connected_ && socket_->isOpen() && sameTarget(host_, port_)) {
         doWriteRequest();
     } else {
         closeSocket();
@@ -181,7 +182,7 @@ void HttpClient::doResolve() {
 
 void HttpClient::doConnect(const asio::ip::tcp::resolver::results_type &endpoints) {
     auto self(shared_from_this());
-    asio::async_connect(socket_,
+    socket_->asyncConnect(
                         endpoints,
                         [this, self](const std::error_code &ec, const asio::ip::tcp::endpoint &) {
                             if (!requestInProgress_) {
@@ -194,8 +195,22 @@ void HttpClient::doConnect(const asio::ip::tcp::resolver::results_type &endpoint
                             connected_ = true;
                             connectedHost_ = host_;
                             connectedPort_ = port_;
-                            doWriteRequest();
+                            doHandshake();
                         });
+}
+
+void HttpClient::doHandshake() {
+    auto self(shared_from_this());
+    socket_->asyncHandshake(false, [this, self](const std::error_code &ec) {
+        if (!requestInProgress_) {
+            return;
+        }
+        if (ec) {
+            reportError("TLS handshake failed: " + ec.message());
+            return;
+        }
+        doWriteRequest();
+    });
 }
 
 void HttpClient::doWriteRequest() {
@@ -208,8 +223,8 @@ void HttpClient::doWriteRequest() {
     writeBuffer_.insert(writeBuffer_.end(), sendBuffer_.begin(), sendBuffer_.end());
 
     auto self(shared_from_this());
-    asio::async_write(
-        socket_, asio::buffer(writeBuffer_), [this, self](const std::error_code &ec, std::size_t) {
+    socket_->asyncWrite(
+        {asio::buffer(writeBuffer_)}, [this, self](const std::error_code &ec, std::size_t) {
             if (ec) {
                 // A keep-alive connection may have been closed by the server
                 // between requests; surface it as an error.
@@ -223,7 +238,7 @@ void HttpClient::doWriteRequest() {
 void HttpClient::doReadResponse() {
     auto self(shared_from_this());
     recvBuffer_.resize(config_.maxResponseSize);
-    socket_.async_read_some(
+    socket_->asyncReadSome(
         asio::buffer(recvBuffer_),
         [this, self](const std::error_code &ec, std::size_t bytesTransferred) {
             if (ec) {
@@ -307,7 +322,7 @@ void HttpClient::close() {
 void HttpClient::closeSocket() {
     std::error_code ignore;
     resolver_.cancel();
-    socket_.close(ignore);
+    socket_->close();
     connected_ = false;
     connectedHost_.clear();
     connectedPort_.clear();

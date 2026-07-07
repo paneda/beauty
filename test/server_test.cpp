@@ -10,6 +10,7 @@
 #include "utils/test_client.hpp"
 
 #include "beauty/server.hpp"
+#include "beauty/i_socket.hpp"
 #include "beauty/request_handler.hpp"
 
 using namespace std::literals::chrono_literals;
@@ -901,6 +902,75 @@ TEST_CASE("server with write fileIO with 100-continue support", "[server]") {
         auto res = fut.get();
 
         REQUIRE(res.statusCode_ == 417);  // Expectation Failed
+    }
+
+    ioc.stop();
+    t.join();
+}
+
+// --- ISocket / PlainSocket tests ---
+// Verify that the ISocket abstraction layer works correctly with PlainSocket,
+// ensuring the refactoring for SSL support does not break plain HTTP.
+
+TEST_CASE("PlainSocket implements ISocket interface", "[server][isocket]") {
+    asio::io_context ioc;
+
+    SECTION("it should report not open when freshly constructed") {
+        PlainSocket sock(ioc);
+        REQUIRE(sock.isOpen() == false);
+    }
+
+    SECTION("it should expose the underlying tcp socket") {
+        PlainSocket sock(ioc);
+        asio::ip::tcp::socket& ref = sock.tcpSocket();
+        REQUIRE(ref.is_open() == false);
+    }
+
+    SECTION("it should close without error when not open") {
+        PlainSocket sock(ioc);
+        sock.close();  // Should not throw
+    }
+
+    SECTION("asyncHandshake should complete synchronously with success") {
+        PlainSocket sock(ioc);
+        bool called = false;
+        std::error_code result;
+        sock.asyncHandshake(true, [&](const std::error_code& ec) {
+            called = true;
+            result = ec;
+        });
+        // PlainSocket::asyncHandshake calls the handler synchronously
+        REQUIRE(called == true);
+        REQUIRE(!result);
+    }
+
+    SECTION("needsHandshake should return false") {
+        PlainSocket sock(ioc);
+        REQUIRE(sock.needsHandshake() == false);
+    }
+}
+
+TEST_CASE("server with PlainSocket serves HTTP through ISocket", "[server][isocket]") {
+    // This test verifies that the Connection→ISocket refactoring does not
+    // break the plain HTTP path.  It exercises the full accept→handshake→
+    // read→write→close cycle through PlainSocket.
+    asio::io_context ioc;
+    TestClient c(ioc);
+
+    Settings settings(0s, 0, 0);
+    Server dut(ioc, "127.0.0.1", "0", settings);
+    uint16_t port = dut.getBindedPort();
+    auto t = std::thread(&asio::io_context::run, &ioc);
+
+    SECTION("GET request works through ISocket PlainSocket path") {
+        openConnection(c, "127.0.0.1", port);
+        auto fut = createFutureResult(c);
+        c.sendRequest(GetIndexRequest);
+
+        auto res = fut.get();
+        REQUIRE(res.action_ == TestClient::TestResult::ReadContent);
+        // Without handlers, server returns 501 Not Implemented
+        REQUIRE(res.statusCode_ == 501);
     }
 
     ioc.stop();

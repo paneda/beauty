@@ -11,9 +11,18 @@
 #include "beauty/connection.hpp"
 #include "beauty/connection_manager.hpp"
 #include "beauty/i_file_io.hpp"
+#include "beauty/i_socket.hpp"
 #include "beauty/i_ws_receiver.hpp"
 #include "beauty/request_handler.hpp"
 #include "beauty/ws_endpoint.hpp"
+
+// Forward-declare ssl::context to avoid pulling in <asio/ssl.hpp> when SSL is
+// not used.
+namespace asio {
+namespace ssl {
+class context;
+}
+}  // namespace asio
 
 namespace beauty {
 
@@ -28,10 +37,25 @@ class Server {
                     const Settings &settings,
                     size_t maxContentSize = 1024);
 
+    // Simple constructor with SSL/TLS support.
+    explicit Server(asio::io_context &ioContext,
+                    uint16_t port,
+                    asio::ssl::context &sslCtx,
+                    const Settings &settings,
+                    size_t maxContentSize = 1024);
+
     // Advanced constructor use for OS:s supporting signal_set.
     explicit Server(asio::io_context &ioContext,
                     const std::string &address,
                     const std::string &port,
+                    const Settings &settings,
+                    size_t maxContentSize = 1024);
+
+    // Advanced constructor with SSL/TLS support.
+    explicit Server(asio::io_context &ioContext,
+                    const std::string &address,
+                    const std::string &port,
+                    asio::ssl::context &sslCtx,
                     const Settings &settings,
                     size_t maxContentSize = 1024);
     ~Server() = default;
@@ -51,7 +75,9 @@ class Server {
     void doTick();
 
     std::shared_ptr<asio::signal_set> signals_;
+    asio::io_context &ioContext_;
     asio::ip::tcp::acceptor acceptor_;
+    asio::ssl::context *sslCtx_ = nullptr;
     ConnectionManager connectionManager_;
     RequestHandler requestHandler_;
 

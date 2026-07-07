@@ -11,6 +11,7 @@
 
 #include "beauty/header.hpp"
 #include "beauty/i_http_client_handler.hpp"
+#include "beauty/i_socket.hpp"
 #include "beauty/response.hpp"
 #include "beauty/response_parser.hpp"
 #include "beauty/url_parser.hpp"
@@ -59,6 +60,13 @@ class HttpClient : public std::enable_shared_from_this<HttpClient> {
     static std::shared_ptr<HttpClient> create(asio::io_context &ioContext,
                                               IHttpClientHandler &handler);
 
+    // Create an HTTPS client. The caller must keep sslCtx alive for the
+    // lifetime of the client.
+    static std::shared_ptr<HttpClient> create(asio::io_context &ioContext,
+                                              IHttpClientHandler &handler,
+                                              const Config &config,
+                                              std::unique_ptr<ISocket> socket);
+
     ~HttpClient() = default;
 
     // Perform an HTTP request against the given http:// URL. Returns false (and
@@ -91,11 +99,13 @@ class HttpClient : public std::enable_shared_from_this<HttpClient> {
     }
 
    private:
-    HttpClient(asio::io_context &ioContext, IHttpClientHandler &handler, const Config &config);
+    HttpClient(asio::io_context &ioContext, IHttpClientHandler &handler, const Config &config,
+               std::unique_ptr<ISocket> socket);
 
     void startRequest();
     void doResolve();
     void doConnect(const asio::ip::tcp::resolver::results_type &endpoints);
+    void doHandshake();
     void doWriteRequest();
     void doReadResponse();
     void startTimeoutTimer();
@@ -107,7 +117,7 @@ class HttpClient : public std::enable_shared_from_this<HttpClient> {
 
     asio::io_context &ioContext_;
     asio::ip::tcp::resolver resolver_;
-    asio::ip::tcp::socket socket_;
+    std::unique_ptr<ISocket> socket_;
     asio::steady_timer timeoutTimer_;
 
     IHttpClientHandler &handler_;
@@ -137,12 +147,24 @@ class HttpClient : public std::enable_shared_from_this<HttpClient> {
 inline std::shared_ptr<HttpClient> HttpClient::create(asio::io_context &ioContext,
                                                       IHttpClientHandler &handler,
                                                       const Config &config) {
-    return std::shared_ptr<HttpClient>(new HttpClient(ioContext, handler, config));
+    return std::shared_ptr<HttpClient>(
+        new HttpClient(ioContext, handler, config,
+                       std::unique_ptr<PlainSocket>(new PlainSocket(ioContext))));
 }
 
 inline std::shared_ptr<HttpClient> HttpClient::create(asio::io_context &ioContext,
                                                       IHttpClientHandler &handler) {
-    return std::shared_ptr<HttpClient>(new HttpClient(ioContext, handler, Config()));
+    return std::shared_ptr<HttpClient>(
+        new HttpClient(ioContext, handler, Config(),
+                       std::unique_ptr<PlainSocket>(new PlainSocket(ioContext))));
+}
+
+inline std::shared_ptr<HttpClient> HttpClient::create(asio::io_context &ioContext,
+                                                      IHttpClientHandler &handler,
+                                                      const Config &config,
+                                                      std::unique_ptr<ISocket> socket) {
+    return std::shared_ptr<HttpClient>(
+        new HttpClient(ioContext, handler, config, std::move(socket)));
 }
 
 }  // namespace beauty

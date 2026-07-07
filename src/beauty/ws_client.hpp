@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "beauty/i_ws_client_handler.hpp"
+#include "beauty/i_socket.hpp"
 #include "beauty/response.hpp"
 #include "beauty/response_parser.hpp"
 #include "beauty/url_parser.hpp"
@@ -106,7 +107,7 @@ class WsClient : public std::enable_shared_from_this<WsClient> {
 
     asio::io_context &ioContext_;
     asio::ip::tcp::resolver resolver_;
-    asio::ip::tcp::socket socket_;
+    std::unique_ptr<ISocket> socket_;
     asio::steady_timer reconnectTimer_;
     asio::steady_timer pingTimer_;
 

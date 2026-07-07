@@ -8,7 +8,7 @@
 
 namespace beauty {
 
-Connection::Connection(asio::ip::tcp::socket socket,
+Connection::Connection(std::unique_ptr<ISocket> socket,
                        ConnectionManager& manager,
                        RequestHandler& handler,
                        unsigned connectionId,
@@ -35,11 +35,24 @@ void Connection::start(bool useKeepAlive,
     useKeepAlive_ = useKeepAlive;
     keepAliveTimeout_ = keepAliveTimeout;
     keepAliveMax_ = keepAliveMax;
-    doRead();
+
+    if (socket_->needsHandshake()) {
+        auto self(shared_from_this());
+        socket_->asyncHandshake(true, [this, self](const std::error_code& ec) {
+            if (!ec) {
+                doRead();
+            } else {
+                connectionManager_.debugMsg("Handshake failed: " + ec.message());
+                connectionManager_.stop(shared_from_this());
+            }
+        });
+    } else {
+        doRead();
+    }
 }
 
 void Connection::stop() {
-    socket_.close();
+    socket_->close();
 }
 
 std::chrono::steady_clock::time_point Connection::getLastActivityTime() const {
@@ -152,7 +165,7 @@ void Connection::doRead() {
         }
         size_t readSize = maxContentSize_ - wsParseOffset_;
         recvBuffer_.resize(wsParseOffset_ + readSize);
-        socket_.async_read_some(
+        socket_->asyncReadSome(
             asio::buffer(recvBuffer_.data() + wsParseOffset_, readSize),
             [this, self](std::error_code ec, std::size_t bytesTransferred) {
                 if (!ec) {
@@ -217,7 +230,7 @@ void Connection::doRead() {
 
     // HTTP path — read into the full buffer from position 0.
     recvBuffer_.resize(maxContentSize_);
-    socket_.async_read_some(
+    socket_->asyncReadSome(
         asio::buffer(recvBuffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
             if (!ec) {
                 lastActivityTime_ = std::chrono::steady_clock::now();
@@ -337,7 +350,7 @@ void Connection::doRead() {
 void Connection::doReadBody() {
     recvBuffer_.resize(maxContentSize_);
     auto self(shared_from_this());
-    socket_.async_read_some(
+    socket_->asyncReadSome(
         asio::buffer(recvBuffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
             if (!ec) {
                 lastActivityTime_ = std::chrono::steady_clock::now();
@@ -373,8 +386,8 @@ void Connection::doReadBody() {
 void Connection::doWriteHeaders() {
     handleConnection();
     auto self(shared_from_this());
-    asio::async_write(
-        socket_, reply_.headerToBuffers(), [this, self](std::error_code ec, std::size_t) {
+    socket_->asyncWrite(
+        reply_.headerToBuffers(), [this, self](std::error_code ec, std::size_t) {
             if (!ec) {
                 lastActivityTime_ = std::chrono::steady_clock::now();
 
@@ -398,8 +411,8 @@ void Connection::doWriteReplyContent() {
     // Handle streaming callback before writing
     requestHandler_.handleStreamingRead(connectionId_, reply_);
 
-    asio::async_write(
-        socket_, reply_.contentToBuffers(), [this, self](std::error_code ec, std::size_t) {
+    socket_->asyncWrite(
+        reply_.contentToBuffers(), [this, self](std::error_code ec, std::size_t) {
             if (!ec) {
                 lastActivityTime_ = std::chrono::steady_clock::now();
 
@@ -470,7 +483,7 @@ void Connection::handleWriteCompleted() {
     } else {
         // Initiate graceful connection closure
         std::error_code ignored_ec;
-        socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
+        socket_->shutdown(ignored_ec);
         connectionManager_.stop(shared_from_this());
     }
 }
@@ -481,8 +494,8 @@ void Connection::doWrite100Continue() {
     // Create 100 Continue response as shared_ptr to ensure it outlives the async_write.
     auto continueResponse = std::make_shared<std::string>("HTTP/1.1 100 Continue\r\n\r\n");
 
-    asio::async_write(socket_,
-                      asio::buffer(*continueResponse),
+    socket_->asyncWrite(
+                      {asio::buffer(*continueResponse)},
                       [this, self, continueResponse](std::error_code ec, std::size_t) {
                           (void)continueResponse;
                           if (!ec) {
@@ -501,7 +514,7 @@ void Connection::doWrite100Continue() {
 void Connection::doReadBodyAfter100Continue() {
     recvBuffer_.resize(maxContentSize_);
     auto self(shared_from_this());
-    socket_.async_read_some(
+    socket_->asyncReadSome(
         asio::buffer(recvBuffer_), [this, self](std::error_code ec, std::size_t bytesTransferred) {
             if (!ec) {
                 lastActivityTime_ = std::chrono::steady_clock::now();
@@ -575,8 +588,8 @@ void Connection::handleUpgradeToWebSocket() {
 
 void Connection::doAckWsUpgrade() {
     auto self(shared_from_this());
-    asio::async_write(
-        socket_, reply_.headerToBuffers(), [this, self](std::error_code ec, std::size_t) {
+    socket_->asyncWrite(
+        reply_.headerToBuffers(), [this, self](std::error_code ec, std::size_t) {
             if (!ec) {
                 requestParser_.reset();
                 request_.reset();
@@ -607,7 +620,7 @@ void Connection::doWriteWsFrame(bool continueReading, WriteCompleteCallback call
     auto self(shared_from_this());
     std::vector<asio::const_buffer> buffers;
     buffers.push_back(asio::buffer(sendBuffer_));
-    asio::async_write(socket_,
+    socket_->asyncWrite(
                       buffers,
                       [this, self, continueReading](std::error_code ec, std::size_t bytesWritten) {
                           writeInProgress_ = false;
@@ -639,7 +652,7 @@ void Connection::doWriteWsFrame(bool continueReading, WriteCompleteCallback call
 void Connection::shutdown() {
     // Initiate graceful connection closure
     std::error_code ignored_ec;
-    socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
+    socket_->shutdown(ignored_ec);
     connectionManager_.stop(shared_from_this());
     requestHandler_.closeFile(connectionId_);
 }
