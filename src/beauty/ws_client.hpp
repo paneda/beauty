@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "beauty/i_ws_client_handler.hpp"
+#include "beauty/i_socket.hpp"
 #include "beauty/response.hpp"
 #include "beauty/response_parser.hpp"
 #include "beauty/url_parser.hpp"
@@ -48,49 +49,57 @@ class WsClient : public std::enable_shared_from_this<WsClient> {
         std::chrono::seconds pingInterval = std::chrono::seconds(0);
     };
 
-    WsClient(const WsClient &) = delete;
-    WsClient &operator=(const WsClient &) = delete;
+    WsClient(const WsClient&) = delete;
+    WsClient& operator=(const WsClient&) = delete;
 
-    static std::shared_ptr<WsClient> create(asio::io_context &ioContext,
-                                            IRandom &random,
-                                            IWsClientHandler &handler,
-                                            const Config &config);
+    static std::shared_ptr<WsClient> create(asio::io_context& ioContext,
+                                            IRandom& random,
+                                            IWsClientHandler& handler,
+                                            const Config& config);
 
-    static std::shared_ptr<WsClient> create(asio::io_context &ioContext,
-                                            IRandom &random,
-                                            IWsClientHandler &handler);
+    static std::shared_ptr<WsClient> create(asio::io_context& ioContext,
+                                            IRandom& random,
+                                            IWsClientHandler& handler);
+
+    // Create a WebSocket client with a custom socket (e.g. SslSocket for wss://).
+    static std::shared_ptr<WsClient> create(asio::io_context& ioContext,
+                                            IRandom& random,
+                                            IWsClientHandler& handler,
+                                            const Config& config,
+                                            std::shared_ptr<ISocket> socket);
 
     ~WsClient() = default;
 
     // Start connecting to the given ws:// URL. May be called again to point the
     // client at a different URL (an existing connection is closed first).
-    void connect(const std::string &url);
+    void connect(const std::string& url);
 
     // Send a text frame. Returns SUCCESS if the write was started, otherwise
     // WRITE_IN_PROGRESS or CONNECTION_CLOSED.
-    WriteResult sendText(const std::string &text);
+    WriteResult sendText(const std::string& text);
 
     // Send a binary frame.
-    WriteResult sendBinary(const std::vector<char> &data);
+    WriteResult sendBinary(const std::vector<char>& data);
 
     // Send a ping frame (no-op if not open or a write is already in progress).
     void sendPing();
 
     // Initiate a graceful close. Disables auto-reconnect for this close.
-    void close(uint16_t statusCode = 1000, const std::string &reason = "");
+    void close(uint16_t statusCode = 1000, const std::string& reason = "");
 
     bool isOpen() const {
         return isOpen_;
     }
 
    private:
-    WsClient(asio::io_context &ioContext,
-             IRandom &random,
-             IWsClientHandler &handler,
-             const Config &config);
+    WsClient(asio::io_context& ioContext,
+             IRandom& random,
+             IWsClientHandler& handler,
+             const Config& config,
+             std::shared_ptr<ISocket> socket);
 
     void doResolve();
-    void doConnect(const asio::ip::tcp::resolver::results_type &endpoints);
+    void doConnect(const asio::ip::tcp::resolver::results_type& endpoints);
     void doWriteHandshake();
     void doReadHandshake();
     void processWsBuffer();
@@ -99,19 +108,19 @@ class WsClient : public std::enable_shared_from_this<WsClient> {
     void startPingTimer();
 
     void finishConnection(bool notifyClose);
-    void handleDisconnect(const std::string &error);
+    void handleDisconnect(const std::string& error);
     void scheduleReconnect();
 
     void resetForNewConnection();
 
-    asio::io_context &ioContext_;
+    asio::io_context& ioContext_;
     asio::ip::tcp::resolver resolver_;
-    asio::ip::tcp::socket socket_;
+    std::shared_ptr<ISocket> socket_;
     asio::steady_timer reconnectTimer_;
     asio::steady_timer pingTimer_;
 
-    IRandom &random_;
-    IWsClientHandler &handler_;
+    IRandom& random_;
+    IWsClientHandler& handler_;
     Config config_;
 
     // Buffers (fixed maximum size, mirroring the server).
@@ -152,17 +161,31 @@ class WsClient : public std::enable_shared_from_this<WsClient> {
     std::chrono::milliseconds currentReconnectDelay_;
 };
 
-inline std::shared_ptr<WsClient> WsClient::create(asio::io_context &ioContext,
-                                                  IRandom &random,
-                                                  IWsClientHandler &handler,
-                                                  const Config &config) {
-    return std::shared_ptr<WsClient>(new WsClient(ioContext, random, handler, config));
+inline std::shared_ptr<WsClient> WsClient::create(asio::io_context& ioContext,
+                                                  IRandom& random,
+                                                  IWsClientHandler& handler,
+                                                  const Config& config) {
+    return std::shared_ptr<WsClient>(new WsClient(
+        ioContext, random, handler, config, std::shared_ptr<ISocket>(new PlainSocket(ioContext))));
 }
 
-inline std::shared_ptr<WsClient> WsClient::create(asio::io_context &ioContext,
-                                                  IRandom &random,
-                                                  IWsClientHandler &handler) {
-    return std::shared_ptr<WsClient>(new WsClient(ioContext, random, handler, Config()));
+inline std::shared_ptr<WsClient> WsClient::create(asio::io_context& ioContext,
+                                                  IRandom& random,
+                                                  IWsClientHandler& handler) {
+    return std::shared_ptr<WsClient>(
+        new WsClient(ioContext,
+                     random,
+                     handler,
+                     Config(),
+                     std::shared_ptr<ISocket>(new PlainSocket(ioContext))));
+}
+
+inline std::shared_ptr<WsClient> WsClient::create(asio::io_context& ioContext,
+                                                  IRandom& random,
+                                                  IWsClientHandler& handler,
+                                                  const Config& config,
+                                                  std::shared_ptr<ISocket> socket) {
+    return std::shared_ptr<WsClient>(new WsClient(ioContext, random, handler, config, socket));
 }
 
 }  // namespace beauty

@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 
+#include "beauty/i_socket.hpp"
 #include "beauty/reply.hpp"
 #include "beauty/request.hpp"
 #include "beauty/request_decoder.hpp"
@@ -25,13 +26,13 @@ class WsEndpoint;
 // Represents a single connection from a client.
 class Connection : public std::enable_shared_from_this<Connection> {
    public:
-    Connection(const Connection &) = delete;
-    Connection &operator=(const Connection &) = delete;
+    Connection(const Connection&) = delete;
+    Connection& operator=(const Connection&) = delete;
 
     // Construct a connection with the given socket.
-    explicit Connection(asio::ip::tcp::socket socket,
-                        ConnectionManager &manager,
-                        RequestHandler &handler,
+    explicit Connection(std::shared_ptr<ISocket> socket,
+                        ConnectionManager& manager,
+                        RequestHandler& handler,
                         unsigned connectionId,
                         size_t maxContentSize);
     ~Connection() = default;
@@ -51,16 +52,16 @@ class Connection : public std::enable_shared_from_this<Connection> {
     bool useKeepAlive() const;
     bool isWebSocket() const;
     unsigned getConnectionId() const;
-    WsEndpoint *getWsEndpoint() const;
+    WsEndpoint* getWsEndpoint() const;
     void sendWsPing();
 
     // WebSocket write state query
     bool isWriteInProgress() const;
 
-    WriteResult sendWsText(const std::string &message, WriteCompleteCallback callback);
-    WriteResult sendWsBinary(const std::vector<char> &data, WriteCompleteCallback callback);
+    WriteResult sendWsText(const std::string& message, WriteCompleteCallback callback);
+    WriteResult sendWsBinary(const std::vector<char>& data, WriteCompleteCallback callback);
     WriteResult sendWsClose(uint16_t statusCode = 1000,
-                            const std::string &reason = "",
+                            const std::string& reason = "",
                             WriteCompleteCallback callback = nullptr);
 
    private:
@@ -84,13 +85,13 @@ class Connection : public std::enable_shared_from_this<Connection> {
     void shutdown();
 
     // Socket for the connection.
-    asio::ip::tcp::socket socket_;
+    std::shared_ptr<ISocket> socket_;
 
     // The manager for this connection.
-    ConnectionManager &connectionManager_;
+    ConnectionManager& connectionManager_;
 
     // The handler used to process the incoming request.
-    RequestHandler &requestHandler_;
+    RequestHandler& requestHandler_;
 
     // The unique id for the connection.
     unsigned connectionId_;
@@ -132,7 +133,7 @@ class Connection : public std::enable_shared_from_this<Connection> {
     std::chrono::steady_clock::time_point lastPongTime_;
 
     // The WebSocket endpoint for this connection (set during upgrade).
-    WsEndpoint *wsEndpoint_ = nullptr;
+    WsEndpoint* wsEndpoint_ = nullptr;
 
     // The received message over WebSocket.
     WsMessage wsMessage_;

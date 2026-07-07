@@ -41,6 +41,7 @@ Beauty was born with the realization that Asio is supported on ESP32 microcontro
   - [🔌 WebSocket Support](#-websocket-support)
   - [📡 WebSocket Client](#-websocket-client)
   - [🌐 HTTP Client](#-http-client)
+  - [🔒 SSL/TLS Support](#-ssltls-support)
 
 ## 📦 Dependencies
 - **Asio (non-boost)** - Async I/O operations
@@ -1130,5 +1131,121 @@ A ready-to-run example is provided under `examples/pc`:
 # POST request with body
 ./build/examples/beauty_http_client_example http://127.0.0.1:8080/api POST '{"key":"value"}'
 ```
+
+## 🔒 SSL/TLS Support
+
+Beauty supports SSL/TLS for the server, HTTP client, and WebSocket client
+through ASIO's SSL layer. On ESP-IDF the underlying crypto is provided by
+mbedTLS (hardware-accelerated on most ESP32 variants); on PC/Linux it uses
+OpenSSL.
+
+### Prerequisites
+
+| Platform | Requirement |
+|----------|------------|
+| **ESP-IDF** | Enable `CONFIG_ASIO_SSL_SUPPORT=y` in menuconfig (`Component config → ESP-ASIO → Enable SSL/TLS support for ASIO`) |
+| **PC/Linux** | Install OpenSSL development headers (`libssl-dev` / `openssl-devel`) |
+
+### HTTPS Server
+
+Create an `asio::ssl::context`, load your certificate and private key, and
+pass it to the `Server` constructor. Beauty will accept TLS connections and
+perform the handshake automatically before reading HTTP requests.
+
+```cpp
+#include <asio/ssl.hpp>
+#include "beauty/server.hpp"
+#include "beauty/ssl_socket.hpp"
+
+asio::io_context ioc;
+
+// Set up SSL context
+asio::ssl::context sslCtx(asio::ssl::context::tlsv12);
+sslCtx.set_options(asio::ssl::context::default_workarounds |
+                   asio::ssl::context::no_sslv2);
+
+// Load cert chain and private key (must be null-terminated for mbedTLS)
+std::string certPem = /* read from file */;
+std::string keyPem  = /* read from file */;
+sslCtx.use_certificate_chain(asio::buffer(certPem.c_str(), certPem.size() + 1));
+sslCtx.use_private_key(asio::buffer(keyPem.c_str(), keyPem.size() + 1),
+                       asio::ssl::context::pem);
+
+beauty::Settings settings(std::chrono::seconds(5), 1000, 20);
+
+// HTTPS on port 443
+beauty::Server httpsServer(ioc, 443, sslCtx, settings, 4096);
+httpsServer.setFileIO(&fileIO);
+httpsServer.addRequestHandler(myHandler);
+
+// Optional: plain HTTP fallback on port 80 (dual-port)
+beauty::Server httpServer(ioc, 80, settings, 4096);
+httpServer.setFileIO(&fileIO);
+httpServer.addRequestHandler(myHandler);
+
+ioc.run();
+```
+
+> **Note (mbedTLS):** PEM buffers passed to `use_certificate_chain()` and
+> `use_private_key()` must be **null-terminated**. Use
+> `asio::buffer(pem.c_str(), pem.size() + 1)` to include the terminator.
+
+### HTTPS Client
+
+Pass a pre-configured `SslSocket` to `HttpClient::create()`:
+
+```cpp
+#include <asio/ssl.hpp>
+#include "beauty/http_client.hpp"
+#include "beauty/ssl_socket.hpp"
+
+asio::io_context ioc;
+MyHandler handler;
+
+asio::ssl::context sslCtx(asio::ssl::context::tlsv12_client);
+sslCtx.set_default_verify_paths();  // Use system CA bundle
+
+beauty::HttpClient::Config config;
+config.maxResponseSize = 4096;
+config.requestTimeout  = std::chrono::seconds(10);
+
+auto socket = std::shared_ptr<beauty::ISocket>(new beauty::SslSocket(ioc, sslCtx));
+auto client = beauty::HttpClient::create(ioc, handler, config, socket);
+
+client->get("https://www.example.com/");
+ioc.run();
+```
+
+### Memory Considerations (ESP32)
+
+Each TLS connection uses approximately 40–60 KB of heap for mbedTLS session
+state and crypto buffers. Plan for 2–4 concurrent HTTPS connections on
+typical ESP32 devices. The `CONFIG_ASIO_SSL_BIO_SIZE` setting (default 1024)
+controls the per-connection BIO buffer — increase it if TLS throughput is
+insufficient.
+
+### Known Limitations (ESP-IDF)
+
+- **HTTPS server** works fully — certificate loading, TLS handshake, and
+  encrypted HTTP serving are all functional.
+- **HTTPS client** is architecturally supported (the `ISocket`/`SslSocket`
+  plumbing is in place), but ESP-IDF's ASIO SSL port (mbedTLS-backed) does
+  not implement client-side context APIs such as `set_verify_mode()`,
+  `set_default_verify_paths()`, or SNI configuration. HTTPS client
+  connections require ESP-IDF ASIO port enhancements. On PC builds with
+  OpenSSL, the HTTPS client works without restrictions.
+
+### Architecture
+
+SSL/TLS is implemented through a type-erased socket interface (`ISocket`)
+with two implementations:
+
+- `PlainSocket` — wraps `asio::ip::tcp::socket` (no encryption)
+- `SslSocket` — wraps `asio::ssl::stream<tcp::socket>` (TLS encryption)
+
+This design keeps `Connection`, `HttpClient`, and `WsClient` as non-template
+classes with zero overhead for plain HTTP builds. The virtual dispatch cost
+per I/O operation is negligible compared to actual network and crypto
+processing.
 
 

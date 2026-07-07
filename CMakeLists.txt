@@ -15,6 +15,7 @@ if(NOT IDF_PATH)
 	endif()
 
 	include(CTest)
+
 	if(BUILD_TESTING)
 		add_subdirectory(test)
 	endif()
@@ -23,9 +24,20 @@ if(NOT IDF_PATH)
 
 	target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE asio::asio cjson)
 
-	target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC 
-	    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-	    $<INSTALL_INTERFACE:include>
+	# Optional SSL/TLS support via OpenSSL
+	find_package(OpenSSL QUIET)
+
+	if(OpenSSL_FOUND)
+		target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+		target_compile_definitions(${CMAKE_PROJECT_NAME} PUBLIC BEAUTY_ENABLE_SSL)
+		message(STATUS "Beauty: SSL/TLS support enabled (OpenSSL ${OPENSSL_VERSION})")
+	else()
+		message(STATUS "Beauty: SSL/TLS support disabled (OpenSSL not found)")
+	endif()
+
+	target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+		$<INSTALL_INTERFACE:include>
 	)
 
 	target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
@@ -54,7 +66,8 @@ endif()
 
 # --- ESP-IDF component support: only active when included as a component ---
 if(IDF_PATH)
-	file (GLOB beauty_sources "src/*.cpp")
+	file(GLOB beauty_sources "src/*.cpp")
+
 	# Register as ESP-IDF component
 	idf_component_register(
 		SRCS ${beauty_sources}

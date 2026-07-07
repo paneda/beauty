@@ -10,6 +10,7 @@
 #include "utils/test_client.hpp"
 
 #include "beauty/server.hpp"
+#include "beauty/i_socket.hpp"
 #include "beauty/request_handler.hpp"
 
 using namespace std::literals::chrono_literals;
@@ -906,3 +907,204 @@ TEST_CASE("server with write fileIO with 100-continue support", "[server]") {
     ioc.stop();
     t.join();
 }
+
+// --- ISocket / PlainSocket tests ---
+// Verify that the ISocket abstraction layer works correctly with PlainSocket,
+// ensuring the refactoring for SSL support does not break plain HTTP.
+
+TEST_CASE("PlainSocket implements ISocket interface", "[server][isocket]") {
+    asio::io_context ioc;
+
+    SECTION("it should report not open when freshly constructed") {
+        PlainSocket sock(ioc);
+        REQUIRE(sock.isOpen() == false);
+    }
+
+    SECTION("it should expose the underlying tcp socket") {
+        PlainSocket sock(ioc);
+        asio::ip::tcp::socket& ref = sock.tcpSocket();
+        REQUIRE(ref.is_open() == false);
+    }
+
+    SECTION("it should close without error when not open") {
+        PlainSocket sock(ioc);
+        sock.close();  // Should not throw
+    }
+
+    SECTION("asyncHandshake should complete synchronously with success") {
+        PlainSocket sock(ioc);
+        bool called = false;
+        std::error_code result;
+        sock.asyncHandshake(true, [&](const std::error_code& ec) {
+            called = true;
+            result = ec;
+        });
+        // PlainSocket::asyncHandshake calls the handler synchronously
+        REQUIRE(called == true);
+        REQUIRE(!result);
+    }
+
+    SECTION("needsHandshake should return false") {
+        PlainSocket sock(ioc);
+        REQUIRE(sock.needsHandshake() == false);
+    }
+}
+
+TEST_CASE("server with PlainSocket serves HTTP through ISocket", "[server][isocket]") {
+    // This test verifies that the Connection→ISocket refactoring does not
+    // break the plain HTTP path.  It exercises the full accept→handshake→
+    // read→write→close cycle through PlainSocket.
+    asio::io_context ioc;
+    TestClient c(ioc);
+
+    Settings settings(0s, 0, 0);
+    Server dut(ioc, "127.0.0.1", "0", settings);
+    uint16_t port = dut.getBindedPort();
+    auto t = std::thread(&asio::io_context::run, &ioc);
+
+    SECTION("GET request works through ISocket PlainSocket path") {
+        openConnection(c, "127.0.0.1", port);
+        auto fut = createFutureResult(c);
+        c.sendRequest(GetIndexRequest);
+
+        auto res = fut.get();
+        REQUIRE(res.action_ == TestClient::TestResult::ReadContent);
+        // Without handlers, server returns 501 Not Implemented
+        REQUIRE(res.statusCode_ == 501);
+    }
+
+    ioc.stop();
+    t.join();
+}
+
+#ifdef BEAUTY_ENABLE_SSL
+#include <asio/ssl.hpp>
+#include "beauty/ssl_socket.hpp"
+
+// Self-signed test certificate and key (localhost, valid 2026–2036).
+// Generated with: openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 3650
+// -nodes -subj '/CN=localhost' These are test-only and contain no secret value.
+static const char TEST_CERT[] =
+    "-----BEGIN CERTIFICATE-----\n"
+    "MIIDCTCCAfGgAwIBAgIUHjkzHDahw+S7eqVS2BFtR09IRUAwDQYJKoZIhvcNAQEL\n"
+    "BQAwFDESMBAGA1UEAwwJbG9jYWxob3N0MB4XDTI2MDcwNzEzNDQ1M1oXDTM2MDcw\n"
+    "NDEzNDQ1M1owFDESMBAGA1UEAwwJbG9jYWxob3N0MIIBIjANBgkqhkiG9w0BAQEF\n"
+    "AAOCAQ8AMIIBCgKCAQEAxSyeOmNSfsGCwv5xr4Eb6GI6vGeNlU0TcJjpBeh1H8/i\n"
+    "AKgjJKdGqWL3nOQWx21uZM7djQKb7UpsmNmFHTXilN4OUrbsoJvEEFvLb0sX0IYA\n"
+    "KECZZvMkiA7MwDo8TOw+/PpVspUnnkpB3PaMeX/rfUCwR/DU1JZzCi/acLcZy8oJ\n"
+    "GhLvoqmZ6BfJbTDFvw6PBwmSkGqLBu7ZQRgEeJ4pCoNkj03DAGTEkjrOUPK2ywzq\n"
+    "2g3Z+ImbmfgdmwVQFsQIgBCHKpcf3jSSaUKv5YWiZFnOep0z7W7MuI7Kynp7o/G+\n"
+    "IuBWpqhUBRNhTAM4/Vhkl/5Qo3lXOgmOaT3/0tsacwIDAQABo1MwUTAdBgNVHQ4E\n"
+    "FgQU0rop38elBlEjWcykuyTQ3rHSt68wHwYDVR0jBBgwFoAU0rop38elBlEjWcyk\n"
+    "uyTQ3rHSt68wDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEARQ01\n"
+    "47UGwF9keWuNLMN+ge5B+LHu7I8pSKDDeILlqQwQ8Mvv5v4ZHch7KxZXr2adgHOF\n"
+    "LthcakXJiFHYnLb2V/1e2gOeyZnYYKBDi2xoq7mT03jZF8ZMZIHOdK4pEzOv1H/K\n"
+    "uGH9qQvijjBznhAZQXwQXuUohxu8fMx40XMUN/t+VWxqVGjjfIZmfjYaPpg8j9TO\n"
+    "X//yB5g+/Rolmt8F4/x6pfr8UZWUH4ubz+fxh939474SlTtWCGtQVGhxhPfl32R9\n"
+    "iAhP0OpDnkSTJByCjcilKhmwpkxf5ThG8v6qEgcrLOKpTFzhYOHTyuLntRKKcYgo\n"
+    "YbgHN0DAKn5U88Ybhw==\n"
+    "-----END CERTIFICATE-----\n";
+
+static const char TEST_KEY[] =
+    "-----BEGIN PRIVATE KEY-----\n"
+    "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDFLJ46Y1J+wYLC\n"
+    "/nGvgRvoYjq8Z42VTRNwmOkF6HUfz+IAqCMkp0apYvec5BbHbW5kzt2NApvtSmyY\n"
+    "2YUdNeKU3g5Stuygm8QQW8tvSxfQhgAoQJlm8ySIDszAOjxM7D78+lWylSeeSkHc\n"
+    "9ox5f+t9QLBH8NTUlnMKL9pwtxnLygkaEu+iqZnoF8ltMMW/Do8HCZKQaosG7tlB\n"
+    "GAR4nikKg2SPTcMAZMSSOs5Q8rbLDOraDdn4iZuZ+B2bBVAWxAiAEIcqlx/eNJJp\n"
+    "Qq/lhaJkWc56nTPtbsy4jsrKenuj8b4i4FamqFQFE2FMAzj9WGSX/lCjeVc6CY5p\n"
+    "Pf/S2xpzAgMBAAECggEAGRFPHIU8G7lmcnv+4B09+xFh/kn8Chs+eXY3SfT/zweS\n"
+    "6Bp4PVS2+xoF+QBWlQwomNBkAmVuhYCMxfIBpnEPWXXRxFpVQyYKizngZ0nYwT4I\n"
+    "DxYHartGzbVz+oxs1irC5068TnQAEXPHY9xEh73npoju4HaR2GU4QvdKgkIFGY9g\n"
+    "nI+YmW4Mlij3bUR1mpEVDGtPZjxtIfUYt7fDsJAJ9P6NYpN41xT2AqnWg/FV5MLX\n"
+    "4hG9woo80CVs1+LA7gUyG49Y6nX+D9A5d6QhWvWhipETmi0bwXimrUAtl8wYqY7k\n"
+    "zfDPBw36tNM6R9Sb71oH1u6vAPgxLcs1ypcUFzt/QQKBgQD6BlYtRxwG2HSZUE5d\n"
+    "bgCEqBeH+KEO21R5apBS5VOrRSjUFZbxxgXaTXj1afSjr43qPAoS69GiXe0xsWgP\n"
+    "jAo4ONIibr/qDJGBdiWkI7pzq4auSXLDqPydXpcsQGdVn9tdtzQzfxTxbkC6Ys51\n"
+    "WPHv5dhRgBSh3oAze/yj6yRWGQKBgQDJ4vCWU/mKkxel56we2kBRe9DdMggPdCsR\n"
+    "ZysLppg1mNkzZ94KTEI+9T7sRAg4CSlSUUaEbe6vDYSP0geofcGNZc0QvNt+44KU\n"
+    "0zu9f3WBjN59II1vsk5LMPQ2sJ0HHghqmHsxib3asuhPT/v95dhon0RqkC8uWkus\n"
+    "G69FltvOawKBgAZmzyINpgwO0r1yLu95d43t99xFY2pL91e8gMF+mavS836qpti9\n"
+    "5zx1q1ktQ1RFlG6g5ukhHJb5rK8PCckMHt7dpZO4HjXR6I/WBJS1TXrUs3gW7VdR\n"
+    "JlapK1m4tGye0TEPFckTweeEmSesi/i5NEieK/G6Q8z5M3MeA5P221FRAoGAIenG\n"
+    "YmpO0/Frmon1RuWAwm9bIZ0i732jMnQzLezZSr+XVORQz0gKJMtLu6KeAtO/Jj3S\n"
+    "67IP00YhC4vLj4k4d0kvjm07LfCH4fot4eJEWfPQ+BH80FOShVz+2SUH68cmwMlG\n"
+    "gIbT5qYBEjmsafUvSjve4UvBMTcn2Qx5f+YcnGsCgYEAwbDwGUDWqGyd2BuJ0PJm\n"
+    "Gxcqw5EavqJQUZpJpPRrNfczJH09i9OyavOfOL/e63SiUnNhPEieQMsv/Gi3v+DI\n"
+    "s5xQ81EqrQqL971z1GTPoTdIax6NY4OODOk8WBtg83XYihOfUMGyJRsMkLfDhA8I\n"
+    "Wdh4yNc0TsVClf4VExc++1g=\n"
+    "-----END PRIVATE KEY-----\n";
+
+TEST_CASE("SslSocket properties", "[server][ssl]") {
+    asio::io_context ioc;
+    asio::ssl::context sslCtx(asio::ssl::context::tlsv12);
+
+    SECTION("needsHandshake should return true") {
+        SslSocket sock(ioc, sslCtx);
+        REQUIRE(sock.needsHandshake() == true);
+    }
+
+    SECTION("it should report not open when freshly constructed") {
+        SslSocket sock(ioc, sslCtx);
+        REQUIRE(sock.isOpen() == false);
+    }
+
+    SECTION("it should close without error when not open") {
+        SslSocket sock(ioc, sslCtx);
+        sock.close();  // Should not throw
+    }
+}
+
+TEST_CASE("SSL server accepts TLS connections", "[server][ssl]") {
+    asio::io_context ioc;
+
+    // Set up SSL context with test certificate
+    asio::ssl::context sslCtx(asio::ssl::context::tlsv12);
+    sslCtx.set_options(asio::ssl::context::default_workarounds | asio::ssl::context::no_sslv2);
+    sslCtx.use_certificate_chain(asio::buffer(TEST_CERT, sizeof(TEST_CERT)));
+    sslCtx.use_private_key(asio::buffer(TEST_KEY, sizeof(TEST_KEY)), asio::ssl::context::pem);
+
+    Settings settings(0s, 0, 0);
+    Server dut(ioc, "127.0.0.1", "0", sslCtx, settings);
+    uint16_t port = dut.getBindedPort();
+    REQUIRE(port != 0);
+
+    auto t = std::thread(&asio::io_context::run, &ioc);
+
+    SECTION("TLS handshake and HTTP request/response cycle") {
+        // Use an SSL client socket to connect, handshake, and send a request
+        asio::ssl::context clientCtx(asio::ssl::context::tlsv12_client);
+        clientCtx.set_verify_mode(asio::ssl::verify_none);  // Self-signed cert
+
+        asio::ip::tcp::resolver resolver(ioc);
+        auto endpoints = resolver.resolve("127.0.0.1", std::to_string(port));
+
+        asio::ssl::stream<asio::ip::tcp::socket> clientStream(ioc, clientCtx);
+        asio::connect(clientStream.next_layer(), endpoints);
+        clientStream.handshake(asio::ssl::stream_base::client);
+
+        // Send a simple HTTP request over TLS
+        std::string request = GetIndexRequest;
+        asio::write(clientStream, asio::buffer(request));
+
+        // Read the response
+        asio::streambuf response;
+        std::error_code ec;
+        asio::read_until(clientStream, response, "\r\n", ec);
+
+        std::istream responseStream(&response);
+        std::string httpVersion;
+        unsigned int statusCode;
+        responseStream >> httpVersion >> statusCode;
+
+        REQUIRE(httpVersion == "HTTP/1.1");
+        // Without handlers, server returns 501
+        REQUIRE(statusCode == 501);
+
+        clientStream.shutdown(ec);  // Ignore shutdown errors
+    }
+
+    ioc.stop();
+    t.join();
+}
+#endif  // BEAUTY_ENABLE_SSL
