@@ -150,23 +150,20 @@ inline std::shared_ptr<HttpClient> HttpClient::create(asio::io_context& ioContex
                                                       IHttpClientHandler& handler,
                                                       const Config& config) {
     return std::shared_ptr<HttpClient>(new HttpClient(
-        ioContext, handler, config,
-        std::shared_ptr<ISocket>(new PlainSocket(ioContext))));
+        ioContext, handler, config, std::shared_ptr<ISocket>(new PlainSocket(ioContext))));
 }
 
 inline std::shared_ptr<HttpClient> HttpClient::create(asio::io_context& ioContext,
                                                       IHttpClientHandler& handler) {
     return std::shared_ptr<HttpClient>(new HttpClient(
-        ioContext, handler, Config(),
-        std::shared_ptr<ISocket>(new PlainSocket(ioContext))));
+        ioContext, handler, Config(), std::shared_ptr<ISocket>(new PlainSocket(ioContext))));
 }
 
 inline std::shared_ptr<HttpClient> HttpClient::create(asio::io_context& ioContext,
                                                       IHttpClientHandler& handler,
                                                       const Config& config,
                                                       std::shared_ptr<ISocket> socket) {
-    return std::shared_ptr<HttpClient>(
-        new HttpClient(ioContext, handler, config, socket));
+    return std::shared_ptr<HttpClient>(new HttpClient(ioContext, handler, config, socket));
 }
 
 }  // namespace beauty

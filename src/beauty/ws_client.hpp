@@ -165,15 +165,19 @@ inline std::shared_ptr<WsClient> WsClient::create(asio::io_context& ioContext,
                                                   IRandom& random,
                                                   IWsClientHandler& handler,
                                                   const Config& config) {
-    return std::shared_ptr<WsClient>(new WsClient(ioContext, random, handler, config,
-        std::shared_ptr<ISocket>(new PlainSocket(ioContext))));
+    return std::shared_ptr<WsClient>(new WsClient(
+        ioContext, random, handler, config, std::shared_ptr<ISocket>(new PlainSocket(ioContext))));
 }
 
 inline std::shared_ptr<WsClient> WsClient::create(asio::io_context& ioContext,
                                                   IRandom& random,
                                                   IWsClientHandler& handler) {
-    return std::shared_ptr<WsClient>(new WsClient(ioContext, random, handler, Config(),
-        std::shared_ptr<ISocket>(new PlainSocket(ioContext))));
+    return std::shared_ptr<WsClient>(
+        new WsClient(ioContext,
+                     random,
+                     handler,
+                     Config(),
+                     std::shared_ptr<ISocket>(new PlainSocket(ioContext))));
 }
 
 inline std::shared_ptr<WsClient> WsClient::create(asio::io_context& ioContext,
