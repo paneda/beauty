@@ -52,7 +52,6 @@ void WsClient::connect(const std::string& urlStr) {
     reconnectEnabled_ = config_.autoReconnect;
     currentReconnectDelay_ = config_.reconnectInitialDelay;
 
-    std::error_code ignore;
     socket_->close();
 
     resetForNewConnection();
@@ -357,7 +356,6 @@ void WsClient::finishConnection(bool notifyClose) {
     finishing_ = true;
     isOpen_ = false;
 
-    std::error_code ignore;
     pingTimer_.cancel();
     socket_->close();
 
@@ -378,7 +376,6 @@ void WsClient::handleDisconnect(const std::string& error) {
     bool wasOpen = isOpen_;
     isOpen_ = false;
 
-    std::error_code ignore;
     pingTimer_.cancel();
     socket_->close();
 

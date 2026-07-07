@@ -322,7 +322,6 @@ void HttpClient::close() {
 }
 
 void HttpClient::closeSocket() {
-    std::error_code ignore;
     resolver_.cancel();
     socket_->close();
     connected_ = false;
