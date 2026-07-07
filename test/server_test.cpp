@@ -981,7 +981,7 @@ TEST_CASE("server with PlainSocket serves HTTP through ISocket", "[server][isock
 #include <asio/ssl.hpp>
 #include "beauty/ssl_socket.hpp"
 
-// Self-signed test certificate and key (localhost, valid 2023–2033).
+// Self-signed test certificate and key (localhost, valid 2026–2036).
 // Generated with: openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 3650
 // -nodes -subj '/CN=localhost' These are test-only and contain no secret value.
 static const char TEST_CERT[] =
