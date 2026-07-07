@@ -19,13 +19,23 @@ class SslSocket : public ISocket {
         asio::async_write(stream_, buffers, std::move(handler));
     }
 
+    void asyncWrite(const asio::const_buffer& buffer, IoHandler handler) override {
+        asio::async_write(stream_, buffer, std::move(handler));
+    }
+
     void close() override {
+        // Send TLS close_notify, then close the underlying TCP socket.
         std::error_code ec;
+        stream_.shutdown(ec);  // SSL shutdown (best-effort, ignore errors)
         stream_.next_layer().close(ec);
     }
 
     void shutdown(std::error_code& ec) override {
-        stream_.next_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        // Perform TLS shutdown handshake, then TCP shutdown.
+        stream_.shutdown(ec);
+        if (!ec) {
+            stream_.next_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        }
     }
 
     bool isOpen() const override {

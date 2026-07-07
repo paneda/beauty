@@ -492,7 +492,7 @@ void Connection::doWrite100Continue() {
     // Create 100 Continue response as shared_ptr to ensure it outlives the async_write.
     auto continueResponse = std::make_shared<std::string>("HTTP/1.1 100 Continue\r\n\r\n");
 
-    socket_->asyncWrite({asio::buffer(*continueResponse)},
+    socket_->asyncWrite(asio::buffer(*continueResponse),
                         [this, self, continueResponse](std::error_code ec, std::size_t) {
                             (void)continueResponse;
                             if (!ec) {

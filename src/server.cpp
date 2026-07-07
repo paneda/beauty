@@ -33,6 +33,8 @@ Server::Server(asio::io_context& ioContext,
       debugMsgCb_(defaultDebugMsgHandler) {
     if (maxContentSize < 1024) {
         debugMsgCb_("maxContentSize must be equal or larger than 1024 bytes");
+        std::error_code ec;
+        acceptor_.close(ec);
         return;
     }
     doAccept();
@@ -52,8 +54,16 @@ Server::Server(asio::io_context& ioContext,
       timer_(ioContext),
       maxContentSize_(maxContentSize),
       debugMsgCb_(defaultDebugMsgHandler) {
+#ifndef BEAUTY_HAS_SSL
+    debugMsgCb_("SSL/TLS support is not compiled in — refusing to serve plaintext on a TLS port");
+    std::error_code ec;
+    acceptor_.close(ec);
+    return;
+#endif
     if (maxContentSize < 1024) {
         debugMsgCb_("maxContentSize must be equal or larger than 1024 bytes");
+        std::error_code ec;
+        acceptor_.close(ec);
         return;
     }
     doAccept();
@@ -84,6 +94,8 @@ Server::Server(asio::io_context& ioContext,
 
     if (maxContentSize < 1024) {
         debugMsgCb_("maxContentSize must be equal or larger than 1024 bytes");
+        std::error_code ec;
+        acceptor_.close(ec);
         return;
     }
     doAwaitStop();
@@ -122,8 +134,17 @@ Server::Server(asio::io_context& ioContext,
     signals_->add(SIGQUIT);
 #endif
 
+#ifndef BEAUTY_HAS_SSL
+    debugMsgCb_("SSL/TLS support is not compiled in — refusing to serve plaintext on a TLS port");
+    std::error_code ec;
+    acceptor_.close(ec);
+    return;
+#endif
+
     if (maxContentSize < 1024) {
         debugMsgCb_("maxContentSize must be equal or larger than 1024 bytes");
+        std::error_code ec;
+        acceptor_.close(ec);
         return;
     }
     doAwaitStop();

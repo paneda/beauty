@@ -225,7 +225,7 @@ void HttpClient::doWriteRequest() {
     writeBuffer_.insert(writeBuffer_.end(), sendBuffer_.begin(), sendBuffer_.end());
 
     auto self(shared_from_this());
-    socket_->asyncWrite({asio::buffer(writeBuffer_)},
+    socket_->asyncWrite(asio::buffer(writeBuffer_),
                         [this, self](const std::error_code& ec, std::size_t) {
                             if (ec) {
                                 // A keep-alive connection may have been closed by the server

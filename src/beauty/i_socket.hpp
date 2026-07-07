@@ -26,6 +26,10 @@ class ISocket {
     // Asynchronous write of a buffer sequence.
     virtual void asyncWrite(const std::vector<asio::const_buffer>& buffers, IoHandler handler) = 0;
 
+    // Asynchronous write of a single contiguous buffer (avoids vector
+    // allocation on the hot path).
+    virtual void asyncWrite(const asio::const_buffer& buffer, IoHandler handler) = 0;
+
     // Close the underlying socket.
     virtual void close() = 0;
 
@@ -63,6 +67,10 @@ class PlainSocket : public ISocket {
 
     void asyncWrite(const std::vector<asio::const_buffer>& buffers, IoHandler handler) override {
         asio::async_write(socket_, buffers, std::move(handler));
+    }
+
+    void asyncWrite(const asio::const_buffer& buffer, IoHandler handler) override {
+        asio::async_write(socket_, buffer, std::move(handler));
     }
 
     void close() override {

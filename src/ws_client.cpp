@@ -123,7 +123,7 @@ void WsClient::doWriteHandshake() {
     sendBuffer_.assign(request.begin(), request.end());
 
     auto self(shared_from_this());
-    socket_->asyncWrite({asio::buffer(sendBuffer_)},
+    socket_->asyncWrite(asio::buffer(sendBuffer_),
                         [this, self](const std::error_code& ec, std::size_t) {
                             if (ec) {
                                 handleDisconnect("Handshake write failed: " + ec.message());
@@ -251,7 +251,7 @@ void WsClient::doReadWs() {
 void WsClient::doWriteWsFrame(bool continueReading, WriteCompleteCallback callback) {
     writeInProgress_ = true;
     auto self(shared_from_this());
-    socket_->asyncWrite({asio::buffer(sendBuffer_)},
+    socket_->asyncWrite(asio::buffer(sendBuffer_),
                         [this, self, continueReading, callback](const std::error_code& ec,
                                                                 std::size_t bytesWritten) {
                             writeInProgress_ = false;
