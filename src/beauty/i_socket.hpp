@@ -24,8 +24,7 @@ class ISocket {
     virtual void asyncReadSome(const asio::mutable_buffer& buffer, IoHandler handler) = 0;
 
     // Asynchronous write of a buffer sequence.
-    virtual void asyncWrite(const std::vector<asio::const_buffer>& buffers,
-                            IoHandler handler) = 0;
+    virtual void asyncWrite(const std::vector<asio::const_buffer>& buffers, IoHandler handler) = 0;
 
     // Close the underlying socket.
     virtual void close() = 0;
@@ -75,9 +74,13 @@ class PlainSocket : public ISocket {
         socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
     }
 
-    bool isOpen() const override { return socket_.is_open(); }
+    bool isOpen() const override {
+        return socket_.is_open();
+    }
 
-    bool needsHandshake() const override { return false; }
+    bool needsHandshake() const override {
+        return false;
+    }
 
     void asyncConnect(const asio::ip::tcp::resolver::results_type& endpoints,
                       ConnectHandler handler) override {
@@ -89,7 +92,9 @@ class PlainSocket : public ISocket {
         handler(std::error_code());
     }
 
-    asio::ip::tcp::socket& tcpSocket() override { return socket_; }
+    asio::ip::tcp::socket& tcpSocket() override {
+        return socket_;
+    }
 
    private:
     asio::ip::tcp::socket socket_;

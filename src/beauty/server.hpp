@@ -28,45 +28,45 @@ namespace beauty {
 
 class Server {
    public:
-    Server(const Server &) = delete;
-    Server &operator=(const Server &) = delete;
+    Server(const Server&) = delete;
+    Server& operator=(const Server&) = delete;
 
     // Simple constructor, use for ESP32.
-    explicit Server(asio::io_context &ioContext,
+    explicit Server(asio::io_context& ioContext,
                     uint16_t port,
-                    const Settings &settings,
+                    const Settings& settings,
                     size_t maxContentSize = 1024);
 
     // Simple constructor with SSL/TLS support.
-    explicit Server(asio::io_context &ioContext,
+    explicit Server(asio::io_context& ioContext,
                     uint16_t port,
-                    asio::ssl::context &sslCtx,
-                    const Settings &settings,
+                    asio::ssl::context& sslCtx,
+                    const Settings& settings,
                     size_t maxContentSize = 1024);
 
     // Advanced constructor use for OS:s supporting signal_set.
-    explicit Server(asio::io_context &ioContext,
-                    const std::string &address,
-                    const std::string &port,
-                    const Settings &settings,
+    explicit Server(asio::io_context& ioContext,
+                    const std::string& address,
+                    const std::string& port,
+                    const Settings& settings,
                     size_t maxContentSize = 1024);
 
     // Advanced constructor with SSL/TLS support.
-    explicit Server(asio::io_context &ioContext,
-                    const std::string &address,
-                    const std::string &port,
-                    asio::ssl::context &sslCtx,
-                    const Settings &settings,
+    explicit Server(asio::io_context& ioContext,
+                    const std::string& address,
+                    const std::string& port,
+                    asio::ssl::context& sslCtx,
+                    const Settings& settings,
                     size_t maxContentSize = 1024);
     ~Server() = default;
 
     uint16_t getBindedPort() const;
 
     // Handlers to be optionally implemented.
-    void setFileIO(IFileIO *fileIO);
-    void addRequestHandler(const handlerCallback &cb);
-    void setExpectContinueHandler(const handlerCallback &cb);
-    void setDebugMsgHandler(const debugMsgCallback &cb);
+    void setFileIO(IFileIO* fileIO);
+    void addRequestHandler(const handlerCallback& cb);
+    void setExpectContinueHandler(const handlerCallback& cb);
+    void setDebugMsgHandler(const debugMsgCallback& cb);
     void setWsEndpoints(std::set<std::shared_ptr<WsEndpoint>> endpoints);
 
    private:
@@ -75,9 +75,9 @@ class Server {
     void doTick();
 
     std::shared_ptr<asio::signal_set> signals_;
-    asio::io_context &ioContext_;
+    asio::io_context& ioContext_;
     asio::ip::tcp::acceptor acceptor_;
-    asio::ssl::context *sslCtx_ = nullptr;
+    asio::ssl::context* sslCtx_ = nullptr;
     ConnectionManager connectionManager_;
     RequestHandler requestHandler_;
 

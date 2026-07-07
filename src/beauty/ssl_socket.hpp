@@ -28,9 +28,13 @@ class SslSocket : public ISocket {
         stream_.next_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
     }
 
-    bool isOpen() const override { return stream_.next_layer().is_open(); }
+    bool isOpen() const override {
+        return stream_.next_layer().is_open();
+    }
 
-    bool needsHandshake() const override { return true; }
+    bool needsHandshake() const override {
+        return true;
+    }
 
     void asyncConnect(const asio::ip::tcp::resolver::results_type& endpoints,
                       ConnectHandler handler) override {
@@ -38,12 +42,14 @@ class SslSocket : public ISocket {
     }
 
     void asyncHandshake(bool isServer, ErrorHandler handler) override {
-        stream_.async_handshake(isServer ? asio::ssl::stream_base::server
-                                         : asio::ssl::stream_base::client,
-                                std::move(handler));
+        stream_.async_handshake(
+            isServer ? asio::ssl::stream_base::server : asio::ssl::stream_base::client,
+            std::move(handler));
     }
 
-    asio::ip::tcp::socket& tcpSocket() override { return stream_.next_layer(); }
+    asio::ip::tcp::socket& tcpSocket() override {
+        return stream_.next_layer();
+    }
 
    private:
     asio::ssl::stream<asio::ip::tcp::socket> stream_;

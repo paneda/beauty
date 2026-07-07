@@ -5,18 +5,21 @@
 
 namespace beauty {
 
-HttpClient::HttpClient(asio::io_context &ioContext,
-                       IHttpClientHandler &handler,
-                       const Config &config,
-                       std::unique_ptr<ISocket> socket)
+HttpClient::HttpClient(asio::io_context& ioContext,
+                       IHttpClientHandler& handler,
+                       const Config& config,
+                       std::shared_ptr<ISocket> socket)
     : ioContext_(ioContext),
       resolver_(ioContext),
-      socket_(std::move(socket)),
+      socket_(socket),
       timeoutTimer_(ioContext),
       handler_(handler),
       config_(config),
       response_(bodyBuffer_),
       responseParser_() {
+    if (!socket_) {
+        socket_.reset(new PlainSocket(ioContext));
+    }
     // Default maxRequestBodySize to maxResponseSize when left at 0.
     if (config_.maxRequestBodySize == 0) {
         config_.maxRequestBodySize = config_.maxResponseSize;
@@ -34,10 +37,10 @@ HttpClient::HttpClient(asio::io_context &ioContext,
     responseParser_.setMaxBodySize(config_.maxResponseSize);
 }
 
-bool HttpClient::request(const std::string &method,
-                         const std::string &url,
-                         const std::vector<Header> &headers,
-                         const std::string &body) {
+bool HttpClient::request(const std::string& method,
+                         const std::string& url,
+                         const std::vector<Header>& headers,
+                         const std::string& body) {
     if (requestInProgress_) {
         return false;
     }
@@ -84,7 +87,7 @@ bool HttpClient::request(const std::string &method,
     req += method_ + " " + target + " HTTP/1.1\r\n";
     req += "Host: " + host_ + ":" + port_ + "\r\n";
     req += std::string("Connection: ") + (config_.keepAlive ? "keep-alive" : "close") + "\r\n";
-    for (const Header &h : headers) {
+    for (const Header& h : headers) {
         req += h.name_ + ": " + h.value_ + "\r\n";
     }
     if (!body.empty()) {
@@ -101,31 +104,31 @@ bool HttpClient::request(const std::string &method,
     return true;
 }
 
-bool HttpClient::get(const std::string &url, const std::vector<Header> &headers) {
+bool HttpClient::get(const std::string& url, const std::vector<Header>& headers) {
     return request("GET", url, headers, std::string());
 }
 
-bool HttpClient::head(const std::string &url, const std::vector<Header> &headers) {
+bool HttpClient::head(const std::string& url, const std::vector<Header>& headers) {
     return request("HEAD", url, headers, std::string());
 }
 
-bool HttpClient::del(const std::string &url, const std::vector<Header> &headers) {
+bool HttpClient::del(const std::string& url, const std::vector<Header>& headers) {
     return request("DELETE", url, headers, std::string());
 }
 
-bool HttpClient::post(const std::string &url,
-                      const std::string &contentType,
-                      const std::string &body,
-                      const std::vector<Header> &headers) {
+bool HttpClient::post(const std::string& url,
+                      const std::string& contentType,
+                      const std::string& body,
+                      const std::vector<Header>& headers) {
     std::vector<Header> all = headers;
     all.push_back(Header{"Content-Type", contentType});
     return request("POST", url, all, body);
 }
 
-bool HttpClient::put(const std::string &url,
-                     const std::string &contentType,
-                     const std::string &body,
-                     const std::vector<Header> &headers) {
+bool HttpClient::put(const std::string& url,
+                     const std::string& contentType,
+                     const std::string& body,
+                     const std::vector<Header>& headers) {
     std::vector<Header> all = headers;
     all.push_back(Header{"Content-Type", contentType});
     return request("PUT", url, all, body);
@@ -156,7 +159,7 @@ void HttpClient::startTimeoutTimer() {
     }
     auto self(shared_from_this());
     timeoutTimer_.expires_after(config_.requestTimeout);
-    timeoutTimer_.async_wait([this, self](const std::error_code &ec) {
+    timeoutTimer_.async_wait([this, self](const std::error_code& ec) {
         if (!ec && requestInProgress_) {
             reportError("Request timed out");
         }
@@ -167,8 +170,8 @@ void HttpClient::doResolve() {
     auto self(shared_from_this());
     resolver_.async_resolve(host_,
                             port_,
-                            [this, self](const std::error_code &ec,
-                                         const asio::ip::tcp::resolver::results_type &endpoints) {
+                            [this, self](const std::error_code& ec,
+                                         const asio::ip::tcp::resolver::results_type& endpoints) {
                                 if (!requestInProgress_) {
                                     return;
                                 }
@@ -180,28 +183,27 @@ void HttpClient::doResolve() {
                             });
 }
 
-void HttpClient::doConnect(const asio::ip::tcp::resolver::results_type &endpoints) {
+void HttpClient::doConnect(const asio::ip::tcp::resolver::results_type& endpoints) {
     auto self(shared_from_this());
-    socket_->asyncConnect(
-                        endpoints,
-                        [this, self](const std::error_code &ec, const asio::ip::tcp::endpoint &) {
-                            if (!requestInProgress_) {
-                                return;
-                            }
-                            if (ec) {
-                                reportError("Connect failed: " + ec.message());
-                                return;
-                            }
-                            connected_ = true;
-                            connectedHost_ = host_;
-                            connectedPort_ = port_;
-                            doHandshake();
-                        });
+    socket_->asyncConnect(endpoints,
+                          [this, self](const std::error_code& ec, const asio::ip::tcp::endpoint&) {
+                              if (!requestInProgress_) {
+                                  return;
+                              }
+                              if (ec) {
+                                  reportError("Connect failed: " + ec.message());
+                                  return;
+                              }
+                              connected_ = true;
+                              connectedHost_ = host_;
+                              connectedPort_ = port_;
+                              doHandshake();
+                          });
 }
 
 void HttpClient::doHandshake() {
     auto self(shared_from_this());
-    socket_->asyncHandshake(false, [this, self](const std::error_code &ec) {
+    socket_->asyncHandshake(false, [this, self](const std::error_code& ec) {
         if (!requestInProgress_) {
             return;
         }
@@ -223,16 +225,16 @@ void HttpClient::doWriteRequest() {
     writeBuffer_.insert(writeBuffer_.end(), sendBuffer_.begin(), sendBuffer_.end());
 
     auto self(shared_from_this());
-    socket_->asyncWrite(
-        {asio::buffer(writeBuffer_)}, [this, self](const std::error_code &ec, std::size_t) {
-            if (ec) {
-                // A keep-alive connection may have been closed by the server
-                // between requests; surface it as an error.
-                reportError("Write failed: " + ec.message());
-                return;
-            }
-            doReadResponse();
-        });
+    socket_->asyncWrite({asio::buffer(writeBuffer_)},
+                        [this, self](const std::error_code& ec, std::size_t) {
+                            if (ec) {
+                                // A keep-alive connection may have been closed by the server
+                                // between requests; surface it as an error.
+                                reportError("Write failed: " + ec.message());
+                                return;
+                            }
+                            doReadResponse();
+                        });
 }
 
 void HttpClient::doReadResponse() {
@@ -240,7 +242,7 @@ void HttpClient::doReadResponse() {
     recvBuffer_.resize(config_.maxResponseSize);
     socket_->asyncReadSome(
         asio::buffer(recvBuffer_),
-        [this, self](const std::error_code &ec, std::size_t bytesTransferred) {
+        [this, self](const std::error_code& ec, std::size_t bytesTransferred) {
             if (ec) {
                 if (ec == asio::error::eof || ec == asio::error::connection_reset) {
                     // The server closed the connection. If the body was
@@ -302,7 +304,7 @@ void HttpClient::deliverResponse() {
     handler_.onResponse(snapshot);
 }
 
-void HttpClient::reportError(const std::string &error) {
+void HttpClient::reportError(const std::string& error) {
     if (!requestInProgress_) {
         return;
     }
@@ -328,7 +330,7 @@ void HttpClient::closeSocket() {
     connectedPort_.clear();
 }
 
-bool HttpClient::sameTarget(const std::string &host, const std::string &port) const {
+bool HttpClient::sameTarget(const std::string& host, const std::string& port) const {
     return connectedHost_ == host && connectedPort_ == port;
 }
 

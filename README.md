@@ -1209,8 +1209,8 @@ beauty::HttpClient::Config config;
 config.maxResponseSize = 4096;
 config.requestTimeout  = std::chrono::seconds(10);
 
-auto socket = std::make_unique<beauty::SslSocket>(ioc, sslCtx);
-auto client = beauty::HttpClient::create(ioc, handler, config, std::move(socket));
+auto socket = std::shared_ptr<beauty::ISocket>(new beauty::SslSocket(ioc, sslCtx));
+auto client = beauty::HttpClient::create(ioc, handler, config, socket);
 
 client->get("https://www.example.com/");
 ioc.run();

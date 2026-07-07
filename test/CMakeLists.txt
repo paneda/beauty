@@ -26,6 +26,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE BEAUTY_ENABLE_TESTING)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE Catch2::Catch2WithMain asio::asio cjson ${CMAKE_PROJECT_NAME})
 
+# OpenSSL and BEAUTY_ENABLE_SSL are inherited as PUBLIC from beauty_library
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 include_directories(

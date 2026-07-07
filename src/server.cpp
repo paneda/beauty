@@ -7,21 +7,22 @@
 #include "beauty/ws_endpoint.hpp"
 
 // SslSocket requires <asio/ssl.hpp> which is only available when SSL support
-// is enabled. On ESP-IDF this is gated by CONFIG_ASIO_SSL_SUPPORT.
-#if defined(CONFIG_ASIO_SSL_SUPPORT) || defined(BEAUTY_ENABLE_SSL) || defined(ASIO_SSL_HPP)
+// is enabled. On ESP-IDF this is gated by CONFIG_ASIO_SSL_SUPPORT. On PC
+// builds, CMakeLists.txt defines BEAUTY_ENABLE_SSL when OpenSSL is found.
+#if defined(CONFIG_ASIO_SSL_SUPPORT) || defined(BEAUTY_ENABLE_SSL)
 #include "beauty/ssl_socket.hpp"
 #define BEAUTY_HAS_SSL 1
 #endif
 
 namespace {
-void defaultDebugMsgHandler(const std::string &) {}
+void defaultDebugMsgHandler(const std::string&) {}
 }
 
 namespace beauty {
 
-Server::Server(asio::io_context &ioContext,
+Server::Server(asio::io_context& ioContext,
                uint16_t port,
-               const Settings &settings,
+               const Settings& settings,
                size_t maxContentSize)
     : ioContext_(ioContext),
       acceptor_(ioContext, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)),
@@ -38,10 +39,10 @@ Server::Server(asio::io_context &ioContext,
     doTick();
 }
 
-Server::Server(asio::io_context &ioContext,
+Server::Server(asio::io_context& ioContext,
                uint16_t port,
-               asio::ssl::context &sslCtx,
-               const Settings &settings,
+               asio::ssl::context& sslCtx,
+               const Settings& settings,
                size_t maxContentSize)
     : ioContext_(ioContext),
       acceptor_(ioContext, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)),
@@ -59,10 +60,10 @@ Server::Server(asio::io_context &ioContext,
     doTick();
 }
 
-Server::Server(asio::io_context &ioContext,
-               const std::string &address,
-               const std::string &port,
-               const Settings &settings,
+Server::Server(asio::io_context& ioContext,
+               const std::string& address,
+               const std::string& port,
+               const Settings& settings,
                size_t maxContentSize)
     : ioContext_(ioContext),
       acceptor_(ioContext),
@@ -100,11 +101,11 @@ Server::Server(asio::io_context &ioContext,
     doTick();
 }
 
-Server::Server(asio::io_context &ioContext,
-               const std::string &address,
-               const std::string &port,
-               asio::ssl::context &sslCtx,
-               const Settings &settings,
+Server::Server(asio::io_context& ioContext,
+               const std::string& address,
+               const std::string& port,
+               asio::ssl::context& sslCtx,
+               const Settings& settings,
                size_t maxContentSize)
     : ioContext_(ioContext),
       acceptor_(ioContext),
@@ -142,15 +143,15 @@ uint16_t Server::getBindedPort() const {
     return acceptor_.local_endpoint().port();
 }
 
-void Server::setFileIO(IFileIO *fileIO) {
+void Server::setFileIO(IFileIO* fileIO) {
     requestHandler_.setFileIO(fileIO);
 }
 
-void Server::addRequestHandler(const handlerCallback &cb) {
+void Server::addRequestHandler(const handlerCallback& cb) {
     requestHandler_.addRequestHandler(cb);
 }
 
-void Server::setExpectContinueHandler(const handlerCallback &cb) {
+void Server::setExpectContinueHandler(const handlerCallback& cb) {
     requestHandler_.setExpectContinueHandler(cb);
 }
 
@@ -158,7 +159,7 @@ void Server::setWsEndpoints(std::set<std::shared_ptr<WsEndpoint>> endpoints) {
     connectionManager_.setWsEndpoints(endpoints);
 }
 
-void Server::setDebugMsgHandler(const debugMsgCallback &cb) {
+void Server::setDebugMsgHandler(const debugMsgCallback& cb) {
     connectionManager_.setDebugMsgHandler(cb);
     debugMsgCb_ = cb;
 }
@@ -169,26 +170,22 @@ void Server::doAccept() {
         // SSL accept: pre-create the SslSocket so we can accept on its
         // underlying TCP socket, then let Connection::start() perform the
         // TLS handshake before the first read.
-        auto sock = std::unique_ptr<SslSocket>(new SslSocket(ioContext_, *sslCtx_));
-        auto *rawTcp = &sock->tcpSocket();
-        acceptor_.async_accept(
-            *rawTcp,
-            [this, sock = std::move(sock)](std::error_code ec) mutable {
-                if (!acceptor_.is_open()) {
-                    return;
-                }
-                if (!ec) {
-                    connectionManager_.start(std::make_shared<Connection>(std::move(sock),
-                                                                         connectionManager_,
-                                                                         requestHandler_,
-                                                                         connectionId_++,
-                                                                         maxContentSize_));
-                } else {
-                    debugMsgCb_("doAccept(ssl): " + ec.message() + ":" +
-                                std::to_string(ec.value()));
-                }
-                doAccept();
-            });
+        std::shared_ptr<ISocket> sock(new SslSocket(ioContext_, *sslCtx_));
+        acceptor_.async_accept(sock->tcpSocket(), [this, sock](std::error_code ec) {
+            if (!acceptor_.is_open()) {
+                return;
+            }
+            if (!ec) {
+                connectionManager_.start(std::make_shared<Connection>(sock,
+                                                                      connectionManager_,
+                                                                      requestHandler_,
+                                                                      connectionId_++,
+                                                                      maxContentSize_));
+            } else {
+                debugMsgCb_("doAccept(ssl): " + ec.message() + ":" + std::to_string(ec.value()));
+            }
+            doAccept();
+        });
         return;
     }
 #endif
@@ -197,8 +194,8 @@ void Server::doAccept() {
             return;
         }
         if (!ec) {
-            auto sock = std::unique_ptr<PlainSocket>(new PlainSocket(std::move(socket)));
-            connectionManager_.start(std::make_shared<Connection>(std::move(sock),
+            std::shared_ptr<ISocket> sock(new PlainSocket(std::move(socket)));
+            connectionManager_.start(std::make_shared<Connection>(sock,
                                                                   connectionManager_,
                                                                   requestHandler_,
                                                                   connectionId_++,

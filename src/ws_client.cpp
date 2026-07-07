@@ -7,13 +7,14 @@
 
 namespace beauty {
 
-WsClient::WsClient(asio::io_context &ioContext,
-                   IRandom &random,
-                   IWsClientHandler &handler,
-                   const Config &config)
+WsClient::WsClient(asio::io_context& ioContext,
+                   IRandom& random,
+                   IWsClientHandler& handler,
+                   const Config& config,
+                   std::shared_ptr<ISocket> socket)
     : ioContext_(ioContext),
       resolver_(ioContext),
-      socket_(std::unique_ptr<PlainSocket>(new PlainSocket(ioContext))),
+      socket_(socket),
       reconnectTimer_(ioContext),
       pingTimer_(ioContext),
       random_(random),
@@ -24,12 +25,15 @@ WsClient::WsClient(asio::io_context &ioContext,
       wsMessage_(recvBuffer_),
       wsParser_(wsMessage_),
       currentReconnectDelay_(config.reconnectInitialDelay) {
+    if (!socket_) {
+        socket_.reset(new PlainSocket(ioContext));
+    }
     recvBuffer_.reserve(config_.maxMessageSize);
     sendBuffer_.reserve(config_.maxMessageSize);
     bodyBuffer_.reserve(config_.maxMessageSize);
 }
 
-void WsClient::connect(const std::string &urlStr) {
+void WsClient::connect(const std::string& urlStr) {
     if (!url_.parse(urlStr)) {
         handler_.onWsError("Invalid WebSocket URL");
         return;
@@ -75,8 +79,8 @@ void WsClient::doResolve() {
     auto self(shared_from_this());
     resolver_.async_resolve(host_,
                             port_,
-                            [this, self](const std::error_code &ec,
-                                         const asio::ip::tcp::resolver::results_type &endpoints) {
+                            [this, self](const std::error_code& ec,
+                                         const asio::ip::tcp::resolver::results_type& endpoints) {
                                 if (ec) {
                                     handleDisconnect("Resolve failed: " + ec.message());
                                     return;
@@ -85,24 +89,23 @@ void WsClient::doResolve() {
                             });
 }
 
-void WsClient::doConnect(const asio::ip::tcp::resolver::results_type &endpoints) {
+void WsClient::doConnect(const asio::ip::tcp::resolver::results_type& endpoints) {
     auto self(shared_from_this());
     socket_->asyncConnect(
-                        endpoints,
-                        [this, self](const std::error_code &ec, const asio::ip::tcp::endpoint &) {
-                            if (ec) {
-                                handleDisconnect("Connect failed: " + ec.message());
-                                return;
-                            }
-                            // For SSL, perform TLS handshake before WebSocket upgrade.
-                            socket_->asyncHandshake(false, [this, self](const std::error_code &ec) {
-                                if (ec) {
-                                    handleDisconnect("TLS handshake failed: " + ec.message());
-                                    return;
-                                }
-                                doWriteHandshake();
-                            });
-                        });
+        endpoints, [this, self](const std::error_code& ec, const asio::ip::tcp::endpoint&) {
+            if (ec) {
+                handleDisconnect("Connect failed: " + ec.message());
+                return;
+            }
+            // For SSL, perform TLS handshake before WebSocket upgrade.
+            socket_->asyncHandshake(false, [this, self](const std::error_code& ec) {
+                if (ec) {
+                    handleDisconnect("TLS handshake failed: " + ec.message());
+                    return;
+                }
+                doWriteHandshake();
+            });
+        });
 }
 
 void WsClient::doWriteHandshake() {
@@ -121,14 +124,14 @@ void WsClient::doWriteHandshake() {
     sendBuffer_.assign(request.begin(), request.end());
 
     auto self(shared_from_this());
-    socket_->asyncWrite(
-        {asio::buffer(sendBuffer_)}, [this, self](const std::error_code &ec, std::size_t) {
-            if (ec) {
-                handleDisconnect("Handshake write failed: " + ec.message());
-                return;
-            }
-            doReadHandshake();
-        });
+    socket_->asyncWrite({asio::buffer(sendBuffer_)},
+                        [this, self](const std::error_code& ec, std::size_t) {
+                            if (ec) {
+                                handleDisconnect("Handshake write failed: " + ec.message());
+                                return;
+                            }
+                            doReadHandshake();
+                        });
 }
 
 void WsClient::doReadHandshake() {
@@ -136,7 +139,7 @@ void WsClient::doReadHandshake() {
     recvBuffer_.resize(config_.maxMessageSize);
     socket_->asyncReadSome(
         asio::buffer(recvBuffer_),
-        [this, self](const std::error_code &ec, std::size_t bytesTransferred) {
+        [this, self](const std::error_code& ec, std::size_t bytesTransferred) {
             if (ec) {
                 handleDisconnect("Handshake read failed: " + ec.message());
                 return;
@@ -214,8 +217,8 @@ void WsClient::processWsBuffer() {
         if (isOpen_) {
             isOpen_ = false;
             wsEncoder_.encodeCloseFrame(1003, "Fragmented messages not supported");
-            doWriteWsFrame(
-                false, [this](const std::error_code &, std::size_t) { finishConnection(true); });
+            doWriteWsFrame(false,
+                           [this](const std::error_code&, std::size_t) { finishConnection(true); });
         }
     }
 }
@@ -230,60 +233,59 @@ void WsClient::doReadWs() {
         isOpen_ = false;
         wsEncoder_.encodeCloseFrame(1009, "Message too big");
         doWriteWsFrame(false,
-                       [this](const std::error_code &, std::size_t) { finishConnection(true); });
+                       [this](const std::error_code&, std::size_t) { finishConnection(true); });
         return;
     }
     size_t readSize = config_.maxMessageSize - wsParseOffset_;
     recvBuffer_.resize(wsParseOffset_ + readSize);
     socket_->asyncReadSome(asio::buffer(recvBuffer_.data() + wsParseOffset_, readSize),
-                            [this, self](const std::error_code &ec, std::size_t bytesTransferred) {
-                                if (ec) {
-                                    handleDisconnect("Read failed: " + ec.message());
-                                    return;
-                                }
-                                recvBuffer_.resize(wsParseOffset_ + bytesTransferred);
-                                processWsBuffer();
-                            });
+                           [this, self](const std::error_code& ec, std::size_t bytesTransferred) {
+                               if (ec) {
+                                   handleDisconnect("Read failed: " + ec.message());
+                                   return;
+                               }
+                               recvBuffer_.resize(wsParseOffset_ + bytesTransferred);
+                               processWsBuffer();
+                           });
 }
 
 void WsClient::doWriteWsFrame(bool continueReading, WriteCompleteCallback callback) {
     writeInProgress_ = true;
     auto self(shared_from_this());
-    socket_->asyncWrite(
-                      {asio::buffer(sendBuffer_)},
-                      [this, self, continueReading, callback](const std::error_code &ec,
-                                                              std::size_t bytesWritten) {
-                          writeInProgress_ = false;
-                          if (ec) {
-                              if (callback) {
-                                  callback(ec, bytesWritten);
-                              }
-                              handleDisconnect("Write failed: " + ec.message());
-                              return;
-                          }
-                          if (callback) {
-                              callback(ec, bytesWritten);
-                          }
-                          // If close() was called while this write was in
-                          // flight, now send the close frame.
-                          if (closePending_ && !closing_) {
-                              closePending_ = false;
-                              isOpen_ = false;
-                              closing_ = true;
-                              wsEncoder_.encodeCloseFrame(pendingCloseCode_, pendingCloseReason_);
-                              doWriteWsFrame(false,
-                                             [this, self](const std::error_code &, std::size_t) {
-                                                 finishConnection(true);
-                                             });
-                              return;
-                          }
-                          if (continueReading && isOpen_) {
-                              doReadWs();
-                          }
-                      });
+    socket_->asyncWrite({asio::buffer(sendBuffer_)},
+                        [this, self, continueReading, callback](const std::error_code& ec,
+                                                                std::size_t bytesWritten) {
+                            writeInProgress_ = false;
+                            if (ec) {
+                                if (callback) {
+                                    callback(ec, bytesWritten);
+                                }
+                                handleDisconnect("Write failed: " + ec.message());
+                                return;
+                            }
+                            if (callback) {
+                                callback(ec, bytesWritten);
+                            }
+                            // If close() was called while this write was in
+                            // flight, now send the close frame.
+                            if (closePending_ && !closing_) {
+                                closePending_ = false;
+                                isOpen_ = false;
+                                closing_ = true;
+                                wsEncoder_.encodeCloseFrame(pendingCloseCode_, pendingCloseReason_);
+                                doWriteWsFrame(false,
+                                               [this, self](const std::error_code&, std::size_t) {
+                                                   finishConnection(true);
+                                               });
+                                return;
+                            }
+                            if (continueReading && isOpen_) {
+                                doReadWs();
+                            }
+                        });
 }
 
-WriteResult WsClient::sendText(const std::string &text) {
+WriteResult WsClient::sendText(const std::string& text) {
     if (!isOpen_) {
         return WriteResult::CONNECTION_CLOSED;
     }
@@ -295,7 +297,7 @@ WriteResult WsClient::sendText(const std::string &text) {
     return WriteResult::SUCCESS;
 }
 
-WriteResult WsClient::sendBinary(const std::vector<char> &data) {
+WriteResult WsClient::sendBinary(const std::vector<char>& data) {
     if (!isOpen_) {
         return WriteResult::CONNECTION_CLOSED;
     }
@@ -315,7 +317,7 @@ void WsClient::sendPing() {
     doWriteWsFrame(false, nullptr);
 }
 
-void WsClient::close(uint16_t statusCode, const std::string &reason) {
+void WsClient::close(uint16_t statusCode, const std::string& reason) {
     reconnectEnabled_ = false;
     if (!isOpen_) {
         return;
@@ -330,7 +332,7 @@ void WsClient::close(uint16_t statusCode, const std::string &reason) {
     isOpen_ = false;
     closing_ = true;
     wsEncoder_.encodeCloseFrame(statusCode, reason);
-    doWriteWsFrame(false, [this](const std::error_code &, std::size_t) { finishConnection(true); });
+    doWriteWsFrame(false, [this](const std::error_code&, std::size_t) { finishConnection(true); });
 }
 
 void WsClient::startPingTimer() {
@@ -339,7 +341,7 @@ void WsClient::startPingTimer() {
     }
     auto self(shared_from_this());
     pingTimer_.expires_after(config_.pingInterval);
-    pingTimer_.async_wait([this, self](const std::error_code &ec) {
+    pingTimer_.async_wait([this, self](const std::error_code& ec) {
         if (ec || !isOpen_) {
             return;
         }
@@ -368,7 +370,7 @@ void WsClient::finishConnection(bool notifyClose) {
     }
 }
 
-void WsClient::handleDisconnect(const std::string &error) {
+void WsClient::handleDisconnect(const std::string& error) {
     if (finishing_) {
         return;
     }
@@ -401,7 +403,7 @@ void WsClient::scheduleReconnect() {
     }
     currentReconnectDelay_ = next;
 
-    reconnectTimer_.async_wait([this, self](const std::error_code &ec) {
+    reconnectTimer_.async_wait([this, self](const std::error_code& ec) {
         if (ec) {
             return;
         }
