@@ -591,6 +591,13 @@ void Connection::doAckWsUpgrade() {
             request_.reset();
             reply_.reset();
             isWebSocket_ = true;
+            // Start the WS keepalive clocks now, otherwise they stay at the epoch
+            // and tick() would send a ping immediately and could false-trigger the
+            // pong timeout before the client's first pong is processed.
+            auto now = std::chrono::steady_clock::now();
+            lastReceivedTime_ = now;
+            lastPingTime_ = now;
+            lastPongTime_ = now;
             connectionManager_.debugMsg("WebSocket upgraded on path: " + request_.requestPath_);
             if (wsEndpoint_) {
                 wsEndpoint_->onWsOpen(std::to_string(connectionId_));
