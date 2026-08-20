@@ -591,6 +591,13 @@ void Connection::doAckWsUpgrade() {
             request_.reset();
             reply_.reset();
             isWebSocket_ = true;
+            // Start the WS keepalive clocks now, otherwise they stay at the epoch
+            // and tick() would send a ping immediately and could false-trigger the
+            // pong timeout before the client's first pong is processed.
+            auto now = std::chrono::steady_clock::now();
+            lastReceivedTime_ = now;
+            lastPingTime_ = now;
+            lastPongTime_ = now;
             connectionManager_.debugMsg("WebSocket upgraded on path: " + request_.requestPath_);
             if (wsEndpoint_) {
                 wsEndpoint_->onWsOpen(std::to_string(connectionId_));
@@ -620,6 +627,14 @@ void Connection::doWriteWsFrame(bool continueReading, WriteCompleteCallback call
         buffers, [this, self, continueReading](std::error_code ec, std::size_t bytesWritten) {
             writeInProgress_ = false;
 
+            // Detach this write's completion callback up front, before any
+            // success/error handling. Otherwise a user hook (e.g. onWsError) or a
+            // re-entrant send started below could overwrite writeCallback_ and we
+            // would invoke the wrong callback with this write's result while
+            // dropping the original one.
+            WriteCompleteCallback cb = std::move(writeCallback_);
+            writeCallback_ = nullptr;
+
             if (!ec) {
                 lastActivityTime_ = std::chrono::steady_clock::now();
                 if (continueReading) {
@@ -636,10 +651,9 @@ void Connection::doWriteWsFrame(bool continueReading, WriteCompleteCallback call
                 shutdown();
             }
 
-            // Call completion callback if provided
-            if (writeCallback_) {
-                writeCallback_(ec, bytesWritten);
-                writeCallback_ = nullptr;
+            // Invoke this write's completion callback (saved above).
+            if (cb) {
+                cb(ec, bytesWritten);
             }
         });
 }
