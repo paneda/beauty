@@ -192,8 +192,9 @@ Beauty's `Settings` class gives you fine-grained control over resource usage and
 ```cpp
 beauty::Settings settings(
     std::chrono::seconds(30),  // keepAliveTimeout
-    100,                       // keepAliveMax  
-    50                         // connectionLimit
+    100,                       // keepAliveMax
+    50,                        // connectionLimit (hard cap, 0 = unlimited)
+    75                         // keepAliveThresholdPercent (soft threshold)
 );
 ```
 
@@ -201,13 +202,22 @@ beauty::Settings settings(
 |---------|---------|-----------------|
 | `keepAliveTimeout_` | HTTP Keep-Alive timeout | `0s` = HTTP/1.0 mode, `>0s` = HTTP/1.1 |
 | `keepAliveMax_` | Max requests per connection | Balance connection reuse vs memory |
-| `connectionLimit_` | Max concurrent connections | **Critical for embedded**: prevents OOM |
+| `connectionLimit_` | Hard cap on concurrent connections | **Critical for embedded**: bounds memory; connections past the cap get `503` |
+| `keepAliveThresholdPercent_` | Soft threshold (% of the cap) for graceful degradation | Drop keep-alive near the cap so slots free fast; `0` disables, default `75` |
 | `wsReceiveTimeout_` | WebSocket message timeout | Detect dead clients |
 | `wsPingInterval_` | WebSocket ping frequency | Keep connections alive through NAT |
 | `wsPongTimeout_` | WebSocket pong response timeout | Clean up unresponsive clients |
 
-> 💾 **Memory Management**: `connectionLimit_` is your best friend on ESP32 - set it based on available RAM!  
-> ⚡ **Performance**: Keep-Alive reduces connection overhead but accumulates memory usage per connection.
+> 💾 **Memory Management**: `connectionLimit_` is your best friend on ESP32. It is a **hard cap**: once that many
+> connections are open, further connections are refused with `503 Service Unavailable` (and closed) before their
+> buffers are allocated, so memory can't be exhausted. Size it from free heap and the per-connection cost (roughly
+> `2 * maxContentSize`). `0` means unlimited.
+>
+> ⚡ **Graceful degradation**: as the number of open connections reaches `keepAliveThresholdPercent_`% of the cap,
+> new connections are served without keep-alive (`Connection: close`) so they release their slot immediately instead
+> of lingering for `keepAliveTimeout_`. This keeps the server responsive to new clients as it nears the cap. A hard
+> cap still means a client that holds many connections can lock others out, which is a connection-exhaustion tradeoff
+> inherent to any fixed cap; the device stays up and recovers rather than crashing.
 
 ## 🔧 Middleware Development
 

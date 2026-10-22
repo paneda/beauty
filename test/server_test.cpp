@@ -1148,7 +1148,9 @@ TEST_CASE("server enforces the concurrent connection limit", "[server]") {
     mockFileIO.createMockFile(64);
 
     // keepAliveTimeout 5s so the first connection stays open; connectionLimit 1.
-    Settings settings(5s, 100, 1);
+    // keepAliveThresholdPercent 0 disables soft shedding so the first connection
+    // keeps its slot via keep-alive and the second one hits the hard cap.
+    Settings settings(5s, 100, 1, 0);
     Server dut(ioc, "127.0.0.1", "0", settings);
     dut.setFileIO(&mockFileIO);
     uint16_t port = dut.getBindedPort();
@@ -1167,17 +1169,58 @@ TEST_CASE("server enforces the concurrent connection limit", "[server]") {
         REQUIRE(res.statusCode_ == 200);
     }
 
-    // The second connection exceeds the limit. The server closes it without a
-    // response, so the client never reads a status line and times out.
+    // The second connection exceeds the hard cap and is refused with 503.
     openConnection(b, "127.0.0.1", port);
     {
         auto fut = createFutureResult(b, ExpectedResult::StatusLine);
         b.sendRequest(
             "GET /index.html HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
         auto res = fut.get();
-        REQUIRE(res.action_ == TestClient::TestResult::TimedOut);
+        REQUIRE(res.statusCode_ == 503);
     }
 
     ioc.stop();
     t.join();
+}
+
+// Deterministic unit test of the keep-alive decision used by ConnectionManager
+// as connections approach the hard cap. Tagged outside [server] so it is not
+// subject to the networked server harness.
+TEST_CASE("keepAliveAllowed soft threshold logic", "[connection_policy]") {
+    SECTION("keep-alive disabled when keepAliveTimeout is 0") {
+        Settings s(0s, 100, 10, 50);
+        REQUIRE_FALSE(keepAliveAllowed(s, 1));
+        REQUIRE_FALSE(keepAliveAllowed(s, 100));
+    }
+
+    SECTION("always on when there is no hard cap") {
+        Settings s(5s, 100, 0, 50);
+        REQUIRE(keepAliveAllowed(s, 1));
+        REQUIRE(keepAliveAllowed(s, 1000));
+    }
+
+    SECTION("always on up to the cap when threshold percent is 0") {
+        Settings s(5s, 100, 4, 0);
+        REQUIRE(keepAliveAllowed(s, 1));
+        REQUIRE(keepAliveAllowed(s, 4));
+    }
+
+    SECTION("granted below the threshold, withheld at and above it") {
+        // cap 10, threshold 50% => soft limit at 5 connections.
+        Settings s(5s, 100, 10, 50);
+        REQUIRE(keepAliveAllowed(s, 1));
+        REQUIRE(keepAliveAllowed(s, 4));
+        REQUIRE_FALSE(keepAliveAllowed(s, 5));
+        REQUIRE_FALSE(keepAliveAllowed(s, 6));
+    }
+
+    SECTION("withheld on the first connection when the cap is tiny") {
+        // cap 2, threshold 50% => soft limit is one connection.
+        Settings s(5s, 100, 2, 50);
+        REQUIRE_FALSE(keepAliveAllowed(s, 1));
+
+        // cap 1, threshold 100% => the single allowed connection is at the cap.
+        Settings s2(5s, 100, 1, 100);
+        REQUIRE_FALSE(keepAliveAllowed(s2, 1));
+    }
 }

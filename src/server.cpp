@@ -198,7 +198,11 @@ void Server::doAccept() {
             }
             if (!ec) {
                 if (connectionManager_.connectionLimitReached()) {
-                    debugMsgCb_("Connection limit reached; dropping new connection");
+                    // At the hard cap: drop the connection. We cannot send a
+                    // meaningful HTTP 503 before the TLS handshake, and we
+                    // deliberately avoid performing the (expensive) handshake for
+                    // a connection we are going to refuse.
+                    debugMsgCb_("Connection limit reached; dropping new TLS connection");
                     sock->close();
                 } else {
                     connectionManager_.start(
@@ -222,9 +226,24 @@ void Server::doAccept() {
         }
         if (!ec) {
             if (connectionManager_.connectionLimitReached()) {
-                // Refuse the connection before allocating its buffers. The socket
-                // is closed as it goes out of scope at the end of this handler.
-                debugMsgCb_("Connection limit reached; dropping new connection");
+                // At the hard cap: reply 503 and close, without creating a
+                // Connection (so no per-connection buffers are allocated). Keep
+                // the socket and response alive through the async write via the
+                // shared_ptr captures.
+                debugMsgCb_("Connection limit reached; replying 503 to new connection");
+                static const std::string kServiceUnavailable =
+                    "HTTP/1.1 503 Service Unavailable\r\n"
+                    "Connection: close\r\n"
+                    "Content-Length: 0\r\n"
+                    "\r\n";
+                auto refused = std::make_shared<asio::ip::tcp::socket>(std::move(socket));
+                asio::async_write(*refused,
+                                  asio::buffer(kServiceUnavailable),
+                                  [refused](std::error_code, std::size_t) {
+                                      std::error_code ignore;
+                                      refused->shutdown(asio::ip::tcp::socket::shutdown_both, ignore);
+                                      refused->close(ignore);
+                                  });
             } else {
                 std::shared_ptr<ISocket> sock(new PlainSocket(std::move(socket)));
                 connectionManager_.start(std::make_shared<Connection>(
