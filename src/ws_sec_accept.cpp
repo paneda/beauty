@@ -62,7 +62,11 @@ int sha1digest(uint8_t *digest, const char *data, size_t databytes) {
 
             /* Copy byte-per byte from specified buffer */
             while (didx < databytes && wcount >= 0) {
-                W[widx] += (((uint32_t)data[didx]) << wcount);
+                // Cast through unsigned char first: a signed char with the high
+                // bit set would otherwise sign-extend to 0xFFFFFFxx and corrupt
+                // the digest. (Current inputs are ASCII, so this is latent, but
+                // sha1digest is written to accept arbitrary bytes.)
+                W[widx] += (((uint32_t)(uint8_t)data[didx]) << wcount);
                 didx++;
                 wcount -= 8;
             }
