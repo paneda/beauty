@@ -1,6 +1,7 @@
 build
 compile_commands.json
 testfiles/
+www/upload/
 *.idea
 *.vscode
 *.bin

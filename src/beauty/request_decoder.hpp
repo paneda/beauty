@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <string>
 
+#include "beauty/parse_common.hpp"
 #include "beauty/request.hpp"
 
 namespace beauty {
@@ -25,10 +26,21 @@ class RequestDecoder {
             auto c = (*i);
             switch (c) {
                 case '%':
-                    if (i[1] && i[2]) {
-                        char hs[]{i[1], i[2]};
-                        escaped += static_cast<char>(std::strtol(hs, nullptr, 16));
+                    // A percent-escape needs two more characters after '%', and
+                    // both must be hex digits. Bounds-check before touching
+                    // i[1]/i[2]: the input range may be a vector<char> with no
+                    // terminating NUL, so reading past the end is a real
+                    // out-of-bounds access. The previous code also passed a
+                    // non-NUL-terminated 2-char array to strtol, which over-read
+                    // adjacent bytes on every escape.
+                    if (end - i > 2 && isHexDigit(static_cast<unsigned char>(i[1])) &&
+                        isHexDigit(static_cast<unsigned char>(i[2]))) {
+                        escaped += static_cast<char>(hexValue(static_cast<unsigned char>(i[1])) * 16 +
+                                                     hexValue(static_cast<unsigned char>(i[2])));
                         i += 2;
+                    } else {
+                        // Malformed or truncated escape: keep the literal '%'.
+                        escaped += '%';
                     }
                     break;
                 case '+':

@@ -69,3 +69,55 @@ TEST_CASE("decode POST request", "[request_decoder]") {
                 std::make_pair<std::string, std::string>("arg2", " !"));
     }
 }
+
+TEST_CASE("decode handles malformed percent-escapes safely", "[request_decoder]") {
+    RequestDecoder reqDecoder;
+    std::vector<char> body;  // not used in tests
+    Request req(body);
+    req.method_ = "GET";
+    req.httpVersionMajor_ = 1;
+    req.httpVersionMinor_ = 1;
+
+    SECTION("trailing lone percent is kept literally") {
+        req.uri_ = "/a%";
+        std::vector<char> content;
+        REQUIRE(reqDecoder.decodeRequest(req, content) == true);
+        REQUIRE(req.requestPath_ == "/a%");
+    }
+    SECTION("truncated percent-escape is kept literally") {
+        req.uri_ = "/a%2";
+        std::vector<char> content;
+        REQUIRE(reqDecoder.decodeRequest(req, content) == true);
+        REQUIRE(req.requestPath_ == "/a%2");
+    }
+    SECTION("non-hex percent-escape is kept literally") {
+        req.uri_ = "/a%zz";
+        std::vector<char> content;
+        REQUIRE(reqDecoder.decodeRequest(req, content) == true);
+        REQUIRE(req.requestPath_ == "/a%zz");
+    }
+    SECTION("valid escape at the very end of input decodes") {
+        req.uri_ = "/a%20";
+        std::vector<char> content;
+        REQUIRE(reqDecoder.decodeRequest(req, content) == true);
+        REQUIRE(req.requestPath_ == "/a ");
+    }
+}
+
+TEST_CASE("decode form body with trailing percent does not overread", "[request_decoder]") {
+    RequestDecoder reqDecoder;
+    std::vector<char> body;  // not used in tests
+    Request req(body);
+    req.method_ = "POST";
+    req.uri_ = "/submit";
+    req.httpVersionMajor_ = 1;
+    req.httpVersionMinor_ = 1;
+    req.headers_.push_back({"Content-Type", "application/x-www-form-urlencoded"});
+
+    // Body ends in a lone '%' and the vector<char> has no NUL terminator, so the
+    // old strtol-based decode would read past the end of the buffer.
+    std::vector<char> content = {'x', '=', '%'};
+    REQUIRE(reqDecoder.decodeRequest(req, content) == true);
+    REQUIRE(req.formParams_.size() == 1);
+    REQUIRE(req.formParams_[0] == std::make_pair<std::string, std::string>("x", "%"));
+}

@@ -556,6 +556,38 @@ TEST_CASE("server with write fileIO", "[server]") {
         REQUIRE(result == expected);
     }
 
+    SECTION("it should reject a multipart upload whose filename escapes the directory") {
+        const std::string boundary = "boundary123456789";
+
+        std::string requestBody =
+            "--" + boundary +
+            "\r\n"
+            "Content-Disposition: form-data; name=\"file\"; "
+            "filename=\"../../../tmp/evil.txt\"\r\n"
+            "Content-Type: text/plain\r\n\r\n"
+            "malicious\r\n" +
+            "--" + boundary + "--\r\n";
+
+        std::string requestHeaders =
+            "POST /upload HTTP/1.1\r\n"
+            "Host: 127.0.0.1:8081\r\n"
+            "Connection: keep-alive\r\n"
+            "Content-Type: multipart/form-data; boundary=" +
+            boundary +
+            "\r\n"
+            "Content-Length: " +
+            std::to_string(requestBody.length()) + "\r\n\r\n";
+
+        openConnection(c, "127.0.0.1", port);
+        auto fut = createFutureResult(c, ExpectedResult::Content);
+        c.sendRequest(requestHeaders + requestBody);
+        auto res = fut.get();
+
+        // The traversal filename must be refused and no file opened for writing.
+        REQUIRE(res.statusCode_ == 400);
+        REQUIRE(mockFileIO.getOpenFileForWriteCalls() == 0);
+    }
+
     SECTION("it should handle large multipart request that exceeds buffer size") {
         // Create a multipart request with total size > 1024 bytes to test doReadBody chunked
         // reading
@@ -1108,3 +1140,87 @@ TEST_CASE("SSL server accepts TLS connections", "[server][ssl]") {
     t.join();
 }
 #endif  // BEAUTY_ENABLE_SSL
+
+TEST_CASE("server enforces the concurrent connection limit", "[server]") {
+    asio::io_context ioc;
+
+    MockFileIO mockFileIO;
+    mockFileIO.createMockFile(64);
+
+    // keepAliveTimeout 5s so the first connection stays open; connectionLimit 1.
+    // keepAliveThresholdPercent 0 disables soft shedding so the first connection
+    // keeps its slot via keep-alive and the second one hits the hard cap.
+    Settings settings(5s, 100, 1, 0);
+    Server dut(ioc, "127.0.0.1", "0", settings);
+    dut.setFileIO(&mockFileIO);
+    uint16_t port = dut.getBindedPort();
+    auto t = std::thread(&asio::io_context::run, &ioc);
+
+    TestClient a(ioc);
+    TestClient b(ioc);
+
+    // The first connection is accepted, served a 200, and kept open (keep-alive).
+    openConnection(a, "127.0.0.1", port);
+    {
+        auto fut = createFutureResult(a, ExpectedResult::Headers);
+        a.sendRequest(
+            "GET /index.html HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: keep-alive\r\n\r\n");
+        auto res = fut.get();
+        REQUIRE(res.statusCode_ == 200);
+    }
+
+    // The second connection exceeds the hard cap and is refused with 503.
+    openConnection(b, "127.0.0.1", port);
+    {
+        auto fut = createFutureResult(b, ExpectedResult::StatusLine);
+        b.sendRequest(
+            "GET /index.html HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+        auto res = fut.get();
+        REQUIRE(res.statusCode_ == 503);
+    }
+
+    ioc.stop();
+    t.join();
+}
+
+// Deterministic unit test of the keep-alive decision used by ConnectionManager
+// as connections approach the hard cap. Tagged outside [server] so it is not
+// subject to the networked server harness.
+TEST_CASE("keepAliveAllowed soft threshold logic", "[connection_policy]") {
+    SECTION("keep-alive disabled when keepAliveTimeout is 0") {
+        Settings s(0s, 100, 10, 50);
+        REQUIRE_FALSE(keepAliveAllowed(s, 1));
+        REQUIRE_FALSE(keepAliveAllowed(s, 100));
+    }
+
+    SECTION("always on when there is no hard cap") {
+        Settings s(5s, 100, 0, 50);
+        REQUIRE(keepAliveAllowed(s, 1));
+        REQUIRE(keepAliveAllowed(s, 1000));
+    }
+
+    SECTION("always on up to the cap when threshold percent is 0") {
+        Settings s(5s, 100, 4, 0);
+        REQUIRE(keepAliveAllowed(s, 1));
+        REQUIRE(keepAliveAllowed(s, 4));
+    }
+
+    SECTION("granted below the threshold, withheld at and above it") {
+        // cap 10, threshold 50% => soft limit at 5 connections.
+        Settings s(5s, 100, 10, 50);
+        REQUIRE(keepAliveAllowed(s, 1));
+        REQUIRE(keepAliveAllowed(s, 4));
+        REQUIRE_FALSE(keepAliveAllowed(s, 5));
+        REQUIRE_FALSE(keepAliveAllowed(s, 6));
+    }
+
+    SECTION("withheld on the first connection when the cap is tiny") {
+        // cap 2, threshold 50% => soft limit is one connection.
+        Settings s(5s, 100, 2, 50);
+        REQUIRE_FALSE(keepAliveAllowed(s, 1));
+
+        // cap 1, threshold 100% => the single allowed connection is at the cap.
+        Settings s2(5s, 100, 1, 100);
+        REQUIRE_FALSE(keepAliveAllowed(s2, 1));
+    }
+}

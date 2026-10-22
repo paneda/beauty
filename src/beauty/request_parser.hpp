@@ -39,7 +39,10 @@ class RequestParser {
     // Handle the next character of input.
     result_type consume(Request &req, std::vector<char> &content, char input);
 
-    void storeHeaderValueIfNeeded(Request &req);
+    // Stores interesting header values on the request. Returns false when the
+    // headers are invalid and the request must be rejected (e.g. a duplicate
+    // Content-Length).
+    bool storeHeaderValueIfNeeded(Request &req);
     result_type checkRequestAfterAllHeaders(Request &req);
 
     // The current state of the parser.

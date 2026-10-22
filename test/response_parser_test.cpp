@@ -106,6 +106,34 @@ TEST_CASE("parse headers", "[response_parser]") {
         REQUIRE(result == ResponseParser::good_complete);
         REQUIRE(fixture.response.keepAlive_ == false);
     }
+
+    SECTION("should reject conflicting Content-Length headers") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Length: 5\r\n"
+            "Content-Length: 10\r\n"
+            "\r\n"
+            "hello");
+        REQUIRE(result == ResponseParser::bad);
+    }
+
+    SECTION("should reject duplicate identical Content-Length headers") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Length: 5\r\n"
+            "Content-Length: 5\r\n"
+            "\r\n"
+            "hello");
+        REQUIRE(result == ResponseParser::bad);
+    }
+
+    SECTION("should reject a non-numeric Content-Length") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Length: notanumber\r\n"
+            "\r\n");
+        REQUIRE(result == ResponseParser::bad);
+    }
 }
 
 TEST_CASE("parse body by content length", "[response_parser]") {

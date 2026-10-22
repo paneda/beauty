@@ -11,14 +11,15 @@ namespace beauty {
 ConnectionManager::ConnectionManager(const Settings& settings)
     : settings_(settings), debugMsgCb_(defaultDebugMsgHandler) {}
 
+bool ConnectionManager::connectionLimitReached() const {
+    return settings_.connectionLimit_ != 0 && connections_.size() >= settings_.connectionLimit_;
+}
+
 void ConnectionManager::start(std::shared_ptr<Connection> c) {
     connections_.insert(c);
-    bool useKeepAlive = false;
-    if (settings_.keepAliveTimeout_ != std::chrono::seconds(0) &&
-        (settings_.connectionLimit_ == 0 ||  // 0 = unlimited
-         (settings_.connectionLimit_ > 0 && connections_.size() <= settings_.connectionLimit_))) {
-        useKeepAlive = true;
-    }
+    // connections_.size() includes the connection just inserted, so the soft
+    // threshold is evaluated against the new total.
+    bool useKeepAlive = keepAliveAllowed(settings_, connections_.size());
     c->start(useKeepAlive, settings_.keepAliveTimeout_, settings_.keepAliveMax_);
 }
 
