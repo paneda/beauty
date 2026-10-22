@@ -398,6 +398,41 @@ TEST_CASE("parse invalid request", "[request_parser]") {
 
         REQUIRE(result == RequestParser::bad);
     }
+    SECTION("should return bad for conflicting Content-Length headers") {
+        const std::string request =
+            "POST /uri HTTP/1.1\r\n"
+            "Host: 127.0.0.1\r\n"
+            "Content-Length: 10\r\n"
+            "Content-Length: 20\r\n"
+            "\r\n";
+
+        auto result = fixture.parse_complete(request);
+
+        REQUIRE(result == RequestParser::bad);
+    }
+    SECTION("should return bad for duplicate identical Content-Length headers") {
+        const std::string request =
+            "POST /uri HTTP/1.1\r\n"
+            "Host: 127.0.0.1\r\n"
+            "Content-Length: 10\r\n"
+            "Content-Length: 10\r\n"
+            "\r\n";
+
+        auto result = fixture.parse_complete(request);
+
+        REQUIRE(result == RequestParser::bad);
+    }
+    SECTION("should return bad for a non-numeric Content-Length") {
+        const std::string request =
+            "POST /uri HTTP/1.1\r\n"
+            "Host: 127.0.0.1\r\n"
+            "Content-Length: notanumber\r\n"
+            "\r\n";
+
+        auto result = fixture.parse_complete(request);
+
+        REQUIRE(result == RequestParser::bad);
+    }
 }
 
 TEST_CASE("Request parser 100-continue", "[request_parser]") {

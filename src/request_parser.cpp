@@ -211,7 +211,9 @@ RequestParser::result_type RequestParser::consume(Request &req,
             return indeterminate;
         case header_value:
             if (input == '\r') {
-                storeHeaderValueIfNeeded(req);
+                if (!storeHeaderValueIfNeeded(req)) {
+                    return bad;
+                }
                 state_ = expecting_newline_2;
             } else if (isCtl(input)) {
                 return bad;
@@ -258,15 +260,23 @@ RequestParser::result_type RequestParser::consume(Request &req,
     }
 }
 
-void RequestParser::storeHeaderValueIfNeeded(Request &req) {
+bool RequestParser::storeHeaderValueIfNeeded(Request &req) {
     Header &h = req.headers_.back();
 
     if (strcasecmp(h.name_.c_str(), "Content-Length") == 0) {
+        // Reject a duplicate Content-Length (RFC 7230 3.3.2). With two values a
+        // front-end proxy and Beauty could disagree on where the body ends,
+        // which is a classic request-smuggling primitive. An unparseable value
+        // is likewise rejected rather than silently treated as "no length".
         size_t actualContentLength = 0;
-        if (parseUint(h.value_.c_str(), actualContentLength)) {
-            req.contentLength_ = actualContentLength;
-            contentLength_ = actualContentLength;
+        if (!parseUint(h.value_.c_str(), actualContentLength)) {
+            return false;
         }
+        if (req.contentLength_ != std::numeric_limits<size_t>::max()) {
+            return false;
+        }
+        req.contentLength_ = actualContentLength;
+        contentLength_ = actualContentLength;
     } else if (strcasecmp(h.name_.c_str(), "Transfer-Encoding") == 0) {
         if (strcasecmp(h.value_.c_str(), "chunked") == 0) {
             req.isChunked_ = true;
@@ -292,6 +302,7 @@ void RequestParser::storeHeaderValueIfNeeded(Request &req) {
             req.upgradeToWebSocket_ = true;
         }
     }
+    return true;
 }
 
 RequestParser::result_type RequestParser::checkRequestAfterAllHeaders(Request &req) {
