@@ -556,6 +556,38 @@ TEST_CASE("server with write fileIO", "[server]") {
         REQUIRE(result == expected);
     }
 
+    SECTION("it should reject a multipart upload whose filename escapes the directory") {
+        const std::string boundary = "boundary123456789";
+
+        std::string requestBody =
+            "--" + boundary +
+            "\r\n"
+            "Content-Disposition: form-data; name=\"file\"; "
+            "filename=\"../../../tmp/evil.txt\"\r\n"
+            "Content-Type: text/plain\r\n\r\n"
+            "malicious\r\n" +
+            "--" + boundary + "--\r\n";
+
+        std::string requestHeaders =
+            "POST /upload HTTP/1.1\r\n"
+            "Host: 127.0.0.1:8081\r\n"
+            "Connection: keep-alive\r\n"
+            "Content-Type: multipart/form-data; boundary=" +
+            boundary +
+            "\r\n"
+            "Content-Length: " +
+            std::to_string(requestBody.length()) + "\r\n\r\n";
+
+        openConnection(c, "127.0.0.1", port);
+        auto fut = createFutureResult(c, ExpectedResult::Content);
+        c.sendRequest(requestHeaders + requestBody);
+        auto res = fut.get();
+
+        // The traversal filename must be refused and no file opened for writing.
+        REQUIRE(res.statusCode_ == 400);
+        REQUIRE(mockFileIO.getOpenFileForWriteCalls() == 0);
+    }
+
     SECTION("it should handle large multipart request that exceeds buffer size") {
         // Create a multipart request with total size > 1024 bytes to test doReadBody chunked
         // reading

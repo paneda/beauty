@@ -21,6 +21,15 @@ std::string combineUploadPaths(const std::string &dir, const std::string &filena
         return dir + filename;
     }
 }
+
+// Reject upload filenames that could escape the intended directory. The request
+// URI is already validated against ".." in RequestDecoder, but the multipart
+// filename arrives separately in the Content-Disposition header and is never
+// seen by that check, so it must be validated independently before it is joined
+// with the request path and handed to the FileIO backend for writing.
+bool isUnsafeUploadFilename(const std::string &filename) {
+    return filename.find("..") != std::string::npos;
+}
 }  // namespace
 
 RequestHandler::RequestHandler(size_t maxContentSize)
@@ -175,7 +184,10 @@ void RequestHandler::handleFileIOWrite(unsigned connectionId,
         return;
     }
 
-    writeFileParts(connectionId, req, rep, parts);
+    if (!writeFileParts(connectionId, req, rep, parts)) {
+        // Upload rejected (e.g. unsafe filename); a complete stock reply is set.
+        return;
+    }
     if (!rep.isStatusOk() && rep.status_ != Reply::status_type::no_content) {
         rep.addHeader("Content-Length", std::to_string(rep.content_.size()));
         return;
@@ -183,7 +195,9 @@ void RequestHandler::handleFileIOWrite(unsigned connectionId,
 
     if (result == MultiPartParser::result_type::done) {
         rep.multiPartParser_.flush(content, parts);
-        writeFileParts(connectionId, req, rep, parts);
+        if (!writeFileParts(connectionId, req, rep, parts)) {
+            return;
+        }
     }
 }
 
@@ -243,7 +257,7 @@ size_t RequestHandler::readFromFile(unsigned connectionId, const Request &req, R
     return nrReadBytes;
 }
 
-void RequestHandler::writeFileParts(unsigned connectionId,
+bool RequestHandler::writeFileParts(unsigned connectionId,
                                     const Request &req,
                                     Reply &rep,
                                     std::deque<MultiPartParser::ContentPart> &parts) {
@@ -254,16 +268,24 @@ void RequestHandler::writeFileParts(unsigned connectionId,
     const std::deque<MultiPartParser::ContentPart> &peakParts = rep.multiPartParser_.peakLastPart();
     for (auto &part : peakParts) {
         if (part.headerOnly_ && !part.filename_.empty()) {
+            if (isUnsafeUploadFilename(part.filename_)) {
+                rep.stockReply(req, Reply::status_type::bad_request);
+                return false;
+            }
             rep.filePath_ = combineUploadPaths(req.requestPath_, part.filename_);
             fileIO_->openFileForWrite(rep.filePath_ + std::to_string(connectionId), req, rep);
             if (!rep.isStatusOk()) {
-                return;
+                return true;
             }
         }
     }
 
     // This loop do the actual writing of data to files in sucessive order.
     for (auto &part : parts) {
+        if (!part.filename_.empty() && isUnsafeUploadFilename(part.filename_)) {
+            rep.stockReply(req, Reply::status_type::bad_request);
+            return false;
+        }
         // if 'headerOnly' it as already been handled above
         if (part.headerOnly_ && !part.filename_.empty()) {
             const std::string filePath = combineUploadPaths(req.requestPath_, part.filename_);
@@ -277,7 +299,7 @@ void RequestHandler::writeFileParts(unsigned connectionId,
                 rep.lastOpenFileForWriteId_ = rep.filePath_ + std::to_string(connectionId);
                 fileIO_->openFileForWrite(rep.lastOpenFileForWriteId_, req, rep);
                 if (!rep.isStatusOk()) {
-                    return;
+                    return true;
                 }
             }
             size_t size = part.end_ - part.start_;
@@ -285,7 +307,7 @@ void RequestHandler::writeFileParts(unsigned connectionId,
                 rep.lastOpenFileForWriteId_, req, rep, &(*part.start_), size, part.foundEnd_);
             if (!rep.isStatusOk()) {
                 rep.lastOpenFileForWriteId_.clear();
-                return;
+                return true;
             }
             if (part.foundEnd_) {
                 rep.lastOpenFileForWriteId_.clear();
@@ -293,6 +315,7 @@ void RequestHandler::writeFileParts(unsigned connectionId,
             }
         }
     }
+    return true;
 }
 
 }  // namespace beauty
