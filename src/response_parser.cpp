@@ -240,7 +240,9 @@ ResponseParser::result_type ResponseParser::consume(Response &res,
             return indeterminate;
         case header_value:
             if (input == '\r') {
-                storeHeaderValueIfNeeded(res);
+                if (!storeHeaderValueIfNeeded(res)) {
+                    return bad;
+                }
                 state_ = expecting_newline_2;
             } else if (isCtl(input)) {
                 return bad;
@@ -384,15 +386,23 @@ ResponseParser::result_type ResponseParser::consume(Response &res,
     }
 }
 
-void ResponseParser::storeHeaderValueIfNeeded(Response &res) {
+bool ResponseParser::storeHeaderValueIfNeeded(Response &res) {
     Header &h = res.headers_.back();
 
     if (strcasecmp(h.name_.c_str(), "Content-Length") == 0) {
+        // Reject a duplicate Content-Length (RFC 7230 3.3.2) and an unparseable
+        // value. Two values would let a malicious or broken server desync the
+        // body length on a reused keep-alive connection, corrupting the next
+        // response parsed on it.
         size_t actualContentLength = 0;
-        if (parseUint(h.value_.c_str(), actualContentLength)) {
-            res.contentLength_ = actualContentLength;
-            contentLength_ = actualContentLength;
+        if (!parseUint(h.value_.c_str(), actualContentLength)) {
+            return false;
         }
+        if (res.contentLength_ != std::numeric_limits<size_t>::max()) {
+            return false;
+        }
+        res.contentLength_ = actualContentLength;
+        contentLength_ = actualContentLength;
     } else if (strcasecmp(h.name_.c_str(), "Transfer-Encoding") == 0) {
         // Handle both bare "chunked" and lists like "gzip, chunked".
         // Per HTTP/1.1, chunked is always the last transfer-coding when present.
@@ -408,6 +418,7 @@ void ResponseParser::storeHeaderValueIfNeeded(Response &res) {
             res.keepAlive_ = true;
         }
     }
+    return true;
 }
 
 ResponseParser::result_type ResponseParser::checkResponseAfterAllHeaders(Response &res) {
