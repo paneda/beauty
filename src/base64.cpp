@@ -77,6 +77,12 @@ std::string base64_encode(const unsigned char* src, size_t len) {
 
 std::string base64_decode(const void* data, const size_t len) {
     unsigned char* p = (unsigned char*)data;
+    // A base64 length of (4n + 1) is invalid: a single trailing character
+    // cannot encode any bytes, and the padding branch below would read one
+    // byte past the end of the input (p[L + 1] with L + 1 == len). Reject it.
+    if (len % 4 == 1) {
+        return std::string();
+    }
     int pad = len > 0 && (len % 4 || p[len - 1] == '=');
     const size_t L = ((len + 3) / 4 - pad) * 4;
     std::string str(L / 4 * 3 + pad, '\0');
@@ -166,6 +172,12 @@ size_t base64_decode_to_buffer(const void* data, size_t len, unsigned char* out,
 
     if (len == 0) {
         return 0;  // Empty input
+    }
+
+    // A base64 length of (4n + 1) is invalid and would make the padding branch
+    // below read one byte past the end of the input. Reject it.
+    if (len % 4 == 1) {
+        return 0;
     }
 
     // Validate input characters
