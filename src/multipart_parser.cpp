@@ -37,6 +37,14 @@ bool MultiPartParser::parseHeader(const Request &req) {
     } else {
         return false;
     }
+
+    // An empty boundary (e.g. "boundary=") is invalid and must be rejected.
+    // Otherwise the boundary-matching state would index boundaryStr_ past its
+    // end, since the terminating check boundaryCount_ == boundaryStr_.size()
+    // can never be reached for a zero-length boundary.
+    if (boundaryStr_.empty()) {
+        return false;
+    }
     return true;
 }
 

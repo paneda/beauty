@@ -59,6 +59,18 @@ TEST_CASE("parse header", "[multipart_parser]") {
         request.headers_.push_back({"Content-Length", "281"});
         REQUIRE(fixture.parseHeader(request));
     }
+    SECTION("should reject an empty boundary") {
+        request.headers_.push_back(
+            {"Content-Type", "multipart/form-data; boundary="});
+        request.headers_.push_back({"Content-Length", "281"});
+        REQUIRE_FALSE(fixture.parseHeader(request));
+    }
+    SECTION("should reject an empty boundary followed by a semicolon") {
+        request.headers_.push_back(
+            {"Content-Type", "multipart/form-data; boundary=; charset=utf-8"});
+        request.headers_.push_back({"Content-Length", "281"});
+        REQUIRE_FALSE(fixture.parseHeader(request));
+    }
 }
 
 TEST_CASE("parse single part content", "[multipart_parser]") {
