@@ -1140,3 +1140,44 @@ TEST_CASE("SSL server accepts TLS connections", "[server][ssl]") {
     t.join();
 }
 #endif  // BEAUTY_ENABLE_SSL
+
+TEST_CASE("server enforces the concurrent connection limit", "[server]") {
+    asio::io_context ioc;
+
+    MockFileIO mockFileIO;
+    mockFileIO.createMockFile(64);
+
+    // keepAliveTimeout 5s so the first connection stays open; connectionLimit 1.
+    Settings settings(5s, 100, 1);
+    Server dut(ioc, "127.0.0.1", "0", settings);
+    dut.setFileIO(&mockFileIO);
+    uint16_t port = dut.getBindedPort();
+    auto t = std::thread(&asio::io_context::run, &ioc);
+
+    TestClient a(ioc);
+    TestClient b(ioc);
+
+    // The first connection is accepted, served a 200, and kept open (keep-alive).
+    openConnection(a, "127.0.0.1", port);
+    {
+        auto fut = createFutureResult(a, ExpectedResult::Headers);
+        a.sendRequest(
+            "GET /index.html HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: keep-alive\r\n\r\n");
+        auto res = fut.get();
+        REQUIRE(res.statusCode_ == 200);
+    }
+
+    // The second connection exceeds the limit. The server closes it without a
+    // response, so the client never reads a status line and times out.
+    openConnection(b, "127.0.0.1", port);
+    {
+        auto fut = createFutureResult(b, ExpectedResult::StatusLine);
+        b.sendRequest(
+            "GET /index.html HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+        auto res = fut.get();
+        REQUIRE(res.action_ == TestClient::TestResult::TimedOut);
+    }
+
+    ioc.stop();
+    t.join();
+}

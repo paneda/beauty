@@ -11,6 +11,10 @@ namespace beauty {
 ConnectionManager::ConnectionManager(const Settings& settings)
     : settings_(settings), debugMsgCb_(defaultDebugMsgHandler) {}
 
+bool ConnectionManager::connectionLimitReached() const {
+    return settings_.connectionLimit_ != 0 && connections_.size() >= settings_.connectionLimit_;
+}
+
 void ConnectionManager::start(std::shared_ptr<Connection> c) {
     connections_.insert(c);
     bool useKeepAlive = false;

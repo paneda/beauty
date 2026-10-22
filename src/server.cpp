@@ -197,8 +197,17 @@ void Server::doAccept() {
                 return;
             }
             if (!ec) {
-                connectionManager_.start(std::make_shared<Connection>(
-                    sock, connectionManager_, requestHandler_, connectionId_++, maxContentSize_));
+                if (connectionManager_.connectionLimitReached()) {
+                    debugMsgCb_("Connection limit reached; dropping new connection");
+                    sock->close();
+                } else {
+                    connectionManager_.start(
+                        std::make_shared<Connection>(sock,
+                                                     connectionManager_,
+                                                     requestHandler_,
+                                                     connectionId_++,
+                                                     maxContentSize_));
+                }
             } else {
                 debugMsgCb_("doAccept(ssl): " + ec.message() + ":" + std::to_string(ec.value()));
             }
@@ -212,9 +221,15 @@ void Server::doAccept() {
             return;
         }
         if (!ec) {
-            std::shared_ptr<ISocket> sock(new PlainSocket(std::move(socket)));
-            connectionManager_.start(std::make_shared<Connection>(
-                sock, connectionManager_, requestHandler_, connectionId_++, maxContentSize_));
+            if (connectionManager_.connectionLimitReached()) {
+                // Refuse the connection before allocating its buffers. The socket
+                // is closed as it goes out of scope at the end of this handler.
+                debugMsgCb_("Connection limit reached; dropping new connection");
+            } else {
+                std::shared_ptr<ISocket> sock(new PlainSocket(std::move(socket)));
+                connectionManager_.start(std::make_shared<Connection>(
+                    sock, connectionManager_, requestHandler_, connectionId_++, maxContentSize_));
+            }
         } else {
             debugMsgCb_("doAccept: " + ec.message() + ":" + std::to_string(ec.value()));
         }

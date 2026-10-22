@@ -35,10 +35,10 @@ struct Settings {
     // Sent in Keep-Alive response header.
     size_t keepAliveMax_;
 
-    // Internal limitation of the number of persistent http connections
-    // that are allowed. If this limit is exceeded, Connection=close will be
-    // sent in the response for new connections.
-    // 0 = no limit.
+    // Hard limit on the number of concurrent connections. Once this many
+    // connections are open, further incoming connections are refused (closed
+    // immediately) before their buffers are allocated, bounding memory use.
+    // This is critical for embedded targets. 0 = no limit.
     size_t connectionLimit_;
 
     // Maximum duration to keep a WebSocket connection open without receiving
