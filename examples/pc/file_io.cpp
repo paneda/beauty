@@ -59,6 +59,14 @@ std::string generate_etag_from_file(const std::string &filepath) {
     return "\"" + ss.str() + "\"";
 }
 
+// Make a request path relative to the document root by removing every leading
+// slash. Removing only one would leave "//etc/passwd" rooted, and joining a
+// rooted path onto docRoot_ with std::filesystem::path replaces docRoot_.
+std::string toRelativePath(const std::string &path) {
+    const size_t pos = path.find_first_not_of('/');
+    return pos == std::string::npos ? std::string() : path.substr(pos);
+}
+
 }  // namespace
 
 FileIO::FileIO(const std::string &docRoot) : docRoot_(docRoot) {
@@ -75,10 +83,8 @@ FileIO::FileIO(const std::string &docRoot) : docRoot_(docRoot) {
 size_t FileIO::openFileForRead(const std::string &id, const Request &req, Reply &reply) {
     HttpResult res(reply.content_);
 
-    // Remove leading slash from filePath_ to make it relative
-    if (!reply.filePath_.empty() && reply.filePath_[0] == '/') {
-        reply.filePath_ = reply.filePath_.substr(1);
-    }
+    // Remove leading slashes from filePath_ to make it relative
+    reply.filePath_ = toRelativePath(reply.filePath_);
 
     fs::path fullPath = fs::path(docRoot_) / reply.filePath_;
 
@@ -158,10 +164,8 @@ void FileIO::closeReadFile(const std::string &id) {
 void FileIO::openFileForWrite(const std::string &id, const Request &, Reply &reply) {
     HttpResult res(reply.content_);
 
-    // Remove leading slash from filePath_ to make it relative
-    if (!reply.filePath_.empty() && reply.filePath_[0] == '/') {
-        reply.filePath_ = reply.filePath_.substr(1);
-    }
+    // Remove leading slashes from filePath_ to make it relative
+    reply.filePath_ = toRelativePath(reply.filePath_);
     fs::path fullPath = fs::path(docRoot_) / reply.filePath_;
 
     // Ensure parent directory exists

@@ -18,6 +18,23 @@ TEST_CASE("error handling", "[request_parser]") {
         std::vector<char> content;
         REQUIRE(reqDecoder.decodeRequest(req, content) == false);
     }
+    SECTION("it should false for a path with repeated leading slashes") {
+        // "//etc/passwd" is still rooted after a backend strips one leading
+        // slash, so it would escape the document root.
+        std::vector<char> content;
+        req.uri_ = "//etc/passwd";
+        REQUIRE(reqDecoder.decodeRequest(req, content) == false);
+    }
+    SECTION("it should false for percent-encoded repeated leading slashes") {
+        std::vector<char> content;
+        req.uri_ = "/%2Fetc/passwd";
+        REQUIRE(reqDecoder.decodeRequest(req, content) == false);
+    }
+    SECTION("it should false for a path with a leading backslash segment") {
+        std::vector<char> content;
+        req.uri_ = "/\\etc\\passwd";
+        REQUIRE(reqDecoder.decodeRequest(req, content) == false);
+    }
 }
 
 TEST_CASE("decode GET request", "[request_decoder]") {
