@@ -88,4 +88,24 @@ inline bool keepAliveAllowed(const Settings& settings, size_t connectionCount) {
     return connectionCount * 100 < settings.connectionLimit_ * settings.keepAliveThresholdPercent_;
 }
 
+// Decides whether ConnectionManager::tick() should close a plain HTTP (non
+// WebSocket) connection.
+// The inactivity timeout (keepAliveTimeout_, when nonzero) applies to every
+// connection, whether or not it was offered keep-alive: a connection served
+// with Connection: close (soft threshold reached, or requested by the client)
+// that never completes its request would otherwise hold its slot under the
+// hard cap forever. The request-count limit only applies to connections that
+// are actually kept alive.
+inline bool httpConnectionExpired(const Settings& settings,
+                                  bool useKeepAlive,
+                                  std::chrono::steady_clock::time_point lastActivityTime,
+                                  size_t nrOfRequests,
+                                  std::chrono::steady_clock::time_point now) {
+    if (settings.keepAliveTimeout_ != std::chrono::seconds(0) &&
+        lastActivityTime + settings.keepAliveTimeout_ < now) {
+        return true;
+    }
+    return useKeepAlive && nrOfRequests >= settings.keepAliveMax_;
+}
+
 }  // namespace beauty

@@ -200,7 +200,7 @@ beauty::Settings settings(
 
 | Setting | Purpose | 🎯 Optimization |
 |---------|---------|-----------------|
-| `keepAliveTimeout_` | HTTP Keep-Alive timeout | `0s` = HTTP/1.0 mode, `>0s` = HTTP/1.1 |
+| `keepAliveTimeout_` | HTTP Keep-Alive timeout; also the inactivity timeout for every HTTP connection | `0s` = HTTP/1.0 mode (no inactivity timeout), `>0s` = HTTP/1.1 |
 | `keepAliveMax_` | Max requests per connection | Balance connection reuse vs memory |
 | `connectionLimit_` | Hard cap on concurrent connections | **Critical for embedded**: bounds memory; connections past the cap get `503` |
 | `keepAliveThresholdPercent_` | Soft threshold (% of the cap) for graceful degradation | Drop keep-alive near the cap so slots free fast; `0` disables, default `75` |
@@ -218,6 +218,11 @@ beauty::Settings settings(
 > of lingering for `keepAliveTimeout_`. This keeps the server responsive to new clients as it nears the cap. A hard
 > cap still means a client that holds many connections can lock others out, which is a connection-exhaustion tradeoff
 > inherent to any fixed cap; the device stays up and recovers rather than crashing.
+>
+> ⏱️ **Idle connections**: a nonzero `keepAliveTimeout_` is applied as an inactivity timeout to every HTTP connection,
+> including those served without keep-alive, so a client that connects and never completes a request cannot hold a
+> slot indefinitely. With `keepAliveTimeout_ = 0s` there is no inactivity timeout, so avoid combining it with a
+> `connectionLimit_` on networks you do not trust.
 
 ## 🔧 Middleware Development
 

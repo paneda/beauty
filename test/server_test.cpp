@@ -1262,6 +1262,75 @@ TEST_CASE("server enforces the concurrent connection limit", "[server]") {
     t.join();
 }
 
+TEST_CASE("server expires idle connections that are not offered keep-alive", "[server]") {
+    asio::io_context ioc;
+
+    MockFileIO mockFileIO;
+    mockFileIO.createMockFile(64);
+
+    // connectionLimit 1 with the default 75% soft threshold: the only slot is
+    // served without keep-alive. A client that connects and never sends a
+    // request must still be expired after keepAliveTimeout (1s), otherwise it
+    // holds the only slot forever.
+    Settings settings(1s, 100, 1);
+    Server dut(ioc, "127.0.0.1", "0", settings);
+    dut.setFileIO(&mockFileIO);
+    uint16_t port = dut.getBindedPort();
+    auto t = std::thread(&asio::io_context::run, &ioc);
+
+    TestClient idle(ioc);
+    TestClient b(ioc);
+
+    openConnection(idle, "127.0.0.1", port);
+
+    // keepAliveTimeout 1s + 1s tick granularity, with margin.
+    std::this_thread::sleep_for(3500ms);
+
+    openConnection(b, "127.0.0.1", port);
+    {
+        auto fut = createFutureResult(b, ExpectedResult::Content);
+        b.sendRequest(
+            "GET /index.html HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+        auto res = fut.get();
+        REQUIRE(res.statusCode_ == 200);
+    }
+
+    ioc.stop();
+    t.join();
+}
+
+// Deterministic unit test of the expiry decision ConnectionManager::tick()
+// applies to plain HTTP connections.
+TEST_CASE("httpConnectionExpired inactivity and request-count logic", "[connection_policy]") {
+    const auto now = std::chrono::steady_clock::now();
+
+    SECTION("an idle keep-alive connection expires after keepAliveTimeout") {
+        Settings s(5s, 100);
+        REQUIRE_FALSE(httpConnectionExpired(s, true, now - 4s, 0, now));
+        REQUIRE(httpConnectionExpired(s, true, now - 6s, 0, now));
+    }
+
+    SECTION("an idle connection without keep-alive expires too") {
+        // Connections shed by the soft threshold, or whose client asked for
+        // Connection: close, must not be able to hold a slot indefinitely.
+        Settings s(5s, 100, 1);
+        REQUIRE_FALSE(httpConnectionExpired(s, false, now - 4s, 0, now));
+        REQUIRE(httpConnectionExpired(s, false, now - 6s, 0, now));
+    }
+
+    SECTION("no inactivity expiry when keepAliveTimeout is 0") {
+        Settings s(0s, 100);
+        REQUIRE_FALSE(httpConnectionExpired(s, false, now - 1h, 0, now));
+    }
+
+    SECTION("the request-count limit only applies to keep-alive connections") {
+        Settings s(5s, 3);
+        REQUIRE_FALSE(httpConnectionExpired(s, true, now, 2, now));
+        REQUIRE(httpConnectionExpired(s, true, now, 3, now));
+        REQUIRE_FALSE(httpConnectionExpired(s, false, now, 3, now));
+    }
+}
+
 // Deterministic unit test of the keep-alive decision used by ConnectionManager
 // as connections approach the hard cap. Tagged outside [server] so it is not
 // subject to the networked server harness.

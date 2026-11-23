@@ -63,23 +63,14 @@ void ConnectionManager::tick() {
             }
             it++;
             continue;
-        } else if ((*it)->useKeepAlive()) {
-            bool erase = false;
-            if (((*it)->getLastActivityTime() + settings_.keepAliveTimeout_ < now)) {
-                debugMsgCb_("Removing HTTP connection due to inactivity");
-                erase = true;
-            }
-            if ((*it)->getNrOfRequests() >= settings_.keepAliveMax_) {
-                debugMsgCb_("Removing HTTP connection due max request limit");
-                erase = true;
-            }
-
-            if (erase) {
-                (*it)->stop();
-                it = connections_.erase(it);
-            } else {
-                it++;
-            }
+        } else if (httpConnectionExpired(settings_,
+                                         (*it)->useKeepAlive(),
+                                         (*it)->getLastActivityTime(),
+                                         (*it)->getNrOfRequests(),
+                                         now)) {
+            debugMsgCb_("Removing HTTP connection due to inactivity or max request limit");
+            (*it)->stop();
+            it = connections_.erase(it);
         } else {
             it++;
         }
