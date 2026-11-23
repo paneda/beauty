@@ -393,7 +393,9 @@ bool ResponseParser::storeHeaderValueIfNeeded(Response &res) {
         // Reject a duplicate Content-Length (RFC 7230 3.3.2) and an unparseable
         // value. Two values would let a malicious or broken server desync the
         // body length on a reused keep-alive connection, corrupting the next
-        // response parsed on it.
+        // response parsed on it. parseContentLength never yields the "not
+        // specified" sentinel, so the duplicate check below cannot be bypassed
+        // by a first value of SIZE_MAX.
         size_t actualContentLength = 0;
         if (!parseContentLength(h.value_, actualContentLength)) {
             return false;

@@ -268,6 +268,8 @@ bool RequestParser::storeHeaderValueIfNeeded(Request &req) {
         // front-end proxy and Beauty could disagree on where the body ends,
         // which is a classic request-smuggling primitive. An unparseable value
         // is likewise rejected rather than silently treated as "no length".
+        // parseContentLength never yields the "not specified" sentinel, so the
+        // duplicate check below cannot be bypassed by a first value of SIZE_MAX.
         size_t actualContentLength = 0;
         if (!parseContentLength(h.value_, actualContentLength)) {
             return false;

@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <limits>
 #include <string>
 
 #include "beauty/response.hpp"
@@ -158,6 +159,30 @@ TEST_CASE("parse headers", "[response_parser]") {
             "hello");
         REQUIRE(result == ResponseParser::good_complete);
         REQUIRE(fixture.response.getContentLength() == 5);
+    }
+
+    SECTION("should reject a Content-Length equal to the 'not set' sentinel") {
+        // SIZE_MAX doubles as "no Content-Length seen". Accepting it as a value
+        // would hide the header from the duplicate check and select the
+        // read-until-close body path.
+        const std::string sizeMax = std::to_string(std::numeric_limits<size_t>::max());
+        auto result = fixture.parse_complete("HTTP/1.1 200 OK\r\n"
+                                             "Content-Length: " +
+                                             sizeMax +
+                                             "\r\n"
+                                             "\r\n"
+                                             "hello");
+        REQUIRE(result == ResponseParser::bad);
+
+        ResponseFixture f2(1024);
+        result = f2.parse_complete("HTTP/1.1 200 OK\r\n"
+                                   "Content-Length: " +
+                                   sizeMax +
+                                   "\r\n"
+                                   "Content-Length: 5\r\n"
+                                   "\r\n"
+                                   "hello");
+        REQUIRE(result == ResponseParser::bad);
     }
 }
 

@@ -109,7 +109,10 @@ inline bool parseUint(const char *str, size_t &out) {
 
 // Parse the value of a Content-Length header: 1*DIGIT, optionally surrounded by
 // whitespace (RFC 7230 3.2 / 3.3.2). Returns false for anything else, including
-// signed values and values that overflow size_t.
+// signed values and values that overflow size_t. SIZE_MAX itself is rejected
+// too, because the parsers use it as the "no Content-Length seen" sentinel;
+// accepting it as a real value would make the header invisible to the
+// duplicate-header check and to the body-framing logic.
 inline bool parseContentLength(const std::string &value, size_t &out) {
     const char *ows = " \t";
     const size_t first = value.find_first_not_of(ows);
@@ -119,6 +122,9 @@ inline bool parseContentLength(const std::string &value, size_t &out) {
     const size_t last = value.find_last_not_of(ows);
     size_t v = 0;
     if (!parseUint(value.substr(first, last - first + 1).c_str(), v)) {
+        return false;
+    }
+    if (v == SIZE_MAX) {
         return false;
     }
     out = v;
