@@ -27,8 +27,14 @@ std::string combineUploadPaths(const std::string &dir, const std::string &filena
 // filename arrives separately in the Content-Disposition header and is never
 // seen by that check, so it must be validated independently before it is joined
 // with the request path and handed to the FileIO backend for writing.
+// A rooted filename ("/tmp/x", "//tmp/x", "\\tmp\\x") is rejected as well: joined
+// with the request path it can leave a repeated leading separator that is still
+// rooted after a backend strips one, replacing the document root.
 bool isUnsafeUploadFilename(const std::string &filename) {
-    return filename.find("..") != std::string::npos;
+    if (filename.find("..") != std::string::npos) {
+        return true;
+    }
+    return !filename.empty() && (filename.front() == '/' || filename.front() == '\\');
 }
 }  // namespace
 
