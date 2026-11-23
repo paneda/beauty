@@ -134,6 +134,31 @@ TEST_CASE("parse headers", "[response_parser]") {
             "\r\n");
         REQUIRE(result == ResponseParser::bad);
     }
+
+    SECTION("should reject a signed Content-Length") {
+        // strtoull accepts a sign, but Content-Length is 1*DIGIT.
+        for (const std::string value : {"+5", "-0", "-5", "5x", "0x10"}) {
+            ResponseFixture f(1024);
+            INFO("Content-Length value: '" << value << "'");
+            auto result = f.parse_complete("HTTP/1.1 200 OK\r\n"
+                                           "Content-Length: " +
+                                           value +
+                                           "\r\n"
+                                           "\r\n"
+                                           "hello");
+            REQUIRE(result == ResponseParser::bad);
+        }
+    }
+
+    SECTION("should accept optional whitespace around Content-Length") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Length:   5  \r\n"
+            "\r\n"
+            "hello");
+        REQUIRE(result == ResponseParser::good_complete);
+        REQUIRE(fixture.response.getContentLength() == 5);
+    }
 }
 
 TEST_CASE("parse body by content length", "[response_parser]") {

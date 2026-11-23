@@ -269,7 +269,7 @@ bool RequestParser::storeHeaderValueIfNeeded(Request &req) {
         // which is a classic request-smuggling primitive. An unparseable value
         // is likewise rejected rather than silently treated as "no length".
         size_t actualContentLength = 0;
-        if (!parseUint(h.value_.c_str(), actualContentLength)) {
+        if (!parseContentLength(h.value_, actualContentLength)) {
             return false;
         }
         if (req.contentLength_ != std::numeric_limits<size_t>::max()) {

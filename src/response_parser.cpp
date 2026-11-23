@@ -395,7 +395,7 @@ bool ResponseParser::storeHeaderValueIfNeeded(Response &res) {
         // body length on a reused keep-alive connection, corrupting the next
         // response parsed on it.
         size_t actualContentLength = 0;
-        if (!parseUint(h.value_.c_str(), actualContentLength)) {
+        if (!parseContentLength(h.value_, actualContentLength)) {
             return false;
         }
         if (res.contentLength_ != std::numeric_limits<size_t>::max()) {

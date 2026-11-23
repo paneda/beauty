@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <cstdint>
+#include <string>
 
 namespace beauty {
 
@@ -81,6 +82,13 @@ inline bool parseUint(const char *str, size_t &out) {
     if (str == nullptr || *str == '\0') {
         return false;
     }
+    // strtoull itself skips leading whitespace and accepts a '+' or '-' sign
+    // (negating the result), so require a pure digit sequence up front.
+    for (const char *p = str; *p != '\0'; ++p) {
+        if (!isDigit(static_cast<unsigned char>(*p))) {
+            return false;
+        }
+    }
     char *end = nullptr;
     errno = 0;
     unsigned long long v = strtoull(str, &end, 10);
@@ -96,6 +104,24 @@ inline bool parseUint(const char *str, size_t &out) {
         return false;
     }
     out = static_cast<size_t>(v);
+    return true;
+}
+
+// Parse the value of a Content-Length header: 1*DIGIT, optionally surrounded by
+// whitespace (RFC 7230 3.2 / 3.3.2). Returns false for anything else, including
+// signed values and values that overflow size_t.
+inline bool parseContentLength(const std::string &value, size_t &out) {
+    const char *ows = " \t";
+    const size_t first = value.find_first_not_of(ows);
+    if (first == std::string::npos) {
+        return false;
+    }
+    const size_t last = value.find_last_not_of(ows);
+    size_t v = 0;
+    if (!parseUint(value.substr(first, last - first + 1).c_str(), v)) {
+        return false;
+    }
+    out = v;
     return true;
 }
 
