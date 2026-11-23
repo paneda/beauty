@@ -232,7 +232,11 @@ ResponseParser::result_type ResponseParser::consume(Response &res,
             if (input == ' ') {
                 state_ = header_value;
             } else if (input == '\r') {
-                // Header with empty value.
+                // Header with empty value. Still run the framing-header checks
+                // so an empty Content-Length is rejected here as well.
+                if (!storeHeaderValueIfNeeded(res)) {
+                    return bad;
+                }
                 state_ = expecting_newline_2;
             } else {
                 return bad;

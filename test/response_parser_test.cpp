@@ -161,6 +161,36 @@ TEST_CASE("parse headers", "[response_parser]") {
         REQUIRE(fixture.response.getContentLength() == 5);
     }
 
+    SECTION("should reject an empty Content-Length") {
+        // No space after the colon takes a separate parser path.
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Length:\r\n"
+            "\r\n"
+            "hello");
+        REQUIRE(result == ResponseParser::bad);
+    }
+
+    SECTION("should reject an empty Content-Length followed by a second one") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Length:\r\n"
+            "Content-Length: 5\r\n"
+            "\r\n"
+            "hello");
+        REQUIRE(result == ResponseParser::bad);
+    }
+
+    SECTION("should still accept other headers with an empty value") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "X-Empty:\r\n"
+            "Content-Length: 5\r\n"
+            "\r\n"
+            "hello");
+        REQUIRE(result == ResponseParser::good_complete);
+    }
+
     SECTION("should reject a Content-Length equal to the 'not set' sentinel") {
         // SIZE_MAX doubles as "no Content-Length seen". Accepting it as a value
         // would hide the header from the duplicate check and select the
