@@ -51,6 +51,10 @@ class RequestHandler {
                         Reply &rep,
                         std::deque<MultiPartParser::ContentPart> &parts);
 
+    // Rejects a multipart upload with 400 Bad Request, first telling the FileIO
+    // backend to abort every file that is still open for writing.
+    void rejectUpload(const Request &req, Reply &rep);
+
     static void defaultExpectContinueHandler(const Request &, Reply &rep);
 
     // The max buffer size when writing socket.

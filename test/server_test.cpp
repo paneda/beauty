@@ -627,6 +627,46 @@ TEST_CASE("server with write fileIO", "[server]") {
         }
     }
 
+    SECTION("it should abort an open upload when a later part has an unsafe filename") {
+        // The first file spans several receive buffers, so it is open and
+        // partially written when the unsafe second part is seen. The backend
+        // only closes a write on its last data, so it must be told to abort.
+        const std::string boundary = "boundary123456789";
+        std::string largeFileContent(3000, 'A');
+
+        std::string requestBody =
+            "--" + boundary +
+            "\r\n"
+            "Content-Disposition: form-data; name=\"file1\"; filename=\"safe.txt\"\r\n"
+            "Content-Type: text/plain\r\n\r\n" +
+            largeFileContent + "\r\n" + "--" + boundary +
+            "\r\n"
+            "Content-Disposition: form-data; name=\"file2\"; filename=\"../evil.txt\"\r\n"
+            "Content-Type: text/plain\r\n\r\n"
+            "malicious\r\n" +
+            "--" + boundary + "--\r\n";
+
+        std::string requestHeaders =
+            "POST / HTTP/1.1\r\n"
+            "Host: 127.0.0.1:8081\r\n"
+            "Connection: close\r\n"
+            "Content-Type: multipart/form-data; boundary=" +
+            boundary +
+            "\r\n"
+            "Content-Length: " +
+            std::to_string(requestBody.length()) + "\r\n\r\n";
+
+        openConnection(c, "127.0.0.1", port);
+        auto fut = createFutureResult(c, ExpectedResult::Content);
+        c.sendRequest(requestHeaders + requestBody);
+        auto res = fut.get();
+
+        REQUIRE(res.statusCode_ == 400);
+        REQUIRE(mockFileIO.getOpenFileForWriteCalls() == 1);
+        REQUIRE(mockFileIO.getAbortWriteFileCalls() == 1);
+        REQUIRE_FALSE(mockFileIO.isWriteFileOpen("/safe.txt0"));
+    }
+
     SECTION("it should handle large multipart request that exceeds buffer size") {
         // Create a multipart request with total size > 1024 bytes to test doReadBody chunked
         // reading

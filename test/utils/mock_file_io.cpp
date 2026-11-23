@@ -90,6 +90,23 @@ void MockFileIO::writeFile(const std::string& id,
     }
 }
 
+void MockFileIO::abortWriteFile(const std::string& id) {
+    countAbortWriteFileCalls_++;
+    auto it = openWriteFiles_.find(id);
+    if (it != openWriteFiles_.end()) {
+        it->second.isOpen_ = false;
+    }
+}
+
+int MockFileIO::getAbortWriteFileCalls() {
+    return countAbortWriteFileCalls_;
+}
+
+bool MockFileIO::isWriteFileOpen(const std::string& id) {
+    auto it = openWriteFiles_.find(id);
+    return it != openWriteFiles_.end() && it->second.isOpen_ && !it->second.lastData_;
+}
+
 int MockFileIO::getOpenFileForWriteCalls() {
     return countOpenFileForWriteCalls_;
 }

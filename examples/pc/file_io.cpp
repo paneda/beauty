@@ -184,6 +184,26 @@ void FileIO::openFileForWrite(const std::string &id, const Request &, Reply &rep
         res.jsonError(Reply::internal_server_error,
                       "Could not open file for writing: " + reply.filePath_);
         reply.send(res.statusCode_, "application/json");
+        return;
+    }
+    openWritePaths_[id] = fullPath.string();
+}
+
+void FileIO::abortWriteFile(const std::string &id) {
+    auto it = openWriteFiles_.find(id);
+    if (it == openWriteFiles_.end()) {
+        return;
+    }
+    it->second.close();
+    openWriteFiles_.erase(it);
+
+    // The upload was abandoned, so do not leave a truncated file behind.
+    auto pathIt = openWritePaths_.find(id);
+    if (pathIt != openWritePaths_.end()) {
+        std::error_code ec;
+        fs::remove(pathIt->second, ec);
+        eTags_.erase(pathIt->second);
+        openWritePaths_.erase(pathIt);
     }
 }
 
@@ -203,6 +223,7 @@ void FileIO::writeFile(const std::string &id,
     if (lastData) {
         it->second.close();
         openWriteFiles_.erase(it);
+        openWritePaths_.erase(id);
 
         // Regenerate ETag for the updated file
         fs::path fullPath = fs::path(docRoot_) / reply.filePath_;

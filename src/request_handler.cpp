@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "beauty/header.hpp"
 #include "beauty/mime_types.hpp"
 #include "beauty/request_handler.hpp"
@@ -35,6 +37,15 @@ bool isUnsafeUploadFilename(const std::string &filename) {
         return true;
     }
     return !filename.empty() && (filename.front() == '/' || filename.front() == '\\');
+}
+
+bool hasUnsafeUploadFilename(const std::deque<MultiPartParser::ContentPart> &parts) {
+    for (const auto &part : parts) {
+        if (!part.filename_.empty() && isUnsafeUploadFilename(part.filename_)) {
+            return true;
+        }
+    }
+    return false;
 }
 }  // namespace
 
@@ -263,35 +274,48 @@ size_t RequestHandler::readFromFile(unsigned connectionId, const Request &req, R
     return nrReadBytes;
 }
 
+void RequestHandler::rejectUpload(const Request &req, Reply &rep) {
+    // A backend only closes a file on its last data, so files that are open
+    // and partially written must be aborted explicitly or their handles leak.
+    for (const auto &id : rep.openFilesForWrite_) {
+        fileIO_->abortWriteFile(id);
+    }
+    rep.openFilesForWrite_.clear();
+    rep.lastOpenFileForWriteId_.clear();
+    rep.stockReply(req, Reply::status_type::bad_request);
+}
+
 bool RequestHandler::writeFileParts(unsigned connectionId,
                                     const Request &req,
                                     Reply &rep,
                                     std::deque<MultiPartParser::ContentPart> &parts) {
+    const std::deque<MultiPartParser::ContentPart> &peakParts = rep.multiPartParser_.peakLastPart();
+
+    // Validate every filename seen so far before opening or writing anything
+    // in this call, so that a rejection never leaves a file opened here behind.
+    if (hasUnsafeUploadFilename(peakParts) || hasUnsafeUploadFilename(parts)) {
+        rejectUpload(req, rep);
+        return false;
+    }
+
     // It seems that some clients first deliver a "headerOnly" part of the
     // multipart (assumably checking for non successful response) and then in
     // successive request deliver the part data. If so, we handle this nicely
     // here by giving the client an early non-successful reply. However this
-    const std::deque<MultiPartParser::ContentPart> &peakParts = rep.multiPartParser_.peakLastPart();
     for (auto &part : peakParts) {
         if (part.headerOnly_ && !part.filename_.empty()) {
-            if (isUnsafeUploadFilename(part.filename_)) {
-                rep.stockReply(req, Reply::status_type::bad_request);
-                return false;
-            }
             rep.filePath_ = combineUploadPaths(req.requestPath_, part.filename_);
-            fileIO_->openFileForWrite(rep.filePath_ + std::to_string(connectionId), req, rep);
+            const std::string id = rep.filePath_ + std::to_string(connectionId);
+            fileIO_->openFileForWrite(id, req, rep);
             if (!rep.isStatusOk()) {
                 return true;
             }
+            rep.openFilesForWrite_.push_back(id);
         }
     }
 
     // This loop do the actual writing of data to files in sucessive order.
     for (auto &part : parts) {
-        if (!part.filename_.empty() && isUnsafeUploadFilename(part.filename_)) {
-            rep.stockReply(req, Reply::status_type::bad_request);
-            return false;
-        }
         // if 'headerOnly' it as already been handled above
         if (part.headerOnly_ && !part.filename_.empty()) {
             const std::string filePath = combineUploadPaths(req.requestPath_, part.filename_);
@@ -307,10 +331,18 @@ bool RequestHandler::writeFileParts(unsigned connectionId,
                 if (!rep.isStatusOk()) {
                     return true;
                 }
+                rep.openFilesForWrite_.push_back(rep.lastOpenFileForWriteId_);
             }
             size_t size = part.end_ - part.start_;
             fileIO_->writeFile(
                 rep.lastOpenFileForWriteId_, req, rep, &(*part.start_), size, part.foundEnd_);
+            if (part.foundEnd_) {
+                // The backend has seen the last data and closed the file.
+                rep.openFilesForWrite_.erase(std::remove(rep.openFilesForWrite_.begin(),
+                                                         rep.openFilesForWrite_.end(),
+                                                         rep.lastOpenFileForWriteId_),
+                                             rep.openFilesForWrite_.end());
+            }
             if (!rep.isStatusOk()) {
                 rep.lastOpenFileForWriteId_.clear();
                 return true;
