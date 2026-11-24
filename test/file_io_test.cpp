@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <filesystem>
 #include <fstream>
 #include <numeric>
 
@@ -73,6 +74,54 @@ TEST_CASE("file_io.cpp", "[file_io]") {
         expected = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
         REQUIRE(readData == expected);
     }
+}
+
+TEST_CASE("file_io.cpp stays inside the document root", "[file_io]") {
+    namespace fs = std::filesystem;
+    const fs::path docRoot = fs::temp_directory_path() / "beauty_file_io_test_root";
+    const fs::path outside = fs::temp_directory_path() / "beauty_file_io_test_outside.txt";
+    fs::remove_all(docRoot);
+    fs::remove(outside);
+    fs::create_directories(docRoot);
+    { std::ofstream(outside) << "secret"; }
+
+    FileIO fio(docRoot.string());
+    std::vector<char> body;
+    Request req(body);
+    std::vector<char> sendBuffer(1024);
+    Reply rep(sendBuffer);
+
+    SECTION("should not read a rooted path outside the document root") {
+        // One leading slash is stripped by design; a second one must not turn
+        // the path into an absolute one that replaces the document root.
+        rep.filePath_ = "/" + outside.string();
+        REQUIRE(fio.openFileForRead("0", req, rep) == 0);
+    }
+    SECTION("should not write a rooted path outside the document root") {
+        rep.filePath_ = "/" + outside.string();
+        fio.openFileForWrite("0", req, rep);
+        fio.abortWriteFile("0");
+        std::ifstream in(outside);
+        std::string content;
+        in >> content;
+        REQUIRE(content == "secret");
+    }
+    SECTION("should close and remove a partially written file on abort") {
+        rep.filePath_ = "/partial.txt";
+        fio.openFileForWrite("0", req, rep);
+        const std::string data = "partial";
+        fio.writeFile("0", req, rep, data.data(), data.size(), false);
+        fio.abortWriteFile("0");
+        REQUIRE_FALSE(fs::exists(docRoot / "partial.txt"));
+        // Aborting is idempotent and the id is free for reuse.
+        fio.abortWriteFile("0");
+        fio.openFileForWrite("0", req, rep);
+        fio.writeFile("0", req, rep, data.data(), data.size(), true);
+        REQUIRE(fs::exists(docRoot / "partial.txt"));
+    }
+
+    fs::remove_all(docRoot);
+    fs::remove(outside);
 }
 
 TEST_CASE("Reading from MockFileIO", "[file_handler]") {

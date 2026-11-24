@@ -16,6 +16,14 @@ bool RequestDecoder::decodeRequest(Request &req, std::vector<char> &content) {
         return false;
     }
 
+    // Reject a second leading separator ("//etc/passwd"). A FileIO backend that
+    // makes the path relative by dropping one leading slash would otherwise be
+    // left with a rooted path that escapes its document root.
+    if (req.requestPath_.size() > 1 &&
+        (req.requestPath_[1] == '/' || req.requestPath_[1] == '\\')) {
+        return false;
+    }
+
     // decode the query string
     std::string queryStr;
     size_t pos = req.requestPath_.find('?');

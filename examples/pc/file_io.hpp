@@ -28,6 +28,7 @@ class FileIO : public beauty::IFileIO {
                    const char *buf,
                    size_t size,
                    bool lastData) override;
+    void abortWriteFile(const std::string &id) override;
 
    private:
     const std::string docRoot_;
@@ -37,6 +38,10 @@ class FileIO : public beauty::IFileIO {
     // Key is the id of each file, provided by Beauty.
     std::unordered_map<std::string, std::ifstream> openReadFiles_;
     std::unordered_map<std::string, std::ofstream> openWriteFiles_;
+
+    // Full path of each file open for writing, so that an aborted upload can
+    // remove its partially written file.
+    std::unordered_map<std::string, std::string> openWritePaths_;
 
     // Map of ETags for files already read, to support If-None-Match
     std::unordered_map<std::string, std::string> eTags_;

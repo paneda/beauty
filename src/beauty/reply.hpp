@@ -130,6 +130,7 @@ class Reply {
         noBodyBytesReceived_ = 0;
         isMultiPart_ = false;
         lastOpenFileForWriteId_ = "";
+        openFilesForWrite_.clear();
         multiPartParser_.reset();  // Reset multipart parser state between requests
         streamCallback_ = nullptr;
         totalStreamSize_ = 0;
@@ -173,6 +174,11 @@ class Reply {
 
     // Keep track of the last opened file in multi-part transfers.
     std::string lastOpenFileForWriteId_;
+
+    // Ids of all files opened for writing in a multi-part transfer that have
+    // not yet received their last data, so they can be aborted if the upload
+    // is rejected part-way.
+    std::vector<std::string> openFilesForWrite_;
 
     // Parser to handle multipart uploads.
     MultiPartParser multiPartParser_;

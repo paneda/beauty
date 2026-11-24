@@ -51,7 +51,10 @@ class ResponseParser {
     // Handle the next character of input.
     result_type consume(Response &res, std::vector<char> &content, char input);
 
-    void storeHeaderValueIfNeeded(Response &res);
+    // Stores interesting header values on the response. Returns false when the
+    // headers are invalid and the response must be rejected (e.g. a duplicate
+    // Content-Length).
+    bool storeHeaderValueIfNeeded(Response &res);
     result_type checkResponseAfterAllHeaders(Response &res);
 
     // The current state of the parser.

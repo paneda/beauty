@@ -556,6 +556,117 @@ TEST_CASE("server with write fileIO", "[server]") {
         REQUIRE(result == expected);
     }
 
+    SECTION("it should reject a multipart upload whose filename escapes the directory") {
+        const std::string boundary = "boundary123456789";
+
+        std::string requestBody =
+            "--" + boundary +
+            "\r\n"
+            "Content-Disposition: form-data; name=\"file\"; "
+            "filename=\"../../../tmp/evil.txt\"\r\n"
+            "Content-Type: text/plain\r\n\r\n"
+            "malicious\r\n" +
+            "--" + boundary + "--\r\n";
+
+        std::string requestHeaders =
+            "POST /upload HTTP/1.1\r\n"
+            "Host: 127.0.0.1:8081\r\n"
+            "Connection: keep-alive\r\n"
+            "Content-Type: multipart/form-data; boundary=" +
+            boundary +
+            "\r\n"
+            "Content-Length: " +
+            std::to_string(requestBody.length()) + "\r\n\r\n";
+
+        openConnection(c, "127.0.0.1", port);
+        auto fut = createFutureResult(c, ExpectedResult::Content);
+        c.sendRequest(requestHeaders + requestBody);
+        auto res = fut.get();
+
+        // The traversal filename must be refused and no file opened for writing.
+        REQUIRE(res.statusCode_ == 400);
+        REQUIRE(mockFileIO.getOpenFileForWriteCalls() == 0);
+    }
+
+    SECTION("it should reject a multipart upload with a rooted filename") {
+        // "//tmp/evil.txt" joined with the request path is still rooted after a
+        // backend strips one leading slash, escaping the document root.
+        for (const std::string filename :
+             {"//tmp/evil.txt", "/tmp/evil.txt", "\\\\tmp\\evil.txt"}) {
+            const std::string boundary = "boundary123456789";
+
+            std::string requestBody = "--" + boundary +
+                                      "\r\n"
+                                      "Content-Disposition: form-data; name=\"file\"; "
+                                      "filename=\"" +
+                                      filename +
+                                      "\"\r\n"
+                                      "Content-Type: text/plain\r\n\r\n"
+                                      "malicious\r\n" +
+                                      "--" + boundary + "--\r\n";
+
+            std::string requestHeaders =
+                "POST / HTTP/1.1\r\n"
+                "Host: 127.0.0.1:8081\r\n"
+                "Connection: close\r\n"
+                "Content-Type: multipart/form-data; boundary=" +
+                boundary +
+                "\r\n"
+                "Content-Length: " +
+                std::to_string(requestBody.length()) + "\r\n\r\n";
+
+            TestClient client(ioc);
+            openConnection(client, "127.0.0.1", port);
+            auto fut = createFutureResult(client, ExpectedResult::Content);
+            client.sendRequest(requestHeaders + requestBody);
+            auto res = fut.get();
+
+            INFO("filename: " << filename);
+            REQUIRE(res.statusCode_ == 400);
+            REQUIRE(mockFileIO.getOpenFileForWriteCalls() == 0);
+        }
+    }
+
+    SECTION("it should abort an open upload when a later part has an unsafe filename") {
+        // The first file spans several receive buffers, so it is open and
+        // partially written when the unsafe second part is seen. The backend
+        // only closes a write on its last data, so it must be told to abort.
+        const std::string boundary = "boundary123456789";
+        std::string largeFileContent(3000, 'A');
+
+        std::string requestBody =
+            "--" + boundary +
+            "\r\n"
+            "Content-Disposition: form-data; name=\"file1\"; filename=\"safe.txt\"\r\n"
+            "Content-Type: text/plain\r\n\r\n" +
+            largeFileContent + "\r\n" + "--" + boundary +
+            "\r\n"
+            "Content-Disposition: form-data; name=\"file2\"; filename=\"../evil.txt\"\r\n"
+            "Content-Type: text/plain\r\n\r\n"
+            "malicious\r\n" +
+            "--" + boundary + "--\r\n";
+
+        std::string requestHeaders =
+            "POST / HTTP/1.1\r\n"
+            "Host: 127.0.0.1:8081\r\n"
+            "Connection: close\r\n"
+            "Content-Type: multipart/form-data; boundary=" +
+            boundary +
+            "\r\n"
+            "Content-Length: " +
+            std::to_string(requestBody.length()) + "\r\n\r\n";
+
+        openConnection(c, "127.0.0.1", port);
+        auto fut = createFutureResult(c, ExpectedResult::Content);
+        c.sendRequest(requestHeaders + requestBody);
+        auto res = fut.get();
+
+        REQUIRE(res.statusCode_ == 400);
+        REQUIRE(mockFileIO.getOpenFileForWriteCalls() == 1);
+        REQUIRE(mockFileIO.getAbortWriteFileCalls() == 1);
+        REQUIRE_FALSE(mockFileIO.isWriteFileOpen("/safe.txt0"));
+    }
+
     SECTION("it should handle large multipart request that exceeds buffer size") {
         // Create a multipart request with total size > 1024 bytes to test doReadBody chunked
         // reading
@@ -1108,3 +1219,156 @@ TEST_CASE("SSL server accepts TLS connections", "[server][ssl]") {
     t.join();
 }
 #endif  // BEAUTY_ENABLE_SSL
+
+TEST_CASE("server enforces the concurrent connection limit", "[server]") {
+    asio::io_context ioc;
+
+    MockFileIO mockFileIO;
+    mockFileIO.createMockFile(64);
+
+    // keepAliveTimeout 5s so the first connection stays open; connectionLimit 1.
+    // keepAliveThresholdPercent 0 disables soft shedding so the first connection
+    // keeps its slot via keep-alive and the second one hits the hard cap.
+    Settings settings(5s, 100, 1, 0);
+    Server dut(ioc, "127.0.0.1", "0", settings);
+    dut.setFileIO(&mockFileIO);
+    uint16_t port = dut.getBindedPort();
+    auto t = std::thread(&asio::io_context::run, &ioc);
+
+    TestClient a(ioc);
+    TestClient b(ioc);
+
+    // The first connection is accepted, served a 200, and kept open (keep-alive).
+    openConnection(a, "127.0.0.1", port);
+    {
+        auto fut = createFutureResult(a, ExpectedResult::Headers);
+        a.sendRequest(
+            "GET /index.html HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: keep-alive\r\n\r\n");
+        auto res = fut.get();
+        REQUIRE(res.statusCode_ == 200);
+    }
+
+    // The second connection exceeds the hard cap and is refused with 503.
+    openConnection(b, "127.0.0.1", port);
+    {
+        auto fut = createFutureResult(b, ExpectedResult::StatusLine);
+        b.sendRequest(
+            "GET /index.html HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+        auto res = fut.get();
+        REQUIRE(res.statusCode_ == 503);
+    }
+
+    ioc.stop();
+    t.join();
+}
+
+TEST_CASE("server expires idle connections that are not offered keep-alive", "[server]") {
+    asio::io_context ioc;
+
+    MockFileIO mockFileIO;
+    mockFileIO.createMockFile(64);
+
+    // connectionLimit 1 with the default 75% soft threshold: the only slot is
+    // served without keep-alive. A client that connects and never sends a
+    // request must still be expired after keepAliveTimeout (1s), otherwise it
+    // holds the only slot forever.
+    Settings settings(1s, 100, 1);
+    Server dut(ioc, "127.0.0.1", "0", settings);
+    dut.setFileIO(&mockFileIO);
+    uint16_t port = dut.getBindedPort();
+    auto t = std::thread(&asio::io_context::run, &ioc);
+
+    TestClient idle(ioc);
+    TestClient b(ioc);
+
+    openConnection(idle, "127.0.0.1", port);
+
+    // keepAliveTimeout 1s + 1s tick granularity, with margin.
+    std::this_thread::sleep_for(3500ms);
+
+    openConnection(b, "127.0.0.1", port);
+    {
+        auto fut = createFutureResult(b, ExpectedResult::Content);
+        b.sendRequest(
+            "GET /index.html HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+        auto res = fut.get();
+        REQUIRE(res.statusCode_ == 200);
+    }
+
+    ioc.stop();
+    t.join();
+}
+
+// Deterministic unit test of the expiry decision ConnectionManager::tick()
+// applies to plain HTTP connections.
+TEST_CASE("httpConnectionExpired inactivity and request-count logic", "[connection_policy]") {
+    const auto now = std::chrono::steady_clock::now();
+
+    SECTION("an idle keep-alive connection expires after keepAliveTimeout") {
+        Settings s(5s, 100);
+        REQUIRE_FALSE(httpConnectionExpired(s, true, now - 4s, 0, now));
+        REQUIRE(httpConnectionExpired(s, true, now - 6s, 0, now));
+    }
+
+    SECTION("an idle connection without keep-alive expires too") {
+        // Connections shed by the soft threshold, or whose client asked for
+        // Connection: close, must not be able to hold a slot indefinitely.
+        Settings s(5s, 100, 1);
+        REQUIRE_FALSE(httpConnectionExpired(s, false, now - 4s, 0, now));
+        REQUIRE(httpConnectionExpired(s, false, now - 6s, 0, now));
+    }
+
+    SECTION("no inactivity expiry when keepAliveTimeout is 0") {
+        Settings s(0s, 100);
+        REQUIRE_FALSE(httpConnectionExpired(s, false, now - 1h, 0, now));
+    }
+
+    SECTION("the request-count limit only applies to keep-alive connections") {
+        Settings s(5s, 3);
+        REQUIRE_FALSE(httpConnectionExpired(s, true, now, 2, now));
+        REQUIRE(httpConnectionExpired(s, true, now, 3, now));
+        REQUIRE_FALSE(httpConnectionExpired(s, false, now, 3, now));
+    }
+}
+
+// Deterministic unit test of the keep-alive decision used by ConnectionManager
+// as connections approach the hard cap. Tagged outside [server] so it is not
+// subject to the networked server harness.
+TEST_CASE("keepAliveAllowed soft threshold logic", "[connection_policy]") {
+    SECTION("keep-alive disabled when keepAliveTimeout is 0") {
+        Settings s(0s, 100, 10, 50);
+        REQUIRE_FALSE(keepAliveAllowed(s, 1));
+        REQUIRE_FALSE(keepAliveAllowed(s, 100));
+    }
+
+    SECTION("always on when there is no hard cap") {
+        Settings s(5s, 100, 0, 50);
+        REQUIRE(keepAliveAllowed(s, 1));
+        REQUIRE(keepAliveAllowed(s, 1000));
+    }
+
+    SECTION("always on up to the cap when threshold percent is 0") {
+        Settings s(5s, 100, 4, 0);
+        REQUIRE(keepAliveAllowed(s, 1));
+        REQUIRE(keepAliveAllowed(s, 4));
+    }
+
+    SECTION("granted below the threshold, withheld at and above it") {
+        // cap 10, threshold 50% => soft limit at 5 connections.
+        Settings s(5s, 100, 10, 50);
+        REQUIRE(keepAliveAllowed(s, 1));
+        REQUIRE(keepAliveAllowed(s, 4));
+        REQUIRE_FALSE(keepAliveAllowed(s, 5));
+        REQUIRE_FALSE(keepAliveAllowed(s, 6));
+    }
+
+    SECTION("withheld on the first connection when the cap is tiny") {
+        // cap 2, threshold 50% => soft limit is one connection.
+        Settings s(5s, 100, 2, 50);
+        REQUIRE_FALSE(keepAliveAllowed(s, 1));
+
+        // cap 1, threshold 100% => the single allowed connection is at the cap.
+        Settings s2(5s, 100, 1, 100);
+        REQUIRE_FALSE(keepAliveAllowed(s2, 1));
+    }
+}

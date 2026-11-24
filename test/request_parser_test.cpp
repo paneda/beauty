@@ -1,5 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <iostream>
+#include <limits>
+#include <string>
 
 #include "beauty/request.hpp"
 #include "beauty/request_parser.hpp"
@@ -397,6 +399,104 @@ TEST_CASE("parse invalid request", "[request_parser]") {
         auto result = fixture.parse_partially(request);
 
         REQUIRE(result == RequestParser::bad);
+    }
+    SECTION("should return bad for conflicting Content-Length headers") {
+        const std::string request =
+            "POST /uri HTTP/1.1\r\n"
+            "Host: 127.0.0.1\r\n"
+            "Content-Length: 10\r\n"
+            "Content-Length: 20\r\n"
+            "\r\n";
+
+        auto result = fixture.parse_complete(request);
+
+        REQUIRE(result == RequestParser::bad);
+    }
+    SECTION("should return bad for duplicate identical Content-Length headers") {
+        const std::string request =
+            "POST /uri HTTP/1.1\r\n"
+            "Host: 127.0.0.1\r\n"
+            "Content-Length: 10\r\n"
+            "Content-Length: 10\r\n"
+            "\r\n";
+
+        auto result = fixture.parse_complete(request);
+
+        REQUIRE(result == RequestParser::bad);
+    }
+    SECTION("should return bad for a non-numeric Content-Length") {
+        const std::string request =
+            "POST /uri HTTP/1.1\r\n"
+            "Host: 127.0.0.1\r\n"
+            "Content-Length: notanumber\r\n"
+            "\r\n";
+
+        auto result = fixture.parse_complete(request);
+
+        REQUIRE(result == RequestParser::bad);
+    }
+    SECTION("should return bad for a signed Content-Length") {
+        // strtoull accepts a sign, but Content-Length is 1*DIGIT.
+        for (const std::string value : {"+5", "-0", "-5", "5x", "0x10", ""}) {
+            RequestFixture f(1024);
+            const std::string request =
+                "POST /uri HTTP/1.1\r\n"
+                "Host: 127.0.0.1\r\n"
+                "Content-Length: " +
+                value +
+                "\r\n"
+                "\r\n"
+                "hello";
+            INFO("Content-Length value: '" << value << "'");
+            REQUIRE(f.parse_complete(request) == RequestParser::bad);
+        }
+    }
+    SECTION("should accept optional whitespace around Content-Length") {
+        const std::string request =
+            "POST /uri HTTP/1.1\r\n"
+            "Host: 127.0.0.1\r\n"
+            "Content-Length:   5  \r\n"
+            "\r\n"
+            "hello";
+
+        auto result = fixture.parse_complete(request);
+
+        REQUIRE(result == RequestParser::good_complete);
+        REQUIRE(fixture.content_ == convertToCharVec("hello"));
+    }
+    SECTION("should return bad for whitespace inside Content-Length") {
+        const std::string request =
+            "POST /uri HTTP/1.1\r\n"
+            "Host: 127.0.0.1\r\n"
+            "Content-Length: 1 0\r\n"
+            "\r\n";
+
+        REQUIRE(fixture.parse_complete(request) == RequestParser::bad);
+    }
+    SECTION("should return bad for a Content-Length equal to the 'not set' sentinel") {
+        // SIZE_MAX doubles as "no Content-Length seen". Accepting it as a value
+        // would hide the header from the duplicate check below.
+        const std::string sizeMax = std::to_string(std::numeric_limits<size_t>::max());
+        const std::string request =
+            "POST /uri HTTP/1.1\r\n"
+            "Host: 127.0.0.1\r\n"
+            "Content-Length: " +
+            sizeMax +
+            "\r\n"
+            "Content-Length: 5\r\n"
+            "\r\n"
+            "hello";
+
+        REQUIRE(fixture.parse_complete(request) == RequestParser::bad);
+    }
+    SECTION("should return bad for a Content-Length that overflows") {
+        const std::string request =
+            "POST /uri HTTP/1.1\r\n"
+            "Host: 127.0.0.1\r\n"
+            "Content-Length: 99999999999999999999999999\r\n"
+            "\r\n";
+
+        REQUIRE(fixture.parse_complete(request) == RequestParser::bad);
     }
 }
 

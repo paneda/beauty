@@ -11,14 +11,15 @@ namespace beauty {
 ConnectionManager::ConnectionManager(const Settings& settings)
     : settings_(settings), debugMsgCb_(defaultDebugMsgHandler) {}
 
+bool ConnectionManager::connectionLimitReached() const {
+    return settings_.connectionLimit_ != 0 && connections_.size() >= settings_.connectionLimit_;
+}
+
 void ConnectionManager::start(std::shared_ptr<Connection> c) {
     connections_.insert(c);
-    bool useKeepAlive = false;
-    if (settings_.keepAliveTimeout_ != std::chrono::seconds(0) &&
-        (settings_.connectionLimit_ == 0 ||  // 0 = unlimited
-         (settings_.connectionLimit_ > 0 && connections_.size() <= settings_.connectionLimit_))) {
-        useKeepAlive = true;
-    }
+    // connections_.size() includes the connection just inserted, so the soft
+    // threshold is evaluated against the new total.
+    bool useKeepAlive = keepAliveAllowed(settings_, connections_.size());
     c->start(useKeepAlive, settings_.keepAliveTimeout_, settings_.keepAliveMax_);
 }
 
@@ -62,23 +63,14 @@ void ConnectionManager::tick() {
             }
             it++;
             continue;
-        } else if ((*it)->useKeepAlive()) {
-            bool erase = false;
-            if (((*it)->getLastActivityTime() + settings_.keepAliveTimeout_ < now)) {
-                debugMsgCb_("Removing HTTP connection due to inactivity");
-                erase = true;
-            }
-            if ((*it)->getNrOfRequests() >= settings_.keepAliveMax_) {
-                debugMsgCb_("Removing HTTP connection due max request limit");
-                erase = true;
-            }
-
-            if (erase) {
-                (*it)->stop();
-                it = connections_.erase(it);
-            } else {
-                it++;
-            }
+        } else if (httpConnectionExpired(settings_,
+                                         (*it)->useKeepAlive(),
+                                         (*it)->getLastActivityTime(),
+                                         (*it)->getNrOfRequests(),
+                                         now)) {
+            debugMsgCb_("Removing HTTP connection due to inactivity or max request limit");
+            (*it)->stop();
+            it = connections_.erase(it);
         } else {
             it++;
         }

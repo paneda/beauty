@@ -42,10 +42,18 @@ class RequestHandler {
    private:
     void openAndReadFile(unsigned connectionId, const Request &req, Reply &rep);
     size_t readFromFile(unsigned connectionId, const Request &req, Reply &rep);
-    void writeFileParts(unsigned connectionId,
+    // Writes the given multipart parts to disk via the FileIO backend. Returns
+    // false when the upload was rejected outright (e.g. an unsafe filename), in
+    // which case a complete stock reply has already been set and the caller must
+    // stop processing the request; true otherwise.
+    bool writeFileParts(unsigned connectionId,
                         const Request &req,
                         Reply &rep,
                         std::deque<MultiPartParser::ContentPart> &parts);
+
+    // Rejects a multipart upload with 400 Bad Request, first telling the FileIO
+    // backend to abort every file that is still open for writing.
+    void rejectUpload(const Request &req, Reply &rep);
 
     static void defaultExpectContinueHandler(const Request &, Reply &rep);
 

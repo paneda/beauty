@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "beauty/header.hpp"
 #include "beauty/mime_types.hpp"
 #include "beauty/request_handler.hpp"
@@ -20,6 +22,30 @@ std::string combineUploadPaths(const std::string &dir, const std::string &filena
     } else {
         return dir + filename;
     }
+}
+
+// Reject upload filenames that could escape the intended directory. The request
+// URI is already validated against ".." in RequestDecoder, but the multipart
+// filename arrives separately in the Content-Disposition header and is never
+// seen by that check, so it must be validated independently before it is joined
+// with the request path and handed to the FileIO backend for writing.
+// A rooted filename ("/tmp/x", "//tmp/x", "\\tmp\\x") is rejected as well: joined
+// with the request path it can leave a repeated leading separator that is still
+// rooted after a backend strips one, replacing the document root.
+bool isUnsafeUploadFilename(const std::string &filename) {
+    if (filename.find("..") != std::string::npos) {
+        return true;
+    }
+    return !filename.empty() && (filename.front() == '/' || filename.front() == '\\');
+}
+
+bool hasUnsafeUploadFilename(const std::deque<MultiPartParser::ContentPart> &parts) {
+    for (const auto &part : parts) {
+        if (!part.filename_.empty() && isUnsafeUploadFilename(part.filename_)) {
+            return true;
+        }
+    }
+    return false;
 }
 }  // namespace
 
@@ -175,7 +201,10 @@ void RequestHandler::handleFileIOWrite(unsigned connectionId,
         return;
     }
 
-    writeFileParts(connectionId, req, rep, parts);
+    if (!writeFileParts(connectionId, req, rep, parts)) {
+        // Upload rejected (e.g. unsafe filename); a complete stock reply is set.
+        return;
+    }
     if (!rep.isStatusOk() && rep.status_ != Reply::status_type::no_content) {
         rep.addHeader("Content-Length", std::to_string(rep.content_.size()));
         return;
@@ -183,7 +212,9 @@ void RequestHandler::handleFileIOWrite(unsigned connectionId,
 
     if (result == MultiPartParser::result_type::done) {
         rep.multiPartParser_.flush(content, parts);
-        writeFileParts(connectionId, req, rep, parts);
+        if (!writeFileParts(connectionId, req, rep, parts)) {
+            return;
+        }
     }
 }
 
@@ -243,22 +274,43 @@ size_t RequestHandler::readFromFile(unsigned connectionId, const Request &req, R
     return nrReadBytes;
 }
 
-void RequestHandler::writeFileParts(unsigned connectionId,
+void RequestHandler::rejectUpload(const Request &req, Reply &rep) {
+    // A backend only closes a file on its last data, so files that are open
+    // and partially written must be aborted explicitly or their handles leak.
+    for (const auto &id : rep.openFilesForWrite_) {
+        fileIO_->abortWriteFile(id);
+    }
+    rep.openFilesForWrite_.clear();
+    rep.lastOpenFileForWriteId_.clear();
+    rep.stockReply(req, Reply::status_type::bad_request);
+}
+
+bool RequestHandler::writeFileParts(unsigned connectionId,
                                     const Request &req,
                                     Reply &rep,
                                     std::deque<MultiPartParser::ContentPart> &parts) {
+    const std::deque<MultiPartParser::ContentPart> &peakParts = rep.multiPartParser_.peakLastPart();
+
+    // Validate every filename seen so far before opening or writing anything
+    // in this call, so that a rejection never leaves a file opened here behind.
+    if (hasUnsafeUploadFilename(peakParts) || hasUnsafeUploadFilename(parts)) {
+        rejectUpload(req, rep);
+        return false;
+    }
+
     // It seems that some clients first deliver a "headerOnly" part of the
     // multipart (assumably checking for non successful response) and then in
     // successive request deliver the part data. If so, we handle this nicely
     // here by giving the client an early non-successful reply. However this
-    const std::deque<MultiPartParser::ContentPart> &peakParts = rep.multiPartParser_.peakLastPart();
     for (auto &part : peakParts) {
         if (part.headerOnly_ && !part.filename_.empty()) {
             rep.filePath_ = combineUploadPaths(req.requestPath_, part.filename_);
-            fileIO_->openFileForWrite(rep.filePath_ + std::to_string(connectionId), req, rep);
+            const std::string id = rep.filePath_ + std::to_string(connectionId);
+            fileIO_->openFileForWrite(id, req, rep);
             if (!rep.isStatusOk()) {
-                return;
+                return true;
             }
+            rep.openFilesForWrite_.push_back(id);
         }
     }
 
@@ -277,15 +329,23 @@ void RequestHandler::writeFileParts(unsigned connectionId,
                 rep.lastOpenFileForWriteId_ = rep.filePath_ + std::to_string(connectionId);
                 fileIO_->openFileForWrite(rep.lastOpenFileForWriteId_, req, rep);
                 if (!rep.isStatusOk()) {
-                    return;
+                    return true;
                 }
+                rep.openFilesForWrite_.push_back(rep.lastOpenFileForWriteId_);
             }
             size_t size = part.end_ - part.start_;
             fileIO_->writeFile(
                 rep.lastOpenFileForWriteId_, req, rep, &(*part.start_), size, part.foundEnd_);
+            if (part.foundEnd_) {
+                // The backend has seen the last data and closed the file.
+                rep.openFilesForWrite_.erase(std::remove(rep.openFilesForWrite_.begin(),
+                                                         rep.openFilesForWrite_.end(),
+                                                         rep.lastOpenFileForWriteId_),
+                                             rep.openFilesForWrite_.end());
+            }
             if (!rep.isStatusOk()) {
                 rep.lastOpenFileForWriteId_.clear();
-                return;
+                return true;
             }
             if (part.foundEnd_) {
                 rep.lastOpenFileForWriteId_.clear();
@@ -293,6 +353,7 @@ void RequestHandler::writeFileParts(unsigned connectionId,
             }
         }
     }
+    return true;
 }
 
 }  // namespace beauty

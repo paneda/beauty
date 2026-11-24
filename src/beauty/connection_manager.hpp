@@ -27,6 +27,12 @@ class ConnectionManager : public IWsSender {
     // Add the specified connection to the manager and start it.
     void start(std::shared_ptr<Connection> c);
 
+    // Returns true when the configured concurrent-connection limit has been
+    // reached and no further connections should be accepted. Always false when
+    // the limit is 0 (unlimited). Checked before a new Connection is created so
+    // its buffers are never allocated for a connection that would be refused.
+    bool connectionLimitReached() const;
+
     // Stop the specified connection.
     void stop(std::shared_ptr<Connection> c);
 

@@ -90,6 +90,15 @@ TEST_CASE("base64_decode", "[base64]") {
         std::string decoded = base64_decode("SGVsbG8sIFdvcmxkIQ==", 20);
         REQUIRE(decoded == "Hello, World!");
     }
+    SECTION("it should reject an invalid length of 4n+1 without overreading") {
+        // len % 4 == 1 is not a valid base64 length and previously read one
+        // byte past the end of the input. Use exactly len bytes so a sanitizer
+        // would catch any overread.
+        std::vector<char> input = {'Q'};
+        REQUIRE(base64_decode(input.data(), input.size()).empty());
+        std::vector<char> input5 = {'Q', 'U', 'J', 'D', 'Q'};
+        REQUIRE(base64_decode(input5.data(), input5.size()).empty());
+    }
 }
 
 TEST_CASE("base64_encode_to_buffer", "[base64]") {
@@ -225,6 +234,14 @@ TEST_CASE("base64_decode_to_buffer", "[base64]") {
         unsigned char buffer[10];
         size_t written = base64_decode_to_buffer("QU JD", 5, buffer, sizeof(buffer));
         REQUIRE(written == 0);  // Should fail - space is not valid
+    }
+
+    SECTION("it should reject an invalid length of 4n+1 without overreading") {
+        unsigned char buffer[10];
+        std::vector<char> input = {'Q'};
+        REQUIRE(base64_decode_to_buffer(input.data(), input.size(), buffer, sizeof(buffer)) == 0);
+        std::vector<char> input5 = {'Q', 'U', 'J', 'D', 'Q'};
+        REQUIRE(base64_decode_to_buffer(input5.data(), input5.size(), buffer, sizeof(buffer)) == 0);
     }
 }
 

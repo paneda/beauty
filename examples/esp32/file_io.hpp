@@ -33,6 +33,7 @@ class FileIO : public beauty::IFileIO {
                    const char* buf,
                    size_t size,
                    bool lastData) override;
+    void abortWriteFile(const std::string& id) override;
 
    private:
     // As we need to handle multiple connections that reads/writes different

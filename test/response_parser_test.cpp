@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <limits>
 #include <string>
 
 #include "beauty/response.hpp"
@@ -105,6 +106,113 @@ TEST_CASE("parse headers", "[response_parser]") {
             "\r\n");
         REQUIRE(result == ResponseParser::good_complete);
         REQUIRE(fixture.response.keepAlive_ == false);
+    }
+
+    SECTION("should reject conflicting Content-Length headers") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Length: 5\r\n"
+            "Content-Length: 10\r\n"
+            "\r\n"
+            "hello");
+        REQUIRE(result == ResponseParser::bad);
+    }
+
+    SECTION("should reject duplicate identical Content-Length headers") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Length: 5\r\n"
+            "Content-Length: 5\r\n"
+            "\r\n"
+            "hello");
+        REQUIRE(result == ResponseParser::bad);
+    }
+
+    SECTION("should reject a non-numeric Content-Length") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Length: notanumber\r\n"
+            "\r\n");
+        REQUIRE(result == ResponseParser::bad);
+    }
+
+    SECTION("should reject a signed Content-Length") {
+        // strtoull accepts a sign, but Content-Length is 1*DIGIT.
+        for (const std::string value : {"+5", "-0", "-5", "5x", "0x10"}) {
+            ResponseFixture f(1024);
+            INFO("Content-Length value: '" << value << "'");
+            auto result = f.parse_complete("HTTP/1.1 200 OK\r\n"
+                                           "Content-Length: " +
+                                           value +
+                                           "\r\n"
+                                           "\r\n"
+                                           "hello");
+            REQUIRE(result == ResponseParser::bad);
+        }
+    }
+
+    SECTION("should accept optional whitespace around Content-Length") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Length:   5  \r\n"
+            "\r\n"
+            "hello");
+        REQUIRE(result == ResponseParser::good_complete);
+        REQUIRE(fixture.response.getContentLength() == 5);
+    }
+
+    SECTION("should reject an empty Content-Length") {
+        // No space after the colon takes a separate parser path.
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Length:\r\n"
+            "\r\n"
+            "hello");
+        REQUIRE(result == ResponseParser::bad);
+    }
+
+    SECTION("should reject an empty Content-Length followed by a second one") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Length:\r\n"
+            "Content-Length: 5\r\n"
+            "\r\n"
+            "hello");
+        REQUIRE(result == ResponseParser::bad);
+    }
+
+    SECTION("should still accept other headers with an empty value") {
+        auto result = fixture.parse_complete(
+            "HTTP/1.1 200 OK\r\n"
+            "X-Empty:\r\n"
+            "Content-Length: 5\r\n"
+            "\r\n"
+            "hello");
+        REQUIRE(result == ResponseParser::good_complete);
+    }
+
+    SECTION("should reject a Content-Length equal to the 'not set' sentinel") {
+        // SIZE_MAX doubles as "no Content-Length seen". Accepting it as a value
+        // would hide the header from the duplicate check and select the
+        // read-until-close body path.
+        const std::string sizeMax = std::to_string(std::numeric_limits<size_t>::max());
+        auto result = fixture.parse_complete("HTTP/1.1 200 OK\r\n"
+                                             "Content-Length: " +
+                                             sizeMax +
+                                             "\r\n"
+                                             "\r\n"
+                                             "hello");
+        REQUIRE(result == ResponseParser::bad);
+
+        ResponseFixture f2(1024);
+        result = f2.parse_complete("HTTP/1.1 200 OK\r\n"
+                                   "Content-Length: " +
+                                   sizeMax +
+                                   "\r\n"
+                                   "Content-Length: 5\r\n"
+                                   "\r\n"
+                                   "hello");
+        REQUIRE(result == ResponseParser::bad);
     }
 }
 

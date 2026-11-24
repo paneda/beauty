@@ -71,3 +71,15 @@ void FileIO::writeFile(const std::string& id,
         reply.send(Reply::status_type::created);
     }
 }
+
+void FileIO::abortWriteFile(const std::string& id) {
+    auto it = openWriteFiles_.find(id);
+    if (it == openWriteFiles_.end()) {
+        return;
+    }
+    // The upload was abandoned, so do not leave a truncated file behind.
+    const std::string fullPath = it->second.path();
+    it->second.close();
+    openWriteFiles_.erase(it);
+    LittleFS.remove(fullPath.c_str());
+}
